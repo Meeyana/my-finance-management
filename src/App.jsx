@@ -135,6 +135,7 @@ export default function App() {
     if (!user) return;
     setIsLoading(true);
 
+    // Sync Transactions
     const txQuery = query(
       collection(db, 'artifacts', appId, 'public', 'data', 'transactions')
     );
@@ -149,6 +150,7 @@ export default function App() {
       setIsLoading(false);
     });
 
+    // Sync Budgets
     const budgetRef = doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config');
     const unsubBudget = onSnapshot(budgetRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -156,6 +158,7 @@ export default function App() {
       }
     }, (error) => console.error("Error fetching budgets:", error));
 
+    // Sync Note Stats
     const notesRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'notes');
     const unsubNotes = onSnapshot(notesRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -341,7 +344,8 @@ export default function App() {
         <select 
           value={viewMonth} 
           onChange={(e) => setViewMonth(parseInt(e.target.value))}
-          className="p-1 text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded touch-manipulation"
+          // iOS FIX: text-base prevents zoom on focus
+          className="p-1 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded"
         >
           {Array.from({ length: 12 }, (_, i) => (
             <option key={i} value={i}>Tháng {i + 1}</option>
@@ -352,7 +356,8 @@ export default function App() {
       <select 
         value={viewYear} 
         onChange={(e) => setViewYear(parseInt(e.target.value))}
-        className="p-1 text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded touch-manipulation"
+        // iOS FIX: text-base prevents zoom on focus
+        className="p-1 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded"
       >
         {Array.from({ length: 5 }, (_, i) => (
           <option key={i} value={new Date().getFullYear() - 2 + i}>
@@ -397,11 +402,13 @@ export default function App() {
 
     return (
       <div className="space-y-6 animate-fade-in pb-12">
+        {/* User Welcome */}
         <div className="mb-4">
             <h2 className="text-2xl font-bold text-gray-800">Xin chào, Tuấn Phan</h2>
             <p className="text-gray-500">Đây là tình hình tài chính tháng này của bạn.</p>
         </div>
 
+        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-200 shadow-lg border-none relative overflow-hidden">
             <div className="relative z-10">
@@ -533,13 +540,13 @@ export default function App() {
                 <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold w-full sm:w-auto">
                   <button 
                     onClick={() => setChartMode('daily')}
-                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all touch-manipulation ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
                     Ngày
                   </button>
                   <button 
                     onClick={() => setChartMode('monthly')}
-                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all touch-manipulation ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
                     Tháng
                   </button>
@@ -548,7 +555,8 @@ export default function App() {
               
               <div className="self-end w-full sm:w-auto">
                  <select
-                   className="w-full sm:w-auto p-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-100 outline-none text-gray-600 font-medium touch-manipulation"
+                   // iOS FIX: text-base
+                   className="w-full sm:w-auto p-2 text-base sm:text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-100 outline-none text-gray-600 font-medium"
                    value={chartCategoryFilter}
                    onChange={(e) => setChartCategoryFilter(e.target.value)}
                  >
@@ -591,7 +599,7 @@ export default function App() {
           </Card>
         </div>
 
-        {/* --- ACTUAL VS BUDGET CHART --- */}
+        {/* --- ACTUAL VS BUDGET CHART (RESTORED) --- */}
         <Card>
           <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
             <Settings size={20} className="text-gray-400" /> Thực tế vs Ngân sách
@@ -622,13 +630,13 @@ export default function App() {
                 <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]}>
                    {
                       spendingByCategory.map((entry, index) => {
-                        let barColor = '#3B82F6'; 
+                        let barColor = '#3B82F6'; // Default blue
                         if (entry.budget > 0) {
                           const ratio = entry.value / entry.budget;
                           if (ratio > 1) {
-                            barColor = '#EF4444'; 
+                            barColor = '#EF4444'; // Red (>100%)
                           } else if (ratio >= 0.8) {
-                            barColor = '#F59E0B'; 
+                            barColor = '#F59E0B'; // Orange (80-100%)
                           }
                         }
                         return <Cell key={`cell-${index}`} fill={barColor} />;
@@ -694,7 +702,7 @@ export default function App() {
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in overflow-hidden my-4">
           <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3>
-            <button onClick={onClose} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors touch-manipulation"><X size={18} className="text-gray-600"/></button>
+            <button onClick={onClose} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors"><X size={18} className="text-gray-600"/></button>
           </div>
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             <div>
@@ -703,7 +711,7 @@ export default function App() {
                 <input 
                   type="number" 
                   required
-                  className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white touch-manipulation"
+                  className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white"
                   value={formData.amount}
                   onChange={e => setFormData({...formData, amount: e.target.value})}
                   placeholder="0"
@@ -714,7 +722,7 @@ export default function App() {
             </div>
             
             <div 
-              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer touch-manipulation select-none ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
+              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
               onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
             >
               <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>
@@ -729,7 +737,8 @@ export default function App() {
                 <input 
                   type="date" 
                   required
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-sm font-medium text-gray-700 touch-manipulation"
+                  // iOS FIX: text-base
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700"
                   value={formData.date}
                   onChange={e => setFormData({...formData, date: e.target.value})}
                 />
@@ -737,7 +746,8 @@ export default function App() {
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label>
                 <select 
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-sm font-medium text-gray-700 touch-manipulation"
+                  // iOS FIX: text-base
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700"
                   value={formData.category}
                   onChange={e => setFormData({...formData, category: e.target.value})}
                 >
@@ -749,18 +759,20 @@ export default function App() {
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label>
               <input 
                 type="text" 
-                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-sm font-medium text-gray-700 placeholder:text-gray-300 touch-manipulation"
+                // iOS FIX: text-base
+                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300"
                 value={formData.note}
                 onChange={handleNoteChange}
                 placeholder="Nhập ghi chú..."
               />
+              {/* Suggestion Dropdown */}
               {suggestions.length > 0 && (
                 <div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">
                   {suggestions.map((s, idx) => (
                     <div 
                       key={idx}
                       onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }}
-                      className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 touch-manipulation"
+                      className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2"
                     >
                       <List size={14} className="text-gray-400" />
                       {s}
@@ -769,7 +781,7 @@ export default function App() {
                 </div>
               )}
             </div>
-            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] transition-all touch-manipulation">
+            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] transition-all">
               Lưu Giao Dịch
             </button>
           </form>
@@ -814,13 +826,14 @@ export default function App() {
               <input 
                 type="text" 
                 placeholder="Tìm kiếm..." 
-                className="w-full pl-10 p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white touch-manipulation"
+                className="w-full pl-10 p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
             <select 
-              className="p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-full md:min-w-[180px] text-sm font-medium text-gray-600 touch-manipulation"
+              // iOS FIX: text-base
+              className="p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-full md:min-w-[180px] text-base sm:text-sm font-medium text-gray-600"
               value={filterCategory}
               onChange={e => setFilterCategory(e.target.value)}
             >
@@ -857,7 +870,8 @@ export default function App() {
                     <td className="px-6 py-4 text-center">
                       <button 
                         onClick={() => deleteTransaction(tx.id)}
-                        className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 touch-manipulation"
+                        // iOS FIX: Always visible on mobile (opacity-100), hidden on desktop until hover
+                        className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -895,7 +909,7 @@ export default function App() {
             </div>
             <button 
                 onClick={() => saveBudgetsToDb(tempBudgets)}
-                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black font-bold shadow-lg transition-all active:scale-95 w-full md:w-auto justify-center touch-manipulation"
+                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black font-bold shadow-lg transition-all active:scale-95 w-full md:w-auto justify-center"
             >
                 <Save size={18} /> Lưu thay đổi
             </button>
@@ -924,7 +938,7 @@ export default function App() {
                         <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Hạn mức tháng</label>
                         <input 
                             type="number" 
-                            className="w-full text-xl font-bold border-b-2 border-slate-100 focus:border-gray-800 outline-none py-2 transition-colors bg-transparent text-gray-800 touch-manipulation"
+                            className="w-full text-xl font-bold border-b-2 border-slate-100 focus:border-gray-800 outline-none py-2 transition-colors bg-transparent text-gray-800"
                             value={currentVal}
                             onChange={(e) => setTempBudgets({...tempBudgets, [cat.id]: Number(e.target.value)})}
                             placeholder="0"
@@ -944,10 +958,11 @@ export default function App() {
   const SidebarItem = ({ id, label, icon: Icon, active }) => (
     <button 
       onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
-      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium touch-manipulation select-none ${
+      // iOS FIX: Added active:bg-gray-200 for immediate touch feedback
+      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium active:bg-gray-200 active:scale-[0.98] ${
         active 
         ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' 
-        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 active:bg-slate-200'
+        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
       }`}
     >
       <Icon size={20} className={active ? 'text-white' : 'text-gray-400'} />
@@ -957,19 +972,20 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-gray-800 font-sans flex flex-col md:flex-row overflow-x-hidden selection:bg-blue-100 selection:text-blue-900">
-      
-      {/* Mobile Overlay Backdrop - KEY FIX FOR MOBILE MENU */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
+      {/* iOS FIX: Global Styles for touch manipulation and scroll */}
+      <style>{`
+        html, body {
+          -webkit-tap-highlight-color: transparent;
+        }
+        button, a, input, select {
+          touch-action: manipulation;
+        }
+      `}</style>
 
       {/* Mobile Header */}
       <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-30 border-b border-gray-100">
         <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">Tuấn Phan</h1>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 touch-manipulation"><Menu size={24}/></button>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 transition-colors"><Menu size={24}/></button>
       </div>
 
       {/* Sidebar */}
@@ -1018,7 +1034,7 @@ export default function App() {
           
           <button 
             onClick={() => setShowAddModal(true)}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm touch-manipulation"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"
           >
             <PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span>
           </button>
