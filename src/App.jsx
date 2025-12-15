@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LabelList, Sector
+  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LabelList 
 } from 'recharts';
 import { 
   LayoutDashboard, Wallet, Receipt, PlusCircle, Settings, 
@@ -28,9 +28,18 @@ const firebaseConfig = {
   appId: "1:31622801510:web:2d6eeb5ab18f7e3a06a5a7"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Initialize Firebase only once
+let app;
+let auth;
+let db;
+
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (error) {
+  console.error("Firebase init error", error);
+}
 
 // Use a fixed App ID for personal use
 const appId = 'quan-ly-chi-tieu-personal';
@@ -89,14 +98,15 @@ const Badge = ({ color, children }) => (
   </span>
 );
 
-// iOS Friendly Select Component
+// iOS Friendly Select Component - UPDATED FOR IOS
 const IOSSelect = ({ value, onChange, options, icon: Icon, className = "" }) => (
-  <div className={`relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-100 transition-all ${className}`}>
+  <div className={`relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-100 transition-all touch-manipulation ${className}`}>
     {Icon && <Icon size={18} className="absolute left-3 text-gray-400 pointer-events-none z-10" />}
     <select 
       value={value} 
       onChange={onChange}
-      className={`w-full appearance-none bg-transparent py-2.5 ${Icon ? 'pl-10' : 'pl-4'} pr-10 text-sm font-semibold text-gray-700 outline-none cursor-pointer z-20 relative`}
+      // Added text-base (16px) to prevent iOS zoom
+      className={`w-full appearance-none bg-transparent py-3 ${Icon ? 'pl-10' : 'pl-4'} pr-10 text-base sm:text-sm font-semibold text-gray-700 outline-none cursor-pointer z-20 relative`}
     >
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -107,41 +117,6 @@ const IOSSelect = ({ value, onChange, options, icon: Icon, className = "" }) => 
     </div>
   </div>
 );
-
-// --- PIE CHART ACTIVE SHAPE ---
-const renderActiveShape = (props) => {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
-
-  return (
-    <g>
-      <text x={cx} y={cy} dy={-10} textAnchor="middle" fill="#374151" className="text-sm font-bold">
-        {payload.name}
-      </text>
-      <text x={cx} y={cy} dy={15} textAnchor="middle" fill="#6B7280" className="text-xs">
-        {formatShortCurrency(value)} ({(percent * 100).toFixed(0)}%)
-      </text>
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius}
-        outerRadius={outerRadius + 8}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-      />
-      <Sector
-        cx={cx}
-        cy={cy}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        innerRadius={innerRadius - 6}
-        outerRadius={innerRadius - 2}
-        fill={fill}
-      />
-    </g>
-  );
-};
-
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -160,7 +135,6 @@ export default function App() {
   // --- CHART STATE ---
   const [chartMode, setChartMode] = useState('daily');
   const [chartCategoryFilter, setChartCategoryFilter] = useState('all');
-  const [pieActiveIndex, setPieActiveIndex] = useState(0); // State for Pie Chart
 
   // --- 1. AUTHENTICATION ---
   useEffect(() => {
@@ -169,26 +143,28 @@ export default function App() {
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                 await signInWithCustomToken(auth, __initial_auth_token);
             } else {
-                throw new Error("No token provided");
+                // Fallback silently if no token (dev mode) or try anon
+                 await signInAnonymously(auth);
             }
         } catch (error) {
-            console.warn("Auth with token failed, falling back to anonymous:", error);
-            try {
-                await signInAnonymously(auth);
-            } catch (anonError) {
-                console.error("Anonymous auth failed:", anonError);
-            }
+            console.warn("Auth failed:", error);
         }
     };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        setUser(currentUser);
+        // Only stop loading if we actually have a user or if auth is done checking
+        if (!currentUser) setIsLoading(false); 
+    });
     return () => unsubscribe();
   }, []);
 
   // --- 2. DATA SYNC ---
   useEffect(() => {
     if (!user) return;
-    setIsLoading(true);
+    
+    // Don't set isLoading(true) here to avoid UI flashing on updates
+    // Just show loading initially
 
     const txQuery = query(
       collection(db, 'artifacts', appId, 'public', 'data', 'transactions')
@@ -251,7 +227,8 @@ export default function App() {
 
   const deleteTransaction = async (id) => {
     if (!user) return;
-    if (confirm('Bạn có chắc muốn xóa giao dịch này?')) {
+    // Use window.confirm properly
+    if (window.confirm('Bạn có chắc muốn xóa giao dịch này?')) {
       try {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id));
       } catch (e) {
@@ -366,6 +343,29 @@ export default function App() {
   }, [currentYearTransactions, viewYear, chartCategoryFilter]);
 
   // --- SUB-COMPONENTS ---
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius * 1.1; 
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    if (percent === 0) return null;
+
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        fill="#374151" 
+        textAnchor={x > cx ? 'start' : 'end'} 
+        dominantBaseline="central"
+        fontSize="12"
+        fontWeight="bold"
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+
   const FilterBar = () => {
     const monthOptions = Array.from({ length: 12 }, (_, i) => ({ value: i, label: `Tháng ${i + 1}` }));
     const yearOptions = Array.from({ length: 5 }, (_, i) => {
@@ -425,8 +425,6 @@ export default function App() {
       });
       return results;
     }, [spendingByCategory]);
-
-    const pieData = spendingByCategory.filter(i => i.value > 0);
 
     return (
       <div className="space-y-6 animate-fade-in pb-12">
@@ -519,68 +517,41 @@ export default function App() {
   
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="min-h-[420px] flex flex-col">
+          <Card className="min-h-[420px]">
             <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
               <PieChart size={20} className="text-gray-400" /> Phân bổ chi tiêu
             </h4>
-            
-            <div className="flex-1 flex flex-col md:flex-row items-center justify-between gap-4">
-              {/* Interactive Donut Chart */}
-              <div className="h-64 w-64 relative flex-shrink-0">
-                 {totalSpent > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        activeIndex={pieActiveIndex}
-                        activeShape={renderActiveShape}
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={70}
-                        outerRadius={90}
-                        dataKey="value"
-                        onMouseEnter={(_, index) => setPieActiveIndex(index)}
-                        stroke="none"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                 ) : (
-                   <div className="h-full flex flex-col items-center justify-center text-gray-400 border-4 border-slate-100 rounded-full">
-                     <Database size={32} className="mb-2 opacity-20" />
-                     <p className="text-xs">Chưa có dữ liệu</p>
-                   </div>
-                 )}
-              </div>
-
-              {/* Custom Legend */}
-              <div className="flex-1 w-full overflow-y-auto max-h-64 pr-2">
-                 <div className="space-y-3">
-                    {pieData.map((entry, index) => (
-                      <div 
-                        key={entry.id} 
-                        className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${pieActiveIndex === index ? 'bg-slate-50 border border-slate-100' : 'hover:bg-slate-50'}`}
-                        onMouseEnter={() => setPieActiveIndex(index)}
-                      >
-                         <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full" style={{backgroundColor: entry.color}}></div>
-                            <span className={`text-sm ${pieActiveIndex === index ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
-                              {entry.name}
-                            </span>
-                         </div>
-                         <div className="text-right">
-                           <p className={`text-sm ${pieActiveIndex === index ? 'font-bold text-gray-900' : 'text-gray-700'}`}>
-                             {formatShortCurrency(entry.value)}
-                           </p>
-                           <p className="text-xs text-gray-400">{(entry.percentage).toFixed(1)}%</p>
-                         </div>
-                      </div>
-                    ))}
+            <div className="h-80 w-full">
+               {totalSpent > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={spendingByCategory.filter(i => i.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={80}
+                      outerRadius={110}
+                      paddingAngle={4}
+                      dataKey="value"
+                      label={renderCustomizedLabel}
+                    >
+                      {spendingByCategory.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={2} stroke="#fff" />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      formatter={(value) => formatCurrency(value)} 
+                      contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}}
+                    />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle"/>
+                  </PieChart>
+                </ResponsiveContainer>
+               ) : (
+                 <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                   <Database size={48} className="mb-2 opacity-10" />
+                   <p className="text-sm">Chưa có dữ liệu</p>
                  </div>
-              </div>
+               )}
             </div>
           </Card>
   
@@ -595,13 +566,13 @@ export default function App() {
                 <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold w-full sm:w-auto">
                   <button 
                     onClick={() => setChartMode('daily')}
-                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all touch-manipulation ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
                     Ngày
                   </button>
                   <button 
                     onClick={() => setChartMode('monthly')}
-                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all touch-manipulation ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
                     Tháng
                   </button>
@@ -756,7 +727,7 @@ export default function App() {
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in overflow-hidden my-4">
           <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3>
-            <button onClick={onClose} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors"><X size={18} className="text-gray-600"/></button>
+            <button onClick={onClose} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors touch-manipulation"><X size={18} className="text-gray-600"/></button>
           </div>
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             <div>
@@ -765,6 +736,7 @@ export default function App() {
                 <input 
                   type="number" 
                   required
+                  // Text-base prevents iOS zoom
                   className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white"
                   value={formData.amount}
                   onChange={e => setFormData({...formData, amount: e.target.value})}
@@ -776,7 +748,7 @@ export default function App() {
             </div>
             
             <div 
-              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
+              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer touch-manipulation ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
               onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
             >
               <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>
@@ -791,7 +763,8 @@ export default function App() {
                 <input 
                   type="date" 
                   required
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-sm font-medium text-gray-700 appearance-none bg-white"
+                  // Text-base prevents iOS zoom
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 appearance-none bg-white"
                   value={formData.date}
                   onChange={e => setFormData({...formData, date: e.target.value})}
                 />
@@ -800,7 +773,8 @@ export default function App() {
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label>
                 <div className="relative">
                   <select 
-                    className="w-full p-3 pr-10 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-sm font-medium text-gray-700 appearance-none"
+                    // Text-base prevents iOS zoom
+                    className="w-full p-3 pr-10 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700 appearance-none"
                     value={formData.category}
                     onChange={e => setFormData({...formData, category: e.target.value})}
                   >
@@ -814,7 +788,8 @@ export default function App() {
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label>
               <input 
                 type="text" 
-                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-sm font-medium text-gray-700 placeholder:text-gray-300"
+                // Text-base prevents iOS zoom
+                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300"
                 value={formData.note}
                 onChange={handleNoteChange}
                 placeholder="Nhập ghi chú..."
@@ -835,7 +810,7 @@ export default function App() {
                 </div>
               )}
             </div>
-            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] transition-all">
+            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] transition-all touch-manipulation">
               Lưu Giao Dịch
             </button>
           </form>
@@ -880,7 +855,8 @@ export default function App() {
               <input 
                 type="text" 
                 placeholder="Tìm kiếm..." 
-                className="w-full pl-10 p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white"
+                // Text-base prevents iOS zoom
+                className="w-full pl-10 p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-base sm:text-sm"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -888,7 +864,8 @@ export default function App() {
             <div className="w-full md:w-[200px]">
               <div className="relative">
                 <select 
-                  className="w-full p-2.5 pr-10 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm font-medium text-gray-600 appearance-none"
+                  // Text-base prevents iOS zoom
+                  className="w-full p-2.5 pr-10 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-600 appearance-none"
                   value={filterCategory}
                   onChange={e => setFilterCategory(e.target.value)}
                 >
@@ -928,7 +905,7 @@ export default function App() {
                     <td className="px-6 py-4 text-center">
                       <button 
                         onClick={() => deleteTransaction(tx.id)}
-                        className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                        className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 touch-manipulation"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -966,7 +943,7 @@ export default function App() {
             </div>
             <button 
                 onClick={() => saveBudgetsToDb(tempBudgets)}
-                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black font-bold shadow-lg transition-all active:scale-95 w-full md:w-auto justify-center"
+                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black font-bold shadow-lg transition-all active:scale-95 w-full md:w-auto justify-center touch-manipulation"
             >
                 <Save size={18} /> Lưu thay đổi
             </button>
@@ -1012,10 +989,25 @@ export default function App() {
   };
 
   // --- MAIN RENDER ---
+  const handleTabChange = (id) => {
+    // 1. Close Menu Immediately
+    setIsMobileMenuOpen(false);
+    
+    // 2. Defer tab switch slightly to allow menu close animation to start smoothly
+    // This fixes the "laggy" feeling where menu freezes while content loads
+    if (window.innerWidth < 768) {
+        setTimeout(() => {
+            setActiveTab(id);
+        }, 150);
+    } else {
+        setActiveTab(id);
+    }
+  };
+
   const SidebarItem = ({ id, label, icon: Icon, active }) => (
     <button 
-      onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
-      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium ${
+      onClick={() => handleTabChange(id)}
+      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium touch-manipulation ${
         active 
         ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' 
         : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
@@ -1031,37 +1023,28 @@ export default function App() {
       {/* Mobile Header */}
       <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-30 border-b border-gray-100">
         <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">Tuấn Phan</h1>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"><Menu size={24}/></button>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 touch-manipulation"><Menu size={24}/></button>
       </div>
 
-      {/* Mobile Menu Overlay */}
+      {/* BACKDROP FOR MOBILE MENU - Crucial for UX */}
       {isMobileMenuOpen && (
         <div 
-            className="fixed inset-0 bg-black/40 z-30 backdrop-blur-sm md:hidden"
+            className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
             onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none`}>
-        <div className="p-8 border-b border-slate-50">
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">
-                        T
-                    </div>
-                    <div>
-                        <h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">Tuấn Phan</h1>
-                        <p className="text-xs text-gray-400 font-medium mt-1">Personal Finance</p>
-                    </div>
+        <div className="p-8 border-b border-slate-50 hidden md:block">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">
+                    T
                 </div>
-                {/* Mobile Close Button */}
-                <button 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="md:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-500"
-                >
-                  <X size={20} />
-                </button>
+                <div>
+                    <h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">Tuấn Phan</h1>
+                    <p className="text-xs text-gray-400 font-medium mt-1">Personal Finance</p>
+                </div>
             </div>
         </div>
         
@@ -1088,7 +1071,7 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 h-screen overflow-y-auto bg-slate-50 relative scroll-smooth">
+      <main className="flex-1 h-screen overflow-y-auto bg-slate-50 relative scroll-smooth touch-pan-y">
         {/* Global Header */}
         <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-20 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
           <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -1097,7 +1080,7 @@ export default function App() {
           
           <button 
             onClick={() => setShowAddModal(true)}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm touch-manipulation"
           >
             <PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span>
           </button>
