@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Wallet, Receipt, PlusCircle, Settings, 
   TrendingUp, TrendingDown, Search, Trash2, Save,
   Menu, X, Database, Calendar, Filter, AlertCircle, BarChart2, ArrowUpRight, ArrowDownRight,
-  List, AlertTriangle,
+  List, AlertTriangle, ChevronDown,
   Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal, Briefcase, User
 } from 'lucide-react';
 
@@ -89,6 +89,25 @@ const Badge = ({ color, children }) => (
   </span>
 );
 
+// iOS Friendly Select Component
+const IOSSelect = ({ value, onChange, options, icon: Icon, className = "" }) => (
+  <div className={`relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-100 transition-all ${className}`}>
+    {Icon && <Icon size={18} className="absolute left-3 text-gray-400 pointer-events-none z-10" />}
+    <select 
+      value={value} 
+      onChange={onChange}
+      className={`w-full appearance-none bg-transparent py-2.5 ${Icon ? 'pl-10' : 'pl-4'} pr-10 text-sm font-semibold text-gray-700 outline-none cursor-pointer z-20 relative`}
+    >
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+      <ChevronDown size={16} className="text-gray-400" />
+    </div>
+  </div>
+);
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -111,14 +130,12 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
         try {
-            // Logic fix: Try environment token first, but catch error if config mismatches
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                 await signInWithCustomToken(auth, __initial_auth_token);
             } else {
                 throw new Error("No token provided");
             }
         } catch (error) {
-            // Fallback to anonymous auth if token fails (e.g., mismatch project) or no token
             console.warn("Auth with token failed, falling back to anonymous:", error);
             try {
                 await signInAnonymously(auth);
@@ -137,7 +154,6 @@ export default function App() {
     if (!user) return;
     setIsLoading(true);
 
-    // Sync Transactions
     const txQuery = query(
       collection(db, 'artifacts', appId, 'public', 'data', 'transactions')
     );
@@ -152,7 +168,6 @@ export default function App() {
       setIsLoading(false);
     });
 
-    // Sync Budgets
     const budgetRef = doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config');
     const unsubBudget = onSnapshot(budgetRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -160,7 +175,6 @@ export default function App() {
       }
     }, (error) => console.error("Error fetching budgets:", error));
 
-    // Sync Note Stats
     const notesRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'notes');
     const unsubNotes = onSnapshot(notesRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -339,34 +353,33 @@ export default function App() {
     );
   };
 
-  const FilterBar = () => (
-    <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl shadow-sm border border-slate-100 w-full sm:w-auto justify-between sm:justify-start">
-      <div className="flex items-center gap-2">
-        <Calendar size={18} className="text-gray-400" />
-        <select 
-          value={viewMonth} 
-          onChange={(e) => setViewMonth(parseInt(e.target.value))}
-          className="p-1 text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded"
-        >
-          {Array.from({ length: 12 }, (_, i) => (
-            <option key={i} value={i}>Tháng {i + 1}</option>
-          ))}
-        </select>
-      </div>
-      <span className="text-gray-200">|</span>
-      <select 
-        value={viewYear} 
-        onChange={(e) => setViewYear(parseInt(e.target.value))}
-        className="p-1 text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded"
-      >
-        {Array.from({ length: 5 }, (_, i) => (
-          <option key={i} value={new Date().getFullYear() - 2 + i}>
-            {new Date().getFullYear() - 2 + i}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
+  const FilterBar = () => {
+    const monthOptions = Array.from({ length: 12 }, (_, i) => ({ value: i, label: `Tháng ${i + 1}` }));
+    const yearOptions = Array.from({ length: 5 }, (_, i) => {
+        const y = new Date().getFullYear() - 2 + i;
+        return { value: y, label: `Năm ${y}` };
+    });
+
+    return (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+            <div className="w-full sm:w-36">
+                <IOSSelect 
+                    icon={Calendar}
+                    value={viewMonth}
+                    onChange={(e) => setViewMonth(parseInt(e.target.value))}
+                    options={monthOptions}
+                />
+            </div>
+            <div className="w-full sm:w-32">
+                 <IOSSelect 
+                    value={viewYear}
+                    onChange={(e) => setViewYear(parseInt(e.target.value))}
+                    options={yearOptions}
+                />
+            </div>
+        </div>
+    );
+  };
 
   const DashboardView = () => {
     const currentChartData = chartMode === 'daily' ? dailySpendingData : monthlySpendingData;
@@ -553,18 +566,18 @@ export default function App() {
                 </div>
               </div>
               
-              <div className="self-end w-full sm:w-auto">
-                 <select
-                   className="w-full sm:w-auto p-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-100 outline-none text-gray-600 font-medium"
+              <div className="self-end w-full sm:w-auto sm:w-40">
+                 <IOSSelect
                    value={chartCategoryFilter}
                    onChange={(e) => setChartCategoryFilter(e.target.value)}
-                 >
-                   <option value="all">Tất cả mục</option>
-                   <option value="eating">Ăn uống</option>
-                   <option value="entertainment">Giải trí</option>
-                   <option value="fuel">Đi lại</option>
-                   <option value="shopping">Mua sắm</option>
-                 </select>
+                   options={[
+                     {value: "all", label: "Tất cả mục"},
+                     {value: "eating", label: "Ăn uống"},
+                     {value: "entertainment", label: "Giải trí"},
+                     {value: "fuel", label: "Đi lại"},
+                     {value: "shopping", label: "Mua sắm"}
+                   ]}
+                 />
               </div>
             </div>
 
@@ -736,20 +749,23 @@ export default function App() {
                 <input 
                   type="date" 
                   required
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-sm font-medium text-gray-700"
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-sm font-medium text-gray-700 appearance-none bg-white"
                   value={formData.date}
                   onChange={e => setFormData({...formData, date: e.target.value})}
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label>
-                <select 
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-sm font-medium text-gray-700"
-                  value={formData.category}
-                  onChange={e => setFormData({...formData, category: e.target.value})}
-                >
-                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <div className="relative">
+                  <select 
+                    className="w-full p-3 pr-10 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-sm font-medium text-gray-700 appearance-none"
+                    value={formData.category}
+                    onChange={e => setFormData({...formData, category: e.target.value})}
+                  >
+                    {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
               </div>
             </div>
             <div className="relative">
@@ -827,14 +843,19 @@ export default function App() {
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <select 
-              className="p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-full md:min-w-[180px] text-sm font-medium text-gray-600"
-              value={filterCategory}
-              onChange={e => setFilterCategory(e.target.value)}
-            >
-              <option value="all">Tất cả danh mục</option>
-              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <div className="w-full md:w-[200px]">
+              <div className="relative">
+                <select 
+                  className="w-full p-2.5 pr-10 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm font-medium text-gray-600 appearance-none"
+                  value={filterCategory}
+                  onChange={e => setFilterCategory(e.target.value)}
+                >
+                  <option value="all">Tất cả danh mục</option>
+                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
