@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LabelList 
+  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LabelList, Sector
 } from 'recharts';
 import { 
   LayoutDashboard, Wallet, Receipt, PlusCircle, Settings, 
@@ -108,6 +108,41 @@ const IOSSelect = ({ value, onChange, options, icon: Icon, className = "" }) => 
   </div>
 );
 
+// --- PIE CHART ACTIVE SHAPE ---
+const renderActiveShape = (props) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
+
+  return (
+    <g>
+      <text x={cx} y={cy} dy={-10} textAnchor="middle" fill="#374151" className="text-sm font-bold">
+        {payload.name}
+      </text>
+      <text x={cx} y={cy} dy={15} textAnchor="middle" fill="#6B7280" className="text-xs">
+        {formatShortCurrency(value)} ({(percent * 100).toFixed(0)}%)
+      </text>
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius + 8}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+      />
+      <Sector
+        cx={cx}
+        cy={cy}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        innerRadius={innerRadius - 6}
+        outerRadius={innerRadius - 2}
+        fill={fill}
+      />
+    </g>
+  );
+};
+
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -125,6 +160,7 @@ export default function App() {
   // --- CHART STATE ---
   const [chartMode, setChartMode] = useState('daily');
   const [chartCategoryFilter, setChartCategoryFilter] = useState('all');
+  const [pieActiveIndex, setPieActiveIndex] = useState(0); // State for Pie Chart
 
   // --- 1. AUTHENTICATION ---
   useEffect(() => {
@@ -330,29 +366,6 @@ export default function App() {
   }, [currentYearTransactions, viewYear, chartCategoryFilter]);
 
   // --- SUB-COMPONENTS ---
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
-    const RADIAN = Math.PI / 180;
-    const radius = outerRadius * 1.1; 
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-    if (percent === 0) return null;
-
-    return (
-      <text 
-        x={x} 
-        y={y} 
-        fill="#374151" 
-        textAnchor={x > cx ? 'start' : 'end'} 
-        dominantBaseline="central"
-        fontSize="12"
-        fontWeight="bold"
-      >
-        {`${(percent * 100).toFixed(0)}%`}
-      </text>
-    );
-  };
-
   const FilterBar = () => {
     const monthOptions = Array.from({ length: 12 }, (_, i) => ({ value: i, label: `Tháng ${i + 1}` }));
     const yearOptions = Array.from({ length: 5 }, (_, i) => {
@@ -412,6 +425,8 @@ export default function App() {
       });
       return results;
     }, [spendingByCategory]);
+
+    const pieData = spendingByCategory.filter(i => i.value > 0);
 
     return (
       <div className="space-y-6 animate-fade-in pb-12">
@@ -504,41 +519,68 @@ export default function App() {
   
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="min-h-[420px]">
+          <Card className="min-h-[420px] flex flex-col">
             <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
               <PieChart size={20} className="text-gray-400" /> Phân bổ chi tiêu
             </h4>
-            <div className="h-80 w-full">
-               {totalSpent > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={spendingByCategory.filter(i => i.value > 0)}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={80}
-                      outerRadius={110}
-                      paddingAngle={4}
-                      dataKey="value"
-                      label={renderCustomizedLabel}
-                    >
-                      {spendingByCategory.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={2} stroke="#fff" />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip 
-                      formatter={(value) => formatCurrency(value)} 
-                      contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}}
-                    />
-                    <Legend verticalAlign="bottom" height={36} iconType="circle"/>
-                  </PieChart>
-                </ResponsiveContainer>
-               ) : (
-                 <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                   <Database size={48} className="mb-2 opacity-10" />
-                   <p className="text-sm">Chưa có dữ liệu</p>
+            
+            <div className="flex-1 flex flex-col md:flex-row items-center justify-between gap-4">
+              {/* Interactive Donut Chart */}
+              <div className="h-64 w-64 relative flex-shrink-0">
+                 {totalSpent > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        activeIndex={pieActiveIndex}
+                        activeShape={renderActiveShape}
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={70}
+                        outerRadius={90}
+                        dataKey="value"
+                        onMouseEnter={(_, index) => setPieActiveIndex(index)}
+                        stroke="none"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                 ) : (
+                   <div className="h-full flex flex-col items-center justify-center text-gray-400 border-4 border-slate-100 rounded-full">
+                     <Database size={32} className="mb-2 opacity-20" />
+                     <p className="text-xs">Chưa có dữ liệu</p>
+                   </div>
+                 )}
+              </div>
+
+              {/* Custom Legend */}
+              <div className="flex-1 w-full overflow-y-auto max-h-64 pr-2">
+                 <div className="space-y-3">
+                    {pieData.map((entry, index) => (
+                      <div 
+                        key={entry.id} 
+                        className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${pieActiveIndex === index ? 'bg-slate-50 border border-slate-100' : 'hover:bg-slate-50'}`}
+                        onMouseEnter={() => setPieActiveIndex(index)}
+                      >
+                         <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{backgroundColor: entry.color}}></div>
+                            <span className={`text-sm ${pieActiveIndex === index ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
+                              {entry.name}
+                            </span>
+                         </div>
+                         <div className="text-right">
+                           <p className={`text-sm ${pieActiveIndex === index ? 'font-bold text-gray-900' : 'text-gray-700'}`}>
+                             {formatShortCurrency(entry.value)}
+                           </p>
+                           <p className="text-xs text-gray-400">{(entry.percentage).toFixed(1)}%</p>
+                         </div>
+                      </div>
+                    ))}
                  </div>
-               )}
+              </div>
             </div>
           </Card>
   
@@ -992,17 +1034,34 @@ export default function App() {
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"><Menu size={24}/></button>
       </div>
 
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+            className="fixed inset-0 bg-black/40 z-30 backdrop-blur-sm md:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none`}>
-        <div className="p-8 border-b border-slate-50 hidden md:block">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">
-                    T
+        <div className="p-8 border-b border-slate-50">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">
+                        T
+                    </div>
+                    <div>
+                        <h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">Tuấn Phan</h1>
+                        <p className="text-xs text-gray-400 font-medium mt-1">Personal Finance</p>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">Tuấn Phan</h1>
-                    <p className="text-xs text-gray-400 font-medium mt-1">Personal Finance</p>
-                </div>
+                {/* Mobile Close Button */}
+                <button 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="md:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-500"
+                >
+                  <X size={20} />
+                </button>
             </div>
         </div>
         
