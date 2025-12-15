@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Wallet, Receipt, PlusCircle, Settings, 
   TrendingUp, TrendingDown, Search, Trash2, Save,
   Menu, X, Database, Calendar, Filter, AlertCircle, BarChart2, ArrowUpRight, ArrowDownRight,
-  List, AlertTriangle, ChevronDown,
+  List, AlertTriangle,
   Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal, Briefcase, User
 } from 'lucide-react';
 
@@ -28,18 +28,9 @@ const firebaseConfig = {
   appId: "1:31622801510:web:2d6eeb5ab18f7e3a06a5a7"
 };
 
-// Initialize Firebase only once
-let app;
-let auth;
-let db;
-
-try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-} catch (error) {
-  console.error("Firebase init error", error);
-}
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 // Use a fixed App ID for personal use
 const appId = 'quan-ly-chi-tieu-personal';
@@ -98,26 +89,6 @@ const Badge = ({ color, children }) => (
   </span>
 );
 
-// iOS Friendly Select Component - UPDATED FOR IOS
-const IOSSelect = ({ value, onChange, options, icon: Icon, className = "" }) => (
-  <div className={`relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-100 transition-all touch-manipulation ${className}`}>
-    {Icon && <Icon size={18} className="absolute left-3 text-gray-400 pointer-events-none z-10" />}
-    <select 
-      value={value} 
-      onChange={onChange}
-      // Added text-base (16px) to prevent iOS zoom
-      className={`w-full appearance-none bg-transparent py-3 ${Icon ? 'pl-10' : 'pl-4'} pr-10 text-base sm:text-sm font-semibold text-gray-700 outline-none cursor-pointer z-20 relative`}
-    >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
-      ))}
-    </select>
-    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none z-10">
-      <ChevronDown size={16} className="text-gray-400" />
-    </div>
-  </div>
-);
-
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -140,32 +111,33 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
         try {
+            // Logic fix: Try environment token first, but catch error if config mismatches
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                 await signInWithCustomToken(auth, __initial_auth_token);
             } else {
-                // Fallback silently if no token (dev mode) or try anon
-                 await signInAnonymously(auth);
+                throw new Error("No token provided");
             }
         } catch (error) {
-            console.warn("Auth failed:", error);
+            // Fallback to anonymous auth if token fails (e.g., mismatch project) or no token
+            console.warn("Auth with token failed, falling back to anonymous:", error);
+            try {
+                await signInAnonymously(auth);
+            } catch (anonError) {
+                console.error("Anonymous auth failed:", anonError);
+            }
         }
     };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-        setUser(currentUser);
-        // Only stop loading if we actually have a user or if auth is done checking
-        if (!currentUser) setIsLoading(false); 
-    });
+    const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
   }, []);
 
   // --- 2. DATA SYNC ---
   useEffect(() => {
     if (!user) return;
-    
-    // Don't set isLoading(true) here to avoid UI flashing on updates
-    // Just show loading initially
+    setIsLoading(true);
 
+    // Sync Transactions
     const txQuery = query(
       collection(db, 'artifacts', appId, 'public', 'data', 'transactions')
     );
@@ -180,6 +152,7 @@ export default function App() {
       setIsLoading(false);
     });
 
+    // Sync Budgets
     const budgetRef = doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config');
     const unsubBudget = onSnapshot(budgetRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -187,6 +160,7 @@ export default function App() {
       }
     }, (error) => console.error("Error fetching budgets:", error));
 
+    // Sync Note Stats
     const notesRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'notes');
     const unsubNotes = onSnapshot(notesRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -227,8 +201,7 @@ export default function App() {
 
   const deleteTransaction = async (id) => {
     if (!user) return;
-    // Use window.confirm properly
-    if (window.confirm('Bạn có chắc muốn xóa giao dịch này?')) {
+    if (confirm('Bạn có chắc muốn xóa giao dịch này?')) {
       try {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id));
       } catch (e) {
@@ -366,33 +339,34 @@ export default function App() {
     );
   };
 
-  const FilterBar = () => {
-    const monthOptions = Array.from({ length: 12 }, (_, i) => ({ value: i, label: `Tháng ${i + 1}` }));
-    const yearOptions = Array.from({ length: 5 }, (_, i) => {
-        const y = new Date().getFullYear() - 2 + i;
-        return { value: y, label: `Năm ${y}` };
-    });
-
-    return (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-            <div className="w-full sm:w-36">
-                <IOSSelect 
-                    icon={Calendar}
-                    value={viewMonth}
-                    onChange={(e) => setViewMonth(parseInt(e.target.value))}
-                    options={monthOptions}
-                />
-            </div>
-            <div className="w-full sm:w-32">
-                 <IOSSelect 
-                    value={viewYear}
-                    onChange={(e) => setViewYear(parseInt(e.target.value))}
-                    options={yearOptions}
-                />
-            </div>
-        </div>
-    );
-  };
+  const FilterBar = () => (
+    <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl shadow-sm border border-slate-100 w-full sm:w-auto justify-between sm:justify-start">
+      <div className="flex items-center gap-2">
+        <Calendar size={18} className="text-gray-400" />
+        <select 
+          value={viewMonth} 
+          onChange={(e) => setViewMonth(parseInt(e.target.value))}
+          className="p-1 text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded"
+        >
+          {Array.from({ length: 12 }, (_, i) => (
+            <option key={i} value={i}>Tháng {i + 1}</option>
+          ))}
+        </select>
+      </div>
+      <span className="text-gray-200">|</span>
+      <select 
+        value={viewYear} 
+        onChange={(e) => setViewYear(parseInt(e.target.value))}
+        className="p-1 text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded"
+      >
+        {Array.from({ length: 5 }, (_, i) => (
+          <option key={i} value={new Date().getFullYear() - 2 + i}>
+            {new Date().getFullYear() - 2 + i}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 
   const DashboardView = () => {
     const currentChartData = chartMode === 'daily' ? dailySpendingData : monthlySpendingData;
@@ -566,31 +540,31 @@ export default function App() {
                 <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold w-full sm:w-auto">
                   <button 
                     onClick={() => setChartMode('daily')}
-                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all touch-manipulation ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
                     Ngày
                   </button>
                   <button 
                     onClick={() => setChartMode('monthly')}
-                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all touch-manipulation ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
                     Tháng
                   </button>
                 </div>
               </div>
               
-              <div className="self-end w-full sm:w-auto sm:w-40">
-                 <IOSSelect
+              <div className="self-end w-full sm:w-auto">
+                 <select
+                   className="w-full sm:w-auto p-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-100 outline-none text-gray-600 font-medium"
                    value={chartCategoryFilter}
                    onChange={(e) => setChartCategoryFilter(e.target.value)}
-                   options={[
-                     {value: "all", label: "Tất cả mục"},
-                     {value: "eating", label: "Ăn uống"},
-                     {value: "entertainment", label: "Giải trí"},
-                     {value: "fuel", label: "Đi lại"},
-                     {value: "shopping", label: "Mua sắm"}
-                   ]}
-                 />
+                 >
+                   <option value="all">Tất cả mục</option>
+                   <option value="eating">Ăn uống</option>
+                   <option value="entertainment">Giải trí</option>
+                   <option value="fuel">Đi lại</option>
+                   <option value="shopping">Mua sắm</option>
+                 </select>
               </div>
             </div>
 
@@ -727,7 +701,7 @@ export default function App() {
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in overflow-hidden my-4">
           <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3>
-            <button onClick={onClose} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors touch-manipulation"><X size={18} className="text-gray-600"/></button>
+            <button onClick={onClose} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors"><X size={18} className="text-gray-600"/></button>
           </div>
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             <div>
@@ -736,7 +710,6 @@ export default function App() {
                 <input 
                   type="number" 
                   required
-                  // Text-base prevents iOS zoom
                   className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white"
                   value={formData.amount}
                   onChange={e => setFormData({...formData, amount: e.target.value})}
@@ -748,7 +721,7 @@ export default function App() {
             </div>
             
             <div 
-              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer touch-manipulation ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
+              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
               onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
             >
               <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>
@@ -763,33 +736,27 @@ export default function App() {
                 <input 
                   type="date" 
                   required
-                  // Text-base prevents iOS zoom
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 appearance-none bg-white"
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-sm font-medium text-gray-700"
                   value={formData.date}
                   onChange={e => setFormData({...formData, date: e.target.value})}
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label>
-                <div className="relative">
-                  <select 
-                    // Text-base prevents iOS zoom
-                    className="w-full p-3 pr-10 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700 appearance-none"
-                    value={formData.category}
-                    onChange={e => setFormData({...formData, category: e.target.value})}
-                  >
-                    {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                  <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
+                <select 
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-sm font-medium text-gray-700"
+                  value={formData.category}
+                  onChange={e => setFormData({...formData, category: e.target.value})}
+                >
+                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
             </div>
             <div className="relative">
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label>
               <input 
                 type="text" 
-                // Text-base prevents iOS zoom
-                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300"
+                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-sm font-medium text-gray-700 placeholder:text-gray-300"
                 value={formData.note}
                 onChange={handleNoteChange}
                 placeholder="Nhập ghi chú..."
@@ -810,7 +777,7 @@ export default function App() {
                 </div>
               )}
             </div>
-            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] transition-all touch-manipulation">
+            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] transition-all">
               Lưu Giao Dịch
             </button>
           </form>
@@ -855,26 +822,19 @@ export default function App() {
               <input 
                 type="text" 
                 placeholder="Tìm kiếm..." 
-                // Text-base prevents iOS zoom
-                className="w-full pl-10 p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white text-base sm:text-sm"
+                className="w-full pl-10 p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <div className="w-full md:w-[200px]">
-              <div className="relative">
-                <select 
-                  // Text-base prevents iOS zoom
-                  className="w-full p-2.5 pr-10 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-600 appearance-none"
-                  value={filterCategory}
-                  onChange={e => setFilterCategory(e.target.value)}
-                >
-                  <option value="all">Tất cả danh mục</option>
-                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
+            <select 
+              className="p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-full md:min-w-[180px] text-sm font-medium text-gray-600"
+              value={filterCategory}
+              onChange={e => setFilterCategory(e.target.value)}
+            >
+              <option value="all">Tất cả danh mục</option>
+              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
           </div>
 
           <div className="overflow-x-auto">
@@ -905,7 +865,7 @@ export default function App() {
                     <td className="px-6 py-4 text-center">
                       <button 
                         onClick={() => deleteTransaction(tx.id)}
-                        className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 touch-manipulation"
+                        className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -943,7 +903,7 @@ export default function App() {
             </div>
             <button 
                 onClick={() => saveBudgetsToDb(tempBudgets)}
-                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black font-bold shadow-lg transition-all active:scale-95 w-full md:w-auto justify-center touch-manipulation"
+                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black font-bold shadow-lg transition-all active:scale-95 w-full md:w-auto justify-center"
             >
                 <Save size={18} /> Lưu thay đổi
             </button>
@@ -989,25 +949,10 @@ export default function App() {
   };
 
   // --- MAIN RENDER ---
-  const handleTabChange = (id) => {
-    // 1. Close Menu Immediately
-    setIsMobileMenuOpen(false);
-    
-    // 2. Defer tab switch slightly to allow menu close animation to start smoothly
-    // This fixes the "laggy" feeling where menu freezes while content loads
-    if (window.innerWidth < 768) {
-        setTimeout(() => {
-            setActiveTab(id);
-        }, 150);
-    } else {
-        setActiveTab(id);
-    }
-  };
-
   const SidebarItem = ({ id, label, icon: Icon, active }) => (
     <button 
-      onClick={() => handleTabChange(id)}
-      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium touch-manipulation ${
+      onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
+      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium ${
         active 
         ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' 
         : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
@@ -1023,16 +968,8 @@ export default function App() {
       {/* Mobile Header */}
       <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-30 border-b border-gray-100">
         <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">Tuấn Phan</h1>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 touch-manipulation"><Menu size={24}/></button>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"><Menu size={24}/></button>
       </div>
-
-      {/* BACKDROP FOR MOBILE MENU - Crucial for UX */}
-      {isMobileMenuOpen && (
-        <div 
-            className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
-            onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
 
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none`}>
@@ -1071,7 +1008,7 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 h-screen overflow-y-auto bg-slate-50 relative scroll-smooth touch-pan-y">
+      <main className="flex-1 h-screen overflow-y-auto bg-slate-50 relative scroll-smooth">
         {/* Global Header */}
         <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-20 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
           <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -1080,7 +1017,7 @@ export default function App() {
           
           <button 
             onClick={() => setShowAddModal(true)}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm touch-manipulation"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"
           >
             <PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span>
           </button>
