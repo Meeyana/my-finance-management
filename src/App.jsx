@@ -659,21 +659,48 @@ export default function App() {
           outline: none;
         }
         
-        /* iOS Dropdown Reset - Giúp dropdown phẳng, đẹp, có mũi tên custom */
-        .custom-select {
+        /* iOS Input & Select Normalization - Đồng nhất style trên iOS */
+        input[type="date"],
+        input[type="number"],
+        input[type="text"],
+        select {
           -webkit-appearance: none;
+          -moz-appearance: none;
           appearance: none;
-          background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
-          background-repeat: no-repeat;
-          background-position: right 0.5rem center;
-          background-size: 1em;
-          padding-right: 2rem;
+          border-radius: 0.75rem; /* 12px - đồng bộ với rounded-xl */
+          font-size: 16px; /* Ngăn iOS zoom khi focus */
         }
         
-        /* Riêng cho FilterBar (chỗ chọn tháng/năm) cần chỉnh lại chút padding vì nó nhỏ */
-        .items-center .custom-select {
-           padding-right: 1.5rem;
-           background-position: right 0rem center;
+        /* Đặc biệt cho date input trên iOS */
+        input[type="date"] {
+          min-height: 48px; /* Đảm bảo đủ cao để tap dễ dàng */
+          display: block;
+          position: relative;
+        }
+        
+        /* Ẩn icon calendar mặc định của iOS nhưng giữ functionality */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          position: absolute;
+          right: 0;
+          width: 100%;
+          height: 100%;
+          opacity: 0;
+          cursor: pointer;
+        }
+        
+        /* Custom calendar icon cho date input */
+        input[type="date"] {
+          background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%224%22%20width%3D%2218%22%20height%3D%2218%22%20rx%3D%222%22%20ry%3D%222%22%3E%3C%2Frect%3E%3Cline%20x1%3D%2216%22%20y1%3D%222%22%20x2%3D%2216%22%20y2%3D%226%22%3E%3C%2Fline%3E%3Cline%20x1%3D%228%22%20y1%3D%222%22%20x2%3D%228%22%20y2%3D%226%22%3E%3C%2Fline%3E%3Cline%20x1%3D%223%22%20y1%3D%2210%22%20x2%3D%2221%22%20y2%3D%2210%22%3E%3C%2Fline%3E%3C%2Fsvg%3E");
+          background-repeat: no-repeat;
+          background-position: right 0.75rem center;
+          background-size: 1.25em;
+          padding-right: 2.5rem;
+        }
+        
+        /* Loại bỏ shadow và hiệu ứng mặc định của iOS */
+        input, select, textarea {
+          -webkit-appearance: none;
+          -webkit-border-radius: 0.75rem;
         }
         
         /* Đảm bảo animations mượt mà */
