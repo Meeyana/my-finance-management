@@ -638,8 +638,19 @@ export default function App() {
           }
         }
         
-        /* Reset focus states sau khi click */
-        button:focus-visible, select:focus-visible {
+        /* Reset focus states sau khi click - QUAN TRỌNG cho dropdowns */
+        select:focus {
+          outline: none !important;
+          box-shadow: none !important;
+          border-color: inherit !important;
+        }
+        
+        select:focus-visible {
+          outline: none !important;
+          box-shadow: none !important;
+        }
+        
+        button:focus-visible {
           outline: 2px solid #3B82F6;
           outline-offset: 2px;
         }
