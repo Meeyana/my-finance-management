@@ -7,7 +7,7 @@ import {
   TrendingUp, TrendingDown, Search, Trash2, Save,
   Menu, X, Database, Calendar, AlertCircle, BarChart2, ArrowUpRight, ArrowDownRight,
   List, AlertTriangle,
-  Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal
+  Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal, ChevronDown
 } from 'lucide-react';
 
 // FIREBASE IMPORTS
@@ -208,14 +208,12 @@ const DashboardContent = React.memo(({
               <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold w-full sm:w-auto">
                 <button 
                   onClick={() => setChartMode('daily')} 
-                  // UPDATED: Removed hover on mobile (sm:hover only)
                   className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all active:scale-95 ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 sm:hover:text-gray-700 active:bg-gray-200'}`}
                 >
                   Ngày
                 </button>
                 <button 
                   onClick={() => setChartMode('monthly')} 
-                  // UPDATED: Removed hover on mobile (sm:hover only)
                   className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all active:scale-95 ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 sm:hover:text-gray-700 active:bg-gray-200'}`}
                 >
                   Tháng
@@ -334,7 +332,6 @@ const TransactionContent = ({
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map((tx) => (
-                // UPDATED: hover:bg... -> sm:hover:bg...
                 <tr key={tx.id} className="sm:hover:bg-slate-50/80 transition-colors group bg-white">
                   <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-medium">{new Date(tx.date).getDate()}/{new Date(tx.date).getMonth() + 1}{tx.isIncurred && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-400" title="Chi phí phát sinh"></span>}</td>
                   <td className="px-6 py-4"><Badge color={CATEGORIES.find(c => c.id === tx.category)?.color || '#999'}>{CATEGORIES.find(c => c.id === tx.category)?.name}</Badge></td>
@@ -343,7 +340,6 @@ const TransactionContent = ({
                   <td className="px-6 py-4 text-center">
                     <button 
                       onClick={() => deleteTransaction(tx.id)} 
-                      // UPDATED: hover:text... -> sm:hover:text... (Only hover on desktop)
                       className="text-gray-300 sm:hover:text-red-500 p-2 rounded-full sm:hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 active:scale-125 active:bg-red-100 active:text-red-600"
                     >
                       <Trash2 size={16} />
@@ -370,7 +366,6 @@ const BudgetContent = ({ budgets, setBudgets, saveBudgetsToDb }) => {
           <div><h3 className="text-2xl font-bold text-gray-800">Cài đặt ngân sách</h3><p className="text-gray-500">Phân bổ hạn mức chi tiêu cho từng danh mục</p></div>
           <button 
             onClick={() => saveBudgetsToDb(budgets)} 
-            // UPDATED: hover -> sm:hover
             className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl sm:hover:bg-black font-bold shadow-lg transition-all active:scale-95 active:bg-black w-full md:w-auto justify-center"
           >
             <Save size={18} /> Lưu thay đổi
@@ -381,7 +376,6 @@ const BudgetContent = ({ budgets, setBudgets, saveBudgetsToDb }) => {
           const currentVal = budgets[cat.id] || 0;
           const Icon = cat.icon;
           return (
-            // UPDATED: hover -> sm:hover (Card shadow and Icon opacity)
             <div key={cat.id} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm sm:hover:shadow-md transition-shadow group relative overflow-hidden">
               <div className={`absolute top-0 right-0 p-4 opacity-10 sm:group-hover:opacity-20 transition-opacity`}><Icon size={80} color={cat.color} /></div>
               <div className="relative z-10 flex flex-col h-full justify-between">
@@ -571,7 +565,6 @@ export default function App() {
             <h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3>
             <button 
               onClick={onClose} 
-              // UPDATED: hover:bg -> sm:hover:bg
               className="bg-gray-100 sm:hover:bg-gray-200 p-2 rounded-full transition-colors active:scale-90 active:bg-gray-200"
             >
               <X size={18} className="text-gray-600"/>
@@ -580,7 +573,6 @@ export default function App() {
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Số tiền</label><div className="relative"><input type="number" required className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0" autoFocus /><span className="absolute right-4 top-5 text-gray-400 font-bold">VNĐ</span></div></div>
             <div 
-              // UPDATED: active:scale remains, hover removed for mobile
               className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer active:scale-[0.98] active:bg-slate-50 ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
               onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
             >
@@ -593,7 +585,6 @@ export default function App() {
             <div className="relative"><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300" value={formData.note} onChange={handleNoteChange} placeholder="Nhập ghi chú..." />{suggestions.length > 0 && (<div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">{suggestions.map((s, idx) => (<div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 sm:hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>))}</div>)}</div>
             <button 
               type="submit" 
-              // UPDATED: hover:bg -> sm:hover:bg
               className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold sm:hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] active:bg-blue-700 transition-all"
             >
               Lưu Giao Dịch
@@ -605,7 +596,6 @@ export default function App() {
   };
 
   const SidebarItem = ({ id, label, icon: Icon, active }) => (
-    // UPDATED: hover:bg... -> sm:hover:bg...
     <button onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium active:bg-gray-200 active:scale-[0.98] ${active ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' : 'text-gray-500 sm:hover:bg-gray-100 sm:hover:text-gray-900'}`}>
       <Icon size={20} className={active ? 'text-white' : 'text-gray-400'} /> {label}
     </button>
@@ -615,12 +605,12 @@ export default function App() {
     <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl shadow-sm border border-slate-100 w-full sm:w-auto justify-between sm:justify-start">
       <div className="flex items-center gap-2">
         <Calendar size={18} className="text-gray-400" />
-        <select value={viewMonth} onChange={(e) => setViewMonth(parseInt(e.target.value))} className="custom-select p-1 pr-6 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer sm:hover:bg-gray-50 rounded">
+        <select value={viewMonth} onChange={(e) => setViewMonth(parseInt(e.target.value))} className="custom-select p-1 pr-8 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer sm:hover:bg-gray-50 rounded">
           {Array.from({ length: 12 }, (_, i) => <option key={i} value={i}>Tháng {i + 1}</option>)}
         </select>
       </div>
       <span className="text-gray-200">|</span>
-      <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} className="custom-select p-1 pr-6 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer sm:hover:bg-gray-50 rounded">
+      <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} className="custom-select p-1 pr-8 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer sm:hover:bg-gray-50 rounded">
         {Array.from({ length: 5 }, (_, i) => <option key={i} value={new Date().getFullYear() - 2 + i}>{new Date().getFullYear() - 2 + i}</option>)}
       </select>
     </div>
@@ -632,88 +622,53 @@ export default function App() {
         html, body { -webkit-tap-highlight-color: transparent; }
         button, a, input, select { touch-action: manipulation; user-select: none; }
         
-        /* REMOVED: The problematic @media (hover: none) block was removed */
+        select:focus { outline: none !important; box-shadow: none !important; border-color: inherit !important; }
+        select:focus-visible { outline: none !important; box-shadow: none !important; }
+        button:focus-visible { outline: 2px solid #3B82F6; outline-offset: 2px; }
+        button:focus:not(:focus-visible), select:focus:not(:focus-visible) { outline: none; }
         
-        /* Reset focus states sau khi click - QUAN TRỌNG cho dropdowns */
-        select:focus {
-          outline: none !important;
-          box-shadow: none !important;
-          border-color: inherit !important;
+        input[type="date"], input[type="number"], input[type="text"], select {
+          -webkit-appearance: none; -moz-appearance: none; appearance: none;
+          border-radius: 0.75rem; font-size: 16px;
         }
-        
-        select:focus-visible {
-          outline: none !important;
-          box-shadow: none !important;
-        }
-        
-        button:focus-visible {
-          outline: 2px solid #3B82F6;
-          outline-offset: 2px;
-        }
-        
-        button:focus:not(:focus-visible), select:focus:not(:focus-visible) {
-          outline: none;
-        }
-        
-        /* iOS Input & Select Normalization - Đồng nhất style trên iOS */
-        input[type="date"],
-        input[type="number"],
-        input[type="text"],
-        select {
-          -webkit-appearance: none;
-          -moz-appearance: none;
+
+        /* --- UPDATED: CSS CHO CUSTOM SELECT CÓ ICON MŨI TÊN --- */
+        .custom-select {
           appearance: none;
-          border-radius: 0.75rem; /* 12px - đồng bộ với rounded-xl */
-          font-size: 16px; /* Ngăn iOS zoom khi focus */
-        }
-        
-        /* Đặc biệt cho date input trên iOS */
-        input[type="date"] {
-          min-height: 48px; /* Đảm bảo đủ cao để tap dễ dàng */
-          display: block;
-          position: relative;
-        }
-        
-        /* Ẩn icon calendar mặc định của iOS nhưng giữ functionality */
-        input[type="date"]::-webkit-calendar-picker-indicator {
-          position: absolute;
-          right: 0;
-          width: 100%;
-          height: 100%;
-          opacity: 0;
-          cursor: pointer;
-        }
-        
-        /* Custom calendar icon cho date input */
-        input[type="date"] {
-          background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%224%22%20width%3D%2218%22%20height%3D%2218%22%20rx%3D%222%22%20ry%3D%222%22%3E%3C%2Frect%3E%3Cline%20x1%3D%2216%22%20y1%3D%222%22%20x2%3D%2216%22%20y2%3D%226%22%3E%3C%2Fline%3E%3Cline%20x1%3D%228%22%20y1%3D%222%22%20x2%3D%228%22%20y2%3D%226%22%3E%3C%2Fline%3E%3Cline%20x1%3D%223%22%20y1%3D%2210%22%20x2%3D%2221%22%20y2%3D%2210%22%3E%3C%2Fline%3E%3C%2Fsvg%3E");
+          background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
           background-repeat: no-repeat;
-          background-position: right 0.75rem center;
-          background-size: 1.25em;
-          padding-right: 2.5rem;
+          background-position: right 0.5rem center;
+          background-size: 1em;
+          padding-right: 2rem !important; /* Tạo khoảng trống cho icon */
         }
         
-        /* Loại bỏ shadow và hiệu ứng mặc định của iOS */
-        input, select, textarea {
-          -webkit-appearance: none;
-          -webkit-border-radius: 0.75rem;
+        input[type="date"] {
+          min-height: 48px; display: block; position: relative;
+          background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%224%22%20width%3D%2218%22%20height%3D%2218%22%20rx%3D%222%22%20ry%3D%222%22%3E%3C%2Frect%3E%3Cline%20x1%3D%2216%22%20y1%3D%222%22%20x2%3D%2216%22%20y2%3D%226%22%3E%3C%2Fline%3E%3Cline%20x1%3D%228%22%20y1%3D%222%22%20x2%3D%228%22%20y2%3D%226%22%3E%3C%2Fline%3E%3Cline%20x1%3D%223%22%20y1%3D%2210%22%20x2%3D%2221%22%20y2%3D%2210%22%3E%3C%2Fline%3E%3C%2Fsvg%3E");
+          background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1.25em; padding-right: 2.5rem;
         }
+        input[type="date"]::-webkit-calendar-picker-indicator { position: absolute; right: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
         
-        /* Đảm bảo animations mượt mà */
-        * {
-          -webkit-tap-highlight-color: transparent;
-        }
+        input, select, textarea { -webkit-appearance: none; -webkit-border-radius: 0.75rem; }
+        * { -webkit-tap-highlight-color: transparent; }
       `}</style>
       
       {/* Mobile Header */}
       <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-30 border-b border-gray-100">
         <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">Tuấn Phan</h1>
-        {/* UPDATED: hover:bg -> sm:hover:bg */}
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 sm:hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 transition-colors"><Menu size={24}/></button>
       </div>
 
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none`}>
+        {/* --- UPDATED: MOBILE SIDEBAR HEADER WITH CLOSE BUTTON --- */}
+        <div className="flex md:hidden items-center justify-between p-6 pb-2 border-b border-gray-50">
+          <h2 className="font-bold text-xl text-gray-900">Menu</h2>
+          <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 -mr-2 text-gray-500 active:bg-gray-100 rounded-full">
+            <X size={24} />
+          </button>
+        </div>
+
         <div className="p-8 border-b border-slate-50 hidden md:block"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">T</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">Tuấn Phan</h1><p className="text-xs text-gray-400 font-medium mt-1">Personal Finance</p></div></div></div>
         <nav className="p-6 space-y-2 flex-1">
           <SidebarItem id="dashboard" label="Tổng quan" icon={LayoutDashboard} active={activeTab === 'dashboard'} />
@@ -727,7 +682,6 @@ export default function App() {
       <main className="flex-1 h-screen overflow-y-auto bg-slate-50 relative scroll-smooth">
         <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-20 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
           <div className="flex items-center gap-4 w-full sm:w-auto">{(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}</div>
-          {/* UPDATED: hover:bg -> sm:hover:bg */}
           <button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
         </header>
 
