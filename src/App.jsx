@@ -208,15 +208,15 @@ const DashboardContent = React.memo(({
               <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold w-full sm:w-auto">
                 <button 
                   onClick={() => setChartMode('daily')} 
-                  // UPDATED: Added active:scale-95 and active:bg-gray-200 for touch feedback
-                  className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all active:scale-95 ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 active:bg-gray-200'}`}
+                  // UPDATED: Removed hover on mobile (sm:hover only)
+                  className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all active:scale-95 ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 sm:hover:text-gray-700 active:bg-gray-200'}`}
                 >
                   Ngày
                 </button>
                 <button 
                   onClick={() => setChartMode('monthly')} 
-                  // UPDATED: Added active:scale-95 and active:bg-gray-200
-                  className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all active:scale-95 ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 active:bg-gray-200'}`}
+                  // UPDATED: Removed hover on mobile (sm:hover only)
+                  className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all active:scale-95 ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 sm:hover:text-gray-700 active:bg-gray-200'}`}
                 >
                   Tháng
                 </button>
@@ -224,7 +224,6 @@ const DashboardContent = React.memo(({
             </div>
             <div className="self-end w-full sm:w-auto">
                <select 
-                 // UPDATED: Added custom-select and refined padding for Dashboard filter
                  className="custom-select w-full sm:w-auto pl-3 py-2 pr-10 text-base sm:text-xs border border-slate-200 rounded-lg bg-white outline-none text-gray-600 font-medium active:bg-gray-50" 
                  value={chartCategoryFilter} 
                  onChange={(e) => setChartCategoryFilter(e.target.value)}
@@ -335,7 +334,8 @@ const TransactionContent = ({
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map((tx) => (
-                <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors group bg-white">
+                // UPDATED: hover:bg... -> sm:hover:bg...
+                <tr key={tx.id} className="sm:hover:bg-slate-50/80 transition-colors group bg-white">
                   <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-medium">{new Date(tx.date).getDate()}/{new Date(tx.date).getMonth() + 1}{tx.isIncurred && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-400" title="Chi phí phát sinh"></span>}</td>
                   <td className="px-6 py-4"><Badge color={CATEGORIES.find(c => c.id === tx.category)?.color || '#999'}>{CATEGORIES.find(c => c.id === tx.category)?.name}</Badge></td>
                   <td className="px-6 py-4 text-gray-800 font-medium">{tx.note}</td>
@@ -343,8 +343,8 @@ const TransactionContent = ({
                   <td className="px-6 py-4 text-center">
                     <button 
                       onClick={() => deleteTransaction(tx.id)} 
-                      // UPDATED: Added active:scale-125 and active:bg-red-100 for clear feedback
-                      className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 active:scale-125 active:bg-red-100 active:text-red-600"
+                      // UPDATED: hover:text... -> sm:hover:text... (Only hover on desktop)
+                      className="text-gray-300 sm:hover:text-red-500 p-2 rounded-full sm:hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 active:scale-125 active:bg-red-100 active:text-red-600"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -370,8 +370,8 @@ const BudgetContent = ({ budgets, setBudgets, saveBudgetsToDb }) => {
           <div><h3 className="text-2xl font-bold text-gray-800">Cài đặt ngân sách</h3><p className="text-gray-500">Phân bổ hạn mức chi tiêu cho từng danh mục</p></div>
           <button 
             onClick={() => saveBudgetsToDb(budgets)} 
-            // UPDATED: Added active:scale-95 and active:bg-black for feedback
-            className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black font-bold shadow-lg transition-all active:scale-95 active:bg-black w-full md:w-auto justify-center"
+            // UPDATED: hover -> sm:hover
+            className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl sm:hover:bg-black font-bold shadow-lg transition-all active:scale-95 active:bg-black w-full md:w-auto justify-center"
           >
             <Save size={18} /> Lưu thay đổi
           </button>
@@ -381,8 +381,9 @@ const BudgetContent = ({ budgets, setBudgets, saveBudgetsToDb }) => {
           const currentVal = budgets[cat.id] || 0;
           const Icon = cat.icon;
           return (
-            <div key={cat.id} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow group relative overflow-hidden">
-              <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity`}><Icon size={80} color={cat.color} /></div>
+            // UPDATED: hover -> sm:hover (Card shadow and Icon opacity)
+            <div key={cat.id} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm sm:hover:shadow-md transition-shadow group relative overflow-hidden">
+              <div className={`absolute top-0 right-0 p-4 opacity-10 sm:group-hover:opacity-20 transition-opacity`}><Icon size={80} color={cat.color} /></div>
               <div className="relative z-10 flex flex-col h-full justify-between">
                   <div className="mb-4"><div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold shadow-sm mb-3" style={{backgroundColor: cat.color}}><Icon size={24} /></div><h4 className="font-bold text-lg text-gray-800">{cat.name}</h4></div>
                   <div className="relative mt-auto">
@@ -570,8 +571,8 @@ export default function App() {
             <h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3>
             <button 
               onClick={onClose} 
-              // UPDATED: Added active:scale-90 and active:bg-gray-200
-              className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors active:scale-90 active:bg-gray-200"
+              // UPDATED: hover:bg -> sm:hover:bg
+              className="bg-gray-100 sm:hover:bg-gray-200 p-2 rounded-full transition-colors active:scale-90 active:bg-gray-200"
             >
               <X size={18} className="text-gray-600"/>
             </button>
@@ -579,7 +580,7 @@ export default function App() {
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Số tiền</label><div className="relative"><input type="number" required className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0" autoFocus /><span className="absolute right-4 top-5 text-gray-400 font-bold">VNĐ</span></div></div>
             <div 
-              // UPDATED: Added active:scale-[0.98] and active:bg-slate-50
+              // UPDATED: active:scale remains, hover removed for mobile
               className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer active:scale-[0.98] active:bg-slate-50 ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
               onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
             >
@@ -589,11 +590,11 @@ export default function App() {
               <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Ngày</label><input type="date" required className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
               <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label><select className="custom-select w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
             </div>
-            <div className="relative"><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300" value={formData.note} onChange={handleNoteChange} placeholder="Nhập ghi chú..." />{suggestions.length > 0 && (<div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">{suggestions.map((s, idx) => (<div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>))}</div>)}</div>
+            <div className="relative"><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300" value={formData.note} onChange={handleNoteChange} placeholder="Nhập ghi chú..." />{suggestions.length > 0 && (<div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">{suggestions.map((s, idx) => (<div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 sm:hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>))}</div>)}</div>
             <button 
               type="submit" 
-              // UPDATED: Added active:scale-[0.98] and active:bg-blue-700
-              className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] active:bg-blue-700 transition-all"
+              // UPDATED: hover:bg -> sm:hover:bg
+              className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold sm:hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] active:bg-blue-700 transition-all"
             >
               Lưu Giao Dịch
             </button>
@@ -604,7 +605,8 @@ export default function App() {
   };
 
   const SidebarItem = ({ id, label, icon: Icon, active }) => (
-    <button onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium active:bg-gray-200 active:scale-[0.98] ${active ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>
+    // UPDATED: hover:bg... -> sm:hover:bg...
+    <button onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium active:bg-gray-200 active:scale-[0.98] ${active ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' : 'text-gray-500 sm:hover:bg-gray-100 sm:hover:text-gray-900'}`}>
       <Icon size={20} className={active ? 'text-white' : 'text-gray-400'} /> {label}
     </button>
   );
@@ -613,12 +615,12 @@ export default function App() {
     <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl shadow-sm border border-slate-100 w-full sm:w-auto justify-between sm:justify-start">
       <div className="flex items-center gap-2">
         <Calendar size={18} className="text-gray-400" />
-        <select value={viewMonth} onChange={(e) => setViewMonth(parseInt(e.target.value))} className="custom-select p-1 pr-6 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded">
+        <select value={viewMonth} onChange={(e) => setViewMonth(parseInt(e.target.value))} className="custom-select p-1 pr-6 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer sm:hover:bg-gray-50 rounded">
           {Array.from({ length: 12 }, (_, i) => <option key={i} value={i}>Tháng {i + 1}</option>)}
         </select>
       </div>
       <span className="text-gray-200">|</span>
-      <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} className="custom-select p-1 pr-6 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded">
+      <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} className="custom-select p-1 pr-6 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer sm:hover:bg-gray-50 rounded">
         {Array.from({ length: 5 }, (_, i) => <option key={i} value={new Date().getFullYear() - 2 + i}>{new Date().getFullYear() - 2 + i}</option>)}
       </select>
     </div>
@@ -630,13 +632,7 @@ export default function App() {
         html, body { -webkit-tap-highlight-color: transparent; }
         button, a, input, select { touch-action: manipulation; user-select: none; }
         
-        /* Tắt hover effects trên touch devices */
-        @media (hover: none) {
-          button:hover, a:hover, select:hover {
-            background-color: inherit !important;
-            color: inherit !important;
-          }
-        }
+        /* REMOVED: The problematic @media (hover: none) block was removed */
         
         /* Reset focus states sau khi click - QUAN TRỌNG cho dropdowns */
         select:focus {
@@ -712,7 +708,8 @@ export default function App() {
       {/* Mobile Header */}
       <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-30 border-b border-gray-100">
         <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">Tuấn Phan</h1>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 transition-colors"><Menu size={24}/></button>
+        {/* UPDATED: hover:bg -> sm:hover:bg */}
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 sm:hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 transition-colors"><Menu size={24}/></button>
       </div>
 
       {/* Sidebar */}
@@ -730,7 +727,8 @@ export default function App() {
       <main className="flex-1 h-screen overflow-y-auto bg-slate-50 relative scroll-smooth">
         <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-20 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
           <div className="flex items-center gap-4 w-full sm:w-auto">{(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}</div>
-          <button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
+          {/* UPDATED: hover:bg -> sm:hover:bg */}
+          <button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
         </header>
 
         <div className="p-4 sm:p-8 max-w-[1600px] mx-auto pb-32">
