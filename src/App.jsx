@@ -10,7 +10,7 @@ import {
   Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal, ChevronDown,
   Heart, Star, Gift, Music, Briefcase, Plane, Gamepad2, GraduationCap,
   Baby, Dog, Car, Zap, Wifi, Phone, Dumbbell,
-  Eye, EyeOff, Bell, BellOff, LogOut, Lock, User, Globe
+  Eye, EyeOff, Bell, BellOff, LogOut, Lock, User, Globe, Plus
 } from 'lucide-react';
 
 // FIREBASE IMPORTS
@@ -90,7 +90,7 @@ const Card = ({ children, className = "" }) => (
 );
 
 const Badge = ({ color, children }) => (
-  <span className="px-3 py-1 rounded-full text-xs font-semibold text-white shadow-sm whitespace-nowrap" style={{ backgroundColor: color }}>
+  <span className="px-2 py-1 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold text-white shadow-sm whitespace-nowrap inline-block" style={{ backgroundColor: color }}>
     {children}
   </span>
 );
@@ -483,21 +483,21 @@ const TransactionContent = ({
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-400 uppercase bg-white border-b border-gray-100">
               <tr>
-                <th className="px-6 py-4 font-semibold">Thời gian</th>
-                <th className="px-6 py-4 font-semibold">Danh mục</th>
-                <th className="px-6 py-4 font-semibold">Nội dung</th>
-                <th className="px-6 py-4 text-right font-semibold">Số tiền</th>
-                <th className="px-6 py-4 text-center font-semibold"></th>
+                <th className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">Thời gian</th>
+                <th className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">Danh mục</th>
+                <th className="px-2 py-3 sm:px-6 sm:py-4 font-semibold min-w-[150px]">Nội dung</th>
+                <th className="px-2 py-3 sm:px-6 sm:py-4 text-right font-semibold whitespace-nowrap">Số tiền</th>
+                <th className="px-2 py-3 sm:px-6 sm:py-4 text-center font-semibold"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map((tx) => (
                 <tr key={tx.id} className="sm:hover:bg-slate-50/80 transition-colors group bg-white">
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-medium">{new Date(tx.date).getDate()}/{new Date(tx.date).getMonth() + 1}{tx.isIncurred && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-400" title="Chi phí phát sinh"></span>}</td>
-                  <td className="px-6 py-4"><Badge color={allCategories.find(c => c.id === tx.category)?.color || '#999'}>{allCategories.find(c => c.id === tx.category)?.name}</Badge></td>
-                  <td className="px-6 py-4 text-gray-800 font-medium">{tx.note}</td>
-                  <td className="px-6 py-4 text-right font-bold text-gray-800">{formatCurrency(tx.amount)}</td>
-                  <td className="px-6 py-4 text-center">
+                  <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-gray-500 font-medium">{new Date(tx.date).getDate()}/{new Date(tx.date).getMonth() + 1}{tx.isIncurred && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-400" title="Chi phí phát sinh"></span>}</td>
+                  <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap"><Badge color={allCategories.find(c => c.id === tx.category)?.color || '#999'}>{allCategories.find(c => c.id === tx.category)?.name}</Badge></td>
+                  <td className="px-2 py-3 sm:px-6 sm:py-4 text-gray-800 font-medium break-words max-w-[200px]">{tx.note}</td>
+                  <td className="px-2 py-3 sm:px-6 sm:py-4 text-right font-bold text-gray-800 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
+                  <td className="px-2 py-3 sm:px-6 sm:py-4 text-center">
                     <button 
                       onClick={() => deleteTransaction(tx.id)} 
                       className="text-gray-300 sm:hover:text-red-500 p-2 rounded-full sm:hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 active:scale-125 active:bg-red-100 active:text-red-600"
@@ -558,7 +558,7 @@ const BudgetContent = ({
             <div key={cat.id} className={`bg-white rounded-2xl p-6 border border-slate-100 shadow-sm sm:hover:shadow-md transition-all group relative overflow-hidden ${!isVisible ? 'opacity-60 grayscale-[0.5]' : ''}`}>
               
               {/* Controls: Visibility, Alert, Delete */}
-              <div className="absolute top-4 right-4 z-10 flex gap-2">
+              <div className="absolute top-4 right-4 z-20 flex gap-2">
                 {isCustom && (
                   <button 
                     onClick={() => deleteCustomCategory(cat.id)}
@@ -897,25 +897,101 @@ export default function App() {
   }), [currentMonthTransactions, search, filterCategory]);
 
   const AddTransactionModal = ({ onClose }) => {
+    const [mode, setMode] = useState('simple'); // 'simple' | 'advanced'
+    
+    // --- STATE FOR SIMPLE MODE ---
     const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], amount: '', category: 'eating', note: '', isIncurred: false });
+    
+    // --- STATE FOR ADVANCED MODE ---
+    const [advancedDate, setAdvancedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [advancedItems, setAdvancedItems] = useState([
+      { amount: '', category: 'eating', note: '', isIncurred: false }
+    ]);
+
     const [suggestions, setSuggestions] = useState([]);
     
-    const handleNoteChange = (e) => {
+    const handleNoteChange = (e, index = null) => {
       const val = e.target.value;
-      setFormData({...formData, note: val});
+      if (mode === 'simple') {
+        setFormData({...formData, note: val});
+      } else {
+        const newItems = [...advancedItems];
+        newItems[index].note = val;
+        setAdvancedItems(newItems);
+      }
+
       if (val.length >= 3) {
         const matches = Object.entries(noteStats).filter(([n, c]) => c >= 2 && n.toLowerCase().includes(val.toLowerCase())).sort((a,b)=>b[1]-a[1]).map(([n])=>n).slice(0,5);
         setSuggestions(matches);
       } else setSuggestions([]);
     };
 
-    const handleSubmit = (e) => { e.preventDefault(); if (!formData.amount || !formData.date) return; addTransaction(formData); onClose(); };
+    const handleSubmitSimple = (e) => { 
+      e.preventDefault(); 
+      if (!formData.amount || !formData.date) return; 
+      addTransaction(formData); 
+      onClose(); 
+    };
+
+    const handleSubmitAdvanced = async (e) => {
+      e.preventDefault();
+      // Filter out empty rows
+      const validItems = advancedItems.filter(item => item.amount && Number(item.amount) > 0);
+      if (validItems.length === 0) return;
+
+      // Check limit before adding batch
+      if (user.isAnonymous && (transactions.length + validItems.length) > 50) {
+        alert(`Bạn đang ở chế độ Demo. Thêm ${validItems.length} giao dịch sẽ vượt quá giới hạn 50.`);
+        return;
+      }
+
+      // Add all transactions
+      // In a real app, you might want to do this in a batch write, but parallel promises work for now
+      await Promise.all(validItems.map(item => addTransaction({
+        ...item,
+        date: advancedDate
+      })));
+      
+      onClose();
+    };
+
+    const addAdvancedRow = () => {
+      setAdvancedItems([...advancedItems, { amount: '', category: 'eating', note: '', isIncurred: false }]);
+    };
+
+    const removeAdvancedRow = (index) => {
+      if (advancedItems.length === 1) return;
+      const newItems = advancedItems.filter((_, i) => i !== index);
+      setAdvancedItems(newItems);
+    };
+
+    const updateAdvancedItem = (index, field, value) => {
+      const newItems = [...advancedItems];
+      newItems[index][field] = value;
+      setAdvancedItems(newItems);
+    };
 
     return (
       <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm overflow-y-auto">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in overflow-hidden my-4">
-          <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-            <h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3>
+        <div className={`bg-white rounded-2xl shadow-2xl w-full ${mode === 'advanced' ? 'max-w-2xl' : 'max-w-md'} animate-scale-in overflow-hidden my-4 transition-all duration-300`}>
+          <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center sticky top-0 z-10">
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3>
+              <div className="flex bg-slate-100 rounded-lg p-1">
+                <button 
+                  onClick={() => setMode('simple')}
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${mode === 'simple' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Đơn giản
+                </button>
+                <button 
+                  onClick={() => setMode('advanced')}
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${mode === 'advanced' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Nâng cao
+                </button>
+              </div>
+            </div>
             <button 
               onClick={onClose} 
               className="bg-gray-100 sm:hover:bg-gray-200 p-2 rounded-full transition-colors active:scale-90 active:bg-gray-200"
@@ -923,26 +999,114 @@ export default function App() {
               <X size={18} className="text-gray-600"/>
             </button>
           </div>
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Số tiền</label><div className="relative"><input type="number" required className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0" autoFocus /><span className="absolute right-4 top-5 text-gray-400 font-bold">VNĐ</span></div></div>
-            <div 
-              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer active:scale-[0.98] active:bg-slate-50 ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
-              onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
-            >
-              <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>{formData.isIncurred && <X size={14} className="text-white" />}</div><label className="text-sm font-medium text-gray-700 cursor-pointer select-none">Đánh dấu là chi phí phát sinh</label>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Ngày</label><input type="date" required className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
-              <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label><select className="custom-select w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-            </div>
-            <div className="relative"><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300" value={formData.note} onChange={handleNoteChange} placeholder="Nhập ghi chú..." />{suggestions.length > 0 && (<div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">{suggestions.map((s, idx) => (<div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 sm:hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>))}</div>)}</div>
-            <button 
-              type="submit" 
-              className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold sm:hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] active:bg-blue-700 transition-all"
-            >
-              Lưu Giao Dịch
-            </button>
-          </form>
+
+          {mode === 'simple' ? (
+            <form onSubmit={handleSubmitSimple} className="p-6 space-y-5">
+              <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Số tiền</label><div className="relative"><input type="number" required className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0" autoFocus /><span className="absolute right-4 top-5 text-gray-400 font-bold">VNĐ</span></div></div>
+              <div 
+                className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer active:scale-[0.98] active:bg-slate-50 ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
+                onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
+              >
+                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>{formData.isIncurred && <X size={14} className="text-white" />}</div><label className="text-sm font-medium text-gray-700 cursor-pointer select-none">Đánh dấu là chi phí phát sinh</label>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Ngày</label><input type="date" required className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+                <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label><select className="custom-select w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              </div>
+              <div className="relative"><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300" value={formData.note} onChange={handleNoteChange} placeholder="Nhập ghi chú..." />{suggestions.length > 0 && (<div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">{suggestions.map((s, idx) => (<div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 sm:hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>))}</div>)}</div>
+              <button 
+                type="submit" 
+                className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold sm:hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] active:bg-blue-700 transition-all"
+              >
+                Lưu Giao Dịch
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleSubmitAdvanced} className="p-6 space-y-6">
+              {/* Date Selection for Batch */}
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col sm:flex-row items-center gap-4">
+                <label className="text-sm font-bold text-blue-800 whitespace-nowrap">Chọn ngày áp dụng chung:</label>
+                <input 
+                  type="date" 
+                  required 
+                  className="w-full sm:w-auto p-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-200 outline-none text-sm font-medium text-gray-700" 
+                  value={advancedDate} 
+                  onChange={e => setAdvancedDate(e.target.value)} 
+                />
+              </div>
+
+              {/* Rows */}
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                {advancedItems.map((item, index) => (
+                  <div key={index} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center bg-slate-50 p-3 rounded-xl border border-slate-200 group">
+                    <span className="text-xs font-bold text-gray-400 w-6 pt-3 sm:pt-0">#{index + 1}</span>
+                    
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-2 w-full">
+                      {/* Amount */}
+                      <div className="sm:col-span-3">
+                        <input 
+                          type="number" 
+                          placeholder="Số tiền" 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-sm font-bold focus:border-blue-500 outline-none"
+                          value={item.amount}
+                          onChange={(e) => updateAdvancedItem(index, 'amount', e.target.value)}
+                          required
+                        />
+                      </div>
+                      
+                      {/* Category */}
+                      <div className="sm:col-span-3">
+                        <select 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:border-blue-500 outline-none"
+                          value={item.category}
+                          onChange={(e) => updateAdvancedItem(index, 'category', e.target.value)}
+                        >
+                          {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Note */}
+                      <div className="sm:col-span-6">
+                        <input 
+                          type="text" 
+                          placeholder="Nội dung..." 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none"
+                          value={item.note}
+                          onChange={(e) => handleNoteChange(e, index)}
+                        />
+                      </div>
+                    </div>
+
+                    <button 
+                      type="button"
+                      onClick={() => removeAdvancedRow(index)}
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors self-end sm:self-center"
+                      title="Xóa dòng này"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Controls */}
+              <div className="flex flex-col sm:flex-row justify-between gap-4 pt-2">
+                <button 
+                  type="button" 
+                  onClick={addAdvancedRow}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors active:scale-95"
+                >
+                  <Plus size={18} /> Thêm dòng
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 bg-gray-900 text-white py-3 px-6 rounded-xl font-bold hover:bg-black shadow-lg shadow-gray-300 transition-all active:scale-[0.98]"
+                >
+                  Lưu tất cả ({advancedItems.filter(i => i.amount).length})
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     );
@@ -1027,6 +1191,12 @@ export default function App() {
         input[type="date"]::-webkit-calendar-picker-indicator { position: absolute; right: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
         
         input, select, textarea { -webkit-appearance: none; -webkit-border-radius: 0.75rem; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
         * { -webkit-tap-highlight-color: transparent; }
       `}</style>
       
