@@ -77,18 +77,15 @@ const Badge = ({ color, children }) => (
 );
 
 // --- COMPONENT: DASHBOARD CONTENT (Extracted & Memoized) ---
-// Tách component này ra ngoài để tránh bị re-render khi App state thay đổi (như toggle menu)
 const DashboardContent = React.memo(({ 
   totalSpent, totalBudget, spendingDiff, totalIncurred, alerts, 
   spendingByCategory, currentChartData, chartMode, setChartMode, 
   chartCategoryFilter, setChartCategoryFilter 
 }) => {
-  // Lazy Load Chart: Chỉ hiển thị chart sau khi component đã mount xong 1 chút
-  // Giúp UI render khung trước, tránh block main thread
   const [showCharts, setShowCharts] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowCharts(true), 200); // Delay 200ms để animation menu mượt
+    const timer = setTimeout(() => setShowCharts(true), 200);
     return () => clearTimeout(timer);
   }, []);
 
@@ -110,7 +107,6 @@ const DashboardContent = React.memo(({
           <p className="text-gray-500">Đây là tình hình tài chính tháng này của bạn.</p>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-200 shadow-lg border-none relative overflow-hidden">
           <div className="relative z-10">
@@ -215,7 +211,11 @@ const DashboardContent = React.memo(({
               </div>
             </div>
             <div className="self-end w-full sm:w-auto">
-               <select className="w-full sm:w-auto p-2 text-base sm:text-xs border border-slate-200 rounded-lg bg-white outline-none text-gray-600 font-medium" value={chartCategoryFilter} onChange={(e) => setChartCategoryFilter(e.target.value)}>
+               <select 
+                 className="custom-select w-full sm:w-auto p-2 text-base sm:text-xs border border-slate-200 rounded-lg bg-white outline-none text-gray-600 font-medium" 
+                 value={chartCategoryFilter} 
+                 onChange={(e) => setChartCategoryFilter(e.target.value)}
+               >
                  <option value="all">Tất cả mục</option>
                  <option value="eating">Ăn uống</option>
                  <option value="entertainment">Giải trí</option>
@@ -300,7 +300,11 @@ const TransactionContent = ({
             <Search className="absolute left-3 top-3 text-gray-400" size={18} />
             <input type="text" placeholder="Tìm kiếm..." className="w-full pl-10 p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <select className="p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-full md:min-w-[180px] text-base sm:text-sm font-medium text-gray-600" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+          <select 
+            className="custom-select p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-full md:min-w-[180px] text-base sm:text-sm font-medium text-gray-600" 
+            value={filterCategory} 
+            onChange={e => setFilterCategory(e.target.value)}
+          >
             <option value="all">Tất cả danh mục</option>
             {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -543,7 +547,7 @@ export default function App() {
             <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}><div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>{formData.isIncurred && <X size={14} className="text-white" />}</div><label className="text-sm font-medium text-gray-700 cursor-pointer select-none">Đánh dấu là chi phí phát sinh</label></div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Ngày</label><input type="date" required className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
-              <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label><select className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label><select className="custom-select w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
             </div>
             <div className="relative"><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300" value={formData.note} onChange={handleNoteChange} placeholder="Nhập ghi chú..." />{suggestions.length > 0 && (<div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">{suggestions.map((s, idx) => (<div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2"><List size={14} className="text-gray-400" />{s}</div>))}</div>)}</div>
             <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] transition-all">Lưu Giao Dịch</button>
@@ -563,12 +567,12 @@ export default function App() {
     <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl shadow-sm border border-slate-100 w-full sm:w-auto justify-between sm:justify-start">
       <div className="flex items-center gap-2">
         <Calendar size={18} className="text-gray-400" />
-        <select value={viewMonth} onChange={(e) => setViewMonth(parseInt(e.target.value))} className="p-1 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded">
+        <select value={viewMonth} onChange={(e) => setViewMonth(parseInt(e.target.value))} className="custom-select p-1 pr-6 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded">
           {Array.from({ length: 12 }, (_, i) => <option key={i} value={i}>Tháng {i + 1}</option>)}
         </select>
       </div>
       <span className="text-gray-200">|</span>
-      <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} className="p-1 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded">
+      <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} className="custom-select p-1 pr-6 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded">
         {Array.from({ length: 5 }, (_, i) => <option key={i} value={new Date().getFullYear() - 2 + i}>{new Date().getFullYear() - 2 + i}</option>)}
       </select>
     </div>
@@ -576,7 +580,27 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-gray-800 font-sans flex flex-col md:flex-row overflow-x-hidden selection:bg-blue-100 selection:text-blue-900">
-      <style>{`html, body { -webkit-tap-highlight-color: transparent; } button, a, input, select { touch-action: manipulation; }`}</style>
+      <style>{`
+        html, body { -webkit-tap-highlight-color: transparent; }
+        button, a, input, select { touch-action: manipulation; }
+        
+        /* iOS Dropdown Reset - Giúp dropdown phẳng, đẹp, có mũi tên custom */
+        .custom-select {
+          -webkit-appearance: none;
+          appearance: none;
+          background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+          background-repeat: no-repeat;
+          background-position: right 0.5rem center;
+          background-size: 1em;
+          padding-right: 2rem; /* Tạo khoảng trống cho mũi tên */
+        }
+        
+        /* Riêng cho FilterBar (chỗ chọn tháng/năm) cần chỉnh lại chút padding vì nó nhỏ */
+        .items-center .custom-select {
+           padding-right: 1.5rem;
+           background-position: right 0rem center;
+        }
+      `}</style>
       
       {/* Mobile Header */}
       <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-30 border-b border-gray-100">
