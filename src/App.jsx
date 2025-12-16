@@ -10,7 +10,7 @@ import {
   Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal, ChevronDown,
   Heart, Star, Gift, Music, Briefcase, Plane, Gamepad2, GraduationCap,
   Baby, Dog, Car, Zap, Wifi, Phone, Dumbbell,
-  Eye, EyeOff, Bell, BellOff, LogOut, Lock, User
+  Eye, EyeOff, Bell, BellOff, LogOut, Lock, User, Globe
 } from 'lucide-react';
 
 // FIREBASE IMPORTS
@@ -18,6 +18,7 @@ import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
+  signInAnonymously,
   signOut,                   
   onAuthStateChanged 
 } from "firebase/auth";
@@ -94,6 +95,36 @@ const Badge = ({ color, children }) => (
   </span>
 );
 
+// --- PATH HELPER FUNCTION (CRITICAL) ---
+const getFirestorePaths = (user) => {
+  if (!user) return null;
+
+  // Nếu là Anonymous (Demo) -> Dùng Public Path
+  if (user.isAnonymous) {
+    return {
+      transactions: collection(db, 'artifacts', appId, 'public', 'data', 'transactions'),
+      budgetConfig: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'budgets'),
+      categories: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'categories'),
+      visibility: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'visibility'),
+      alerts: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'alerts'),
+      notes: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'notes'),
+      isPublic: true
+    };
+  }
+
+  // Nếu là User thường -> Dùng Private Path
+  return {
+    transactions: collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'),
+    budgetConfig: doc(db, 'artifacts', appId, 'users', user.uid, 'budgets', 'config'),
+    categories: doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'categories'),
+    visibility: doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'visibility'),
+    alerts: doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'alerts'),
+    notes: doc(db, 'artifacts', appId, 'users', user.uid, 'stats', 'notes'),
+    isPublic: false
+  };
+};
+
+
 // --- LOGIN COMPONENT ---
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
@@ -110,6 +141,24 @@ const LoginScreen = () => {
     } catch (err) {
       console.error(err);
       setError('Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.');
+      setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await signInAnonymously(auth);
+    } catch (err) {
+      console.error("Lỗi đăng nhập demo:", err);
+      let msg = 'Không thể truy cập demo. Vui lòng thử lại.';
+      if (err.code === 'auth/operation-not-allowed') {
+        msg = 'Lỗi: Bạn chưa bật "Anonymous Sign-in" trong Firebase Console -> Authentication.';
+      } else if (err.code === 'auth/network-request-failed') {
+        msg = 'Lỗi kết nối mạng. Vui lòng kiểm tra lại internet.';
+      }
+      setError(msg);
       setLoading(false);
     }
   };
@@ -167,17 +216,28 @@ const LoginScreen = () => {
             {loading ? <span className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></span> : 'Đăng Nhập'}
           </button>
         </form>
+
+        <div className="mt-6 text-center">
+          <button 
+            onClick={handleDemoLogin}
+            disabled={loading}
+            className="text-xs text-gray-400 hover:text-blue-600 font-medium transition-colors inline-flex items-center gap-1 group"
+          >
+            Xem demo (Public Data) <ArrowUpRight size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"/>
+          </button>
+        </div>
+
       </div>
     </div>
   );
 };
 
-// --- COMPONENT: DASHBOARD CONTENT ---
+// --- DASHBOARD CONTENT ---
 const DashboardContent = React.memo(({ 
   totalSpent, totalBudget, spendingDiff, totalIncurred, alerts, 
   spendingByCategory, currentChartData, chartMode, setChartMode, 
   chartCategoryFilter, setChartCategoryFilter, allCategories, categoryVisibility,
-  userName // Receive userName prop
+  userName, isPublic
 }) => {
   const [showCharts, setShowCharts] = useState(false);
 
@@ -199,9 +259,14 @@ const DashboardContent = React.memo(({
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
-      <div className="mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">Xin chào, {userName}</h2>
-          <p className="text-gray-500">Đây là tình hình tài chính tháng này của bạn.</p>
+      <div className="mb-4 flex justify-between items-start">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              Xin chào, {userName}
+              {isPublic && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">Public Mode</span>}
+            </h2>
+            <p className="text-gray-500">Đây là tình hình tài chính tháng này của bạn.</p>
+          </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -284,6 +349,7 @@ const DashboardContent = React.memo(({
                   <Pie
                     data={spendingByCategory.filter(i => i.value > 0)}
                     cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={4} dataKey="value" label={renderCustomizedLabel}
+                    activeShape={null} // Removed active shape highlight
                   >
                     {spendingByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={2} stroke="#fff" />)}
                   </Pie>
@@ -338,7 +404,7 @@ const DashboardContent = React.memo(({
                 <XAxis dataKey="name" tick={{fontSize: 10, fill: '#94A3B8'}} axisLine={false} tickLine={false} interval={chartMode === 'daily' ? 2 : 0} />
                 <YAxis hide />
                 <RechartsTooltip formatter={(value) => formatCurrency(value)} labelFormatter={(label, payload) => payload[0]?.payload.fullLabel || label} cursor={{fill: '#F8FAFC'}} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
-                <Bar dataKey="amount" fill={chartColor} radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={false} />
+                <Bar dataKey="amount" fill={chartColor} radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={false} activeBar={false} />
               </BarChart>
             </ResponsiveContainer>
             )}
@@ -360,7 +426,7 @@ const DashboardContent = React.memo(({
               <YAxis dataKey="name" type="category" tick={{fontSize: 12, fill: '#4B5563', fontWeight: 600}} width={80} axisLine={false} tickLine={false} />
               <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
               <Legend />
-              <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false}>
+              <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false} activeBar={false}>
                  {spendingByCategory.filter(item => item.value > 0).map((entry, index) => {
                     let barColor = '#3B82F6';
                     if (entry.budget > 0) {
@@ -372,7 +438,7 @@ const DashboardContent = React.memo(({
                  })}
                  <LabelList dataKey="value" position="right" formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} style={{fontSize: '11px', fontWeight: 'bold', fill: '#6B7280'}} />
               </Bar>
-              <Bar dataKey="budget" name="Ngân sách" fill="#F3F4F6" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false}>
+              <Bar dataKey="budget" name="Ngân sách" fill="#F3F4F6" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false} activeBar={false}>
                  <LabelList dataKey="budget" position="right" formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} style={{fontSize: '11px', fill: '#9CA3AF'}} />
               </Bar>
             </BarChart>
@@ -526,7 +592,7 @@ const BudgetContent = ({
                   </div>
                   <div className="relative mt-auto">
                       <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Hạn mức tháng</label>
-                      <input type="number" className="w-full text-xl font-bold border-b-2 border-slate-100 focus:border-gray-800 outline-none py-2 transition-colors bg-transparent text-gray-800" value={currentVal} onChange={(e) => setBudgets({...budgets, [cat.id]: Number(e.target.value)})} placeholder="0" />
+                      <input type="number" className="w-full text-xl font-bold border-b-2 border-slate-100 focus:border-gray-800 outline-none py-2 transition-colors bg-transparent text-gray-800" value={currentVal === 0 ? '' : currentVal} onChange={(e) => setBudgets({...budgets, [cat.id]: Number(e.target.value)})} placeholder="0" />
                       <span className="absolute right-0 bottom-3 text-xs text-gray-400 font-bold">VNĐ</span>
                   </div>
               </div>
@@ -601,7 +667,7 @@ export default function App() {
     return onAuthStateChanged(auth, setUser);
   }, []);
 
-  // --- DATA SYNC (PRIVATE PER USER) ---
+  // --- DATA SYNC (ADAPTED FOR PUBLIC VS PRIVATE) ---
   useEffect(() => {
     if (!user) {
       setTransactions([]);
@@ -609,35 +675,38 @@ export default function App() {
       return;
     }
     setIsLoading(true);
+
+    const paths = getFirestorePaths(user);
+    if (!paths) return;
     
-    // Transactions: users/{uid}/transactions
-    const unsubTx = onSnapshot(query(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions')), (snapshot) => {
+    // Transactions
+    const unsubTx = onSnapshot(query(paths.transactions), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       data.sort((a, b) => new Date(b.date) - new Date(a.date));
       setTransactions(data);
       setIsLoading(false);
     }, (e) => { console.error(e); setIsLoading(false); });
 
-    // Budgets: users/{uid}/budgets/config
-    const unsubBudget = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'budgets', 'config'), (s) => s.exists() && setBudgets(s.data()));
+    // Budgets Config
+    const unsubBudget = onSnapshot(paths.budgetConfig, (s) => s.exists() && setBudgets(s.data()));
     
-    // Custom Categories: users/{uid}/settings/categories
-    const unsubCustomCats = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'categories'), (s) => {
+    // Custom Categories
+    const unsubCustomCats = onSnapshot(paths.categories, (s) => {
       if (s.exists()) setCustomCategoryConfig(s.data());
     });
 
-    // Visibility Settings: users/{uid}/settings/visibility
-    const unsubVisibility = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'visibility'), (s) => {
+    // Visibility Settings
+    const unsubVisibility = onSnapshot(paths.visibility, (s) => {
       if (s.exists()) setCategoryVisibility(s.data());
     });
 
-    // Alert Settings: users/{uid}/settings/alerts
-    const unsubAlerts = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'alerts'), (s) => {
+    // Alert Settings
+    const unsubAlerts = onSnapshot(paths.alerts, (s) => {
       if (s.exists()) setCategoryAlerts(s.data());
     });
 
-    // Notes Stats: users/{uid}/stats/notes
-    const unsubNotes = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'stats', 'notes'), (s) => s.exists() && setNoteStats(s.data()));
+    // Notes Stats
+    const unsubNotes = onSnapshot(paths.notes, (s) => s.exists() && setNoteStats(s.data()));
 
     return () => { unsubTx(); unsubBudget(); unsubNotes(); unsubCustomCats(); unsubVisibility(); unsubAlerts(); };
   }, [user]);
@@ -656,69 +725,75 @@ export default function App() {
   // --- ACTIONS (UPDATED PATHS) ---
   const addTransaction = async (newTx) => {
     if (!user) return;
-    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'), { ...newTx, createdAt: serverTimestamp() });
+    const paths = getFirestorePaths(user);
+    
+    await addDoc(paths.transactions, { ...newTx, createdAt: serverTimestamp() });
+    
     if (newTx.note?.trim()) {
       const cleanNote = newTx.note.trim().replace(/\./g, '');
-      if (cleanNote) await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'stats', 'notes'), { [cleanNote]: increment(1) }, { merge: true });
+      if (cleanNote) await setDoc(paths.notes, { [cleanNote]: increment(1) }, { merge: true });
     }
   };
 
   const deleteTransaction = async (id) => {
     if (!user || !confirm('Bạn có chắc muốn xóa giao dịch này?')) return;
-    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'transactions', id));
+    const paths = getFirestorePaths(user);
+    // Use doc() with the collection ref and ID
+    await deleteDoc(doc(paths.transactions, id));
   };
 
   const saveBudgetsToDb = async (newBudgets) => {
     if (!user) return;
-    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'budgets', 'config'), newBudgets);
+    const paths = getFirestorePaths(user);
+    await setDoc(paths.budgetConfig, newBudgets);
     alert("Đã cập nhật ngân sách thành công!");
   };
 
   const addNewCategory = async ({ name, budget }) => {
     if (!user) return;
+    const paths = getFirestorePaths(user);
     const id = `custom_${Date.now()}`;
     const randomColor = getRandomColor();
-    // REMOVED ICON FROM SAVE
-    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'categories'), {
+
+    await setDoc(paths.categories, {
       [id]: { label: name, color: randomColor }
     }, { merge: true });
-    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'budgets', 'config'), {
+    
+    await setDoc(paths.budgetConfig, {
       [id]: Number(budget)
     }, { merge: true });
     alert("Đã thêm danh mục mới thành công!");
   };
 
   const deleteCustomCategory = async (id) => {
-    if (!user || !confirm('Bạn có chắc muốn xóa danh mục này? Dữ liệu chi tiêu cũ vẫn được giữ nhưng danh mục sẽ không còn hiển thị.')) return;
+    if (!user || !confirm('Bạn có chắc muốn xóa danh mục này?')) return;
+    const paths = getFirestorePaths(user);
     
-    const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'categories');
-    const budgetRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgets', 'config');
-    const visibilityRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'visibility');
-    const alertsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'alerts');
-
     // Remove from settings map
-    await updateDoc(settingsRef, { [id]: deleteField() });
+    await updateDoc(paths.categories, { [id]: deleteField() });
     
-    // Clean up budget config (optional but good for data hygiene)
-    await updateDoc(budgetRef, { [id]: deleteField() });
+    // Clean up budget config
+    await updateDoc(paths.budgetConfig, { [id]: deleteField() });
     
-    // Clean up other configs
-    try { await updateDoc(visibilityRef, { [id]: deleteField() }); } catch(e) {}
-    try { await updateDoc(alertsRef, { [id]: deleteField() }); } catch(e) {}
+    // Clean up other configs (try-catch because they might not exist)
+    try { await updateDoc(paths.visibility, { [id]: deleteField() }); } catch(e) {}
+    try { await updateDoc(paths.alerts, { [id]: deleteField() }); } catch(e) {}
   };
 
   const toggleVisibility = async (id) => {
     if (!user) return;
+    const paths = getFirestorePaths(user);
     const currentStatus = categoryVisibility[id] !== false; 
-    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'visibility'), {
+    await setDoc(paths.visibility, {
       [id]: !currentStatus
     }, { merge: true });
   };
 
   const toggleAlert = async (id) => {
     if (!user) return;
-    const currentStatus = categoryAlerts[id] !== false; // Default true
-    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'alerts'), {
+    const paths = getFirestorePaths(user);
+    const currentStatus = categoryAlerts[id] !== false; 
+    await setDoc(paths.alerts, {
       [id]: !currentStatus
     }, { merge: true });
   };
@@ -888,6 +963,7 @@ export default function App() {
   // Helper for name
   const getUserName = () => {
     if (!user) return '';
+    if (user.isAnonymous) return 'Demo User';
     return user.displayName || user.email?.split('@')[0] || 'Người dùng';
   };
   const userName = getUserName();
@@ -907,6 +983,17 @@ export default function App() {
         input[type="date"], input[type="number"], input[type="text"], select {
           -webkit-appearance: none; -moz-appearance: none; appearance: none;
           border-radius: 0.75rem; font-size: 16px;
+        }
+
+        /* Disable focus outline for charts */
+        .recharts-surface:focus {
+            outline: none;
+        }
+        path.recharts-sector:focus,
+        path.recharts-rectangle:focus,
+        g.recharts-layer:focus,
+        .recharts-wrapper:focus {
+            outline: none !important;
         }
 
         .custom-select {
@@ -931,7 +1018,7 @@ export default function App() {
       
       {/* Mobile Header */}
       <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-gray-100">
-        <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">{userName}</h1>
+        <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">{userName} {user.isAnonymous && <Globe size={16} className="text-blue-500" />}</h1>
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
           className="p-2 sm:hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 transition-colors"
@@ -950,7 +1037,7 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none pt-[73px] md:pt-0`}>
-        <div className="p-8 border-b border-slate-50 hidden md:block"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">{userInitial}</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">Personal Finance</p></div></div></div>
+        <div className="p-8 border-b border-slate-50 hidden md:block"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">{userInitial}</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">{user.isAnonymous ? 'Public Shared Dashboard' : 'Personal Finance'}</p></div></div></div>
         <nav className="p-6 space-y-2 flex-1">
           <SidebarItem id="dashboard" label="Tổng quan" icon={LayoutDashboard} active={activeTab === 'dashboard'} />
           <SidebarItem id="transactions" label="Sổ giao dịch" icon={Receipt} active={activeTab === 'transactions'} />
@@ -987,8 +1074,9 @@ export default function App() {
                   chartMode={chartMode} setChartMode={setChartMode} 
                   chartCategoryFilter={chartCategoryFilter} setChartCategoryFilter={setChartCategoryFilter}
                   allCategories={allCategories}
-                  categoryVisibility={categoryVisibility} // Passed visibility prop
-                  userName={userName} // Pass dynamic name
+                  categoryVisibility={categoryVisibility} 
+                  userName={userName}
+                  isPublic={user.isAnonymous}
                 />
               )}
               {activeTab === 'transactions' && (
@@ -1007,9 +1095,9 @@ export default function App() {
                   onAddCategory={addNewCategory}
                   categoryVisibility={categoryVisibility}
                   toggleVisibility={toggleVisibility}
-                  categoryAlerts={categoryAlerts} // Pass alert state
-                  toggleAlert={toggleAlert} // Pass alert toggle function
-                  deleteCustomCategory={deleteCustomCategory} // Pass delete function
+                  categoryAlerts={categoryAlerts} 
+                  toggleAlert={toggleAlert} 
+                  deleteCustomCategory={deleteCustomCategory} 
                 />
               )}
             </>
