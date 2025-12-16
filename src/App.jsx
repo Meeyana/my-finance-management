@@ -206,13 +206,26 @@ const DashboardContent = React.memo(({
              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <h4 className="font-bold text-gray-800 flex items-center gap-2"><BarChart2 size={20} className="text-gray-400" /> Xu hướng chi tiêu</h4>
               <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold w-full sm:w-auto">
-                <button onClick={() => setChartMode('daily')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Ngày</button>
-                <button onClick={() => setChartMode('monthly')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Tháng</button>
+                <button 
+                  onClick={() => setChartMode('daily')} 
+                  // UPDATED: Added active:scale-95 and active:bg-gray-200 for touch feedback
+                  className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all active:scale-95 ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 active:bg-gray-200'}`}
+                >
+                  Ngày
+                </button>
+                <button 
+                  onClick={() => setChartMode('monthly')} 
+                  // UPDATED: Added active:scale-95 and active:bg-gray-200
+                  className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all active:scale-95 ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700 active:bg-gray-200'}`}
+                >
+                  Tháng
+                </button>
               </div>
             </div>
             <div className="self-end w-full sm:w-auto">
                <select 
-                 className="custom-select w-full sm:w-auto p-2 text-base sm:text-xs border border-slate-200 rounded-lg bg-white outline-none text-gray-600 font-medium" 
+                 // UPDATED: Added custom-select and refined padding for Dashboard filter
+                 className="custom-select w-full sm:w-auto pl-3 py-2 pr-10 text-base sm:text-xs border border-slate-200 rounded-lg bg-white outline-none text-gray-600 font-medium active:bg-gray-50" 
                  value={chartCategoryFilter} 
                  onChange={(e) => setChartCategoryFilter(e.target.value)}
                >
@@ -328,7 +341,13 @@ const TransactionContent = ({
                   <td className="px-6 py-4 text-gray-800 font-medium">{tx.note}</td>
                   <td className="px-6 py-4 text-right font-bold text-gray-800">{formatCurrency(tx.amount)}</td>
                   <td className="px-6 py-4 text-center">
-                    <button onClick={() => deleteTransaction(tx.id)} className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><Trash2 size={16} /></button>
+                    <button 
+                      onClick={() => deleteTransaction(tx.id)} 
+                      // UPDATED: Added active:scale-125 and active:bg-red-100 for clear feedback
+                      className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 active:scale-125 active:bg-red-100 active:text-red-600"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -349,7 +368,13 @@ const BudgetContent = ({ budgets, setBudgets, saveBudgetsToDb }) => {
     <div className="space-y-8 animate-fade-in pb-24">
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div><h3 className="text-2xl font-bold text-gray-800">Cài đặt ngân sách</h3><p className="text-gray-500">Phân bổ hạn mức chi tiêu cho từng danh mục</p></div>
-          <button onClick={() => saveBudgetsToDb(budgets)} className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black font-bold shadow-lg transition-all active:scale-95 w-full md:w-auto justify-center"><Save size={18} /> Lưu thay đổi</button>
+          <button 
+            onClick={() => saveBudgetsToDb(budgets)} 
+            // UPDATED: Added active:scale-95 and active:bg-black for feedback
+            className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black font-bold shadow-lg transition-all active:scale-95 active:bg-black w-full md:w-auto justify-center"
+          >
+            <Save size={18} /> Lưu thay đổi
+          </button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {CATEGORIES.map(cat => {
@@ -541,16 +566,37 @@ export default function App() {
     return (
       <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm overflow-y-auto">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in overflow-hidden my-4">
-          <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center"><h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3><button onClick={onClose} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors"><X size={18} className="text-gray-600"/></button></div>
+          <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+            <h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3>
+            <button 
+              onClick={onClose} 
+              // UPDATED: Added active:scale-90 and active:bg-gray-200
+              className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors active:scale-90 active:bg-gray-200"
+            >
+              <X size={18} className="text-gray-600"/>
+            </button>
+          </div>
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Số tiền</label><div className="relative"><input type="number" required className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0" autoFocus /><span className="absolute right-4 top-5 text-gray-400 font-bold">VNĐ</span></div></div>
-            <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}><div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>{formData.isIncurred && <X size={14} className="text-white" />}</div><label className="text-sm font-medium text-gray-700 cursor-pointer select-none">Đánh dấu là chi phí phát sinh</label></div>
+            <div 
+              // UPDATED: Added active:scale-[0.98] and active:bg-slate-50
+              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer active:scale-[0.98] active:bg-slate-50 ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
+              onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
+            >
+              <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>{formData.isIncurred && <X size={14} className="text-white" />}</div><label className="text-sm font-medium text-gray-700 cursor-pointer select-none">Đánh dấu là chi phí phát sinh</label>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Ngày</label><input type="date" required className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
               <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label><select className="custom-select w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
             </div>
-            <div className="relative"><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300" value={formData.note} onChange={handleNoteChange} placeholder="Nhập ghi chú..." />{suggestions.length > 0 && (<div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">{suggestions.map((s, idx) => (<div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2"><List size={14} className="text-gray-400" />{s}</div>))}</div>)}</div>
-            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] transition-all">Lưu Giao Dịch</button>
+            <div className="relative"><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300" value={formData.note} onChange={handleNoteChange} placeholder="Nhập ghi chú..." />{suggestions.length > 0 && (<div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">{suggestions.map((s, idx) => (<div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>))}</div>)}</div>
+            <button 
+              type="submit" 
+              // UPDATED: Added active:scale-[0.98] and active:bg-blue-700
+              className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] active:bg-blue-700 transition-all"
+            >
+              Lưu Giao Dịch
+            </button>
           </form>
         </div>
       </div>
