@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LabelList 
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LabelList 
 } from 'recharts';
 import { 
   LayoutDashboard, Wallet, Receipt, PlusCircle, Settings, 
   TrendingUp, TrendingDown, Search, Trash2, Save,
-  Menu, X, Database, Calendar, Filter, AlertCircle, BarChart2, ArrowUpRight, ArrowDownRight,
+  Menu, X, Database, Calendar, AlertCircle, BarChart2, ArrowUpRight, ArrowDownRight,
   List, AlertTriangle,
-  Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal, Briefcase, User
+  Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal
 } from 'lucide-react';
 
 // FIREBASE IMPORTS
@@ -31,11 +31,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-// Use a fixed App ID for personal use
 const appId = 'quan-ly-chi-tieu-personal';
 
-// MAPPING CATEGORY TO ICONS
+// --- CONFIG & UTILS ---
 const CATEGORY_CONFIG = {
   eating: { icon: Coffee, label: 'Ăn uống', color: '#EF4444' },
   investment: { icon: TrendingUp, label: 'Đầu tư', color: '#10B981' },
@@ -55,28 +53,17 @@ const CATEGORIES = Object.keys(CATEGORY_CONFIG).map(key => ({
 }));
 
 const INITIAL_BUDGETS = {
-  eating: 0,
-  investment: 0,
-  entertainment: 0,
-  learning: 0,
-  living: 0,
-  fuel: 0,
-  shopping: 0,
-  other: 0
+  eating: 0, investment: 0, entertainment: 0, learning: 0, 
+  living: 0, fuel: 0, shopping: 0, other: 0
 };
 
-// UTILS
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
-};
-
+const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 const formatShortCurrency = (amount) => {
   if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'tr';
   if (amount >= 1000) return (amount / 1000).toFixed(0) + 'k';
   return amount;
 };
 
-// COMPONENTS
 const Card = ({ children, className = "" }) => (
   <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-5 sm:p-6 ${className}`}>
     {children}
@@ -89,6 +76,301 @@ const Badge = ({ color, children }) => (
   </span>
 );
 
+// --- COMPONENT: DASHBOARD CONTENT (Extracted & Memoized) ---
+// Tách component này ra ngoài để tránh bị re-render khi App state thay đổi (như toggle menu)
+const DashboardContent = React.memo(({ 
+  totalSpent, totalBudget, spendingDiff, totalIncurred, alerts, 
+  spendingByCategory, currentChartData, chartMode, setChartMode, 
+  chartCategoryFilter, setChartCategoryFilter 
+}) => {
+  // Lazy Load Chart: Chỉ hiển thị chart sau khi component đã mount xong 1 chút
+  // Giúp UI render khung trước, tránh block main thread
+  const [showCharts, setShowCharts] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowCharts(true), 200); // Delay 200ms để animation menu mượt
+    return () => clearTimeout(timer);
+  }, []);
+
+  const chartColor = chartMode === 'daily' ? '#3B82F6' : '#8B5CF6';
+
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius * 1.1; 
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    if (percent === 0) return null;
+    return <text x={x} y={y} fill="#374151" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="12" fontWeight="bold">{`${(percent * 100).toFixed(0)}%`}</text>;
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in pb-12">
+      <div className="mb-4">
+          <h2 className="text-2xl font-bold text-gray-800">Xin chào, Tuấn Phan</h2>
+          <p className="text-gray-500">Đây là tình hình tài chính tháng này của bạn.</p>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-200 shadow-lg border-none relative overflow-hidden">
+          <div className="relative z-10">
+              <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">Đã chi tiêu</p>
+              <h3 className="text-3xl font-bold mt-2 tracking-tight">{formatCurrency(totalSpent)}</h3>
+              <div className="mt-3 inline-flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm">
+                {spendingDiff > 0 ? <ArrowUpRight size={12}/> : <ArrowDownRight size={12}/>}
+                {spendingDiff > 0 ? '+' : ''}{formatShortCurrency(spendingDiff)} so với tháng trước
+              </div>
+          </div>
+          <TrendingDown className="absolute right-[-10px] bottom-[-10px] text-white opacity-20" size={100} />
+        </Card>
+        
+        <Card>
+           <div className="flex justify-between items-start">
+            <div>
+              <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Ngân sách</p>
+              <h3 className="text-2xl font-bold text-gray-800 mt-1">{formatCurrency(totalBudget)}</h3>
+            </div>
+             <div className="p-2.5 bg-green-50 rounded-xl text-green-600"><Wallet size={24} /></div>
+          </div>
+          <div className="mt-4 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+              <div className="h-full rounded-full bg-green-500" style={{width: `${totalBudget > 0 ? Math.min((totalSpent/totalBudget)*100, 100) : 0}%`}}></div>
+          </div>
+        </Card>
+        
+        <Card>
+           <div className="flex justify-between items-start">
+            <div>
+              <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Phát sinh</p>
+              <h3 className="text-2xl font-bold text-orange-600 mt-1">{formatCurrency(totalIncurred)}</h3>
+            </div>
+             <div className="p-2.5 bg-orange-50 rounded-xl text-orange-600"><AlertCircle size={24} /></div>
+          </div>
+        </Card>
+
+        <Card>
+           <div className="flex justify-between items-start">
+            <div>
+              <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Còn lại</p>
+              <h3 className={`text-2xl font-bold mt-1 ${totalBudget - totalSpent < 0 ? 'text-red-600' : 'text-indigo-600'}`}>
+                {formatCurrency(totalBudget - totalSpent)}
+              </h3>
+            </div>
+             <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600"><TrendingUp size={24} /></div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {alerts.map((alert) => (
+            <div key={alert.id} className={`p-4 rounded-xl border-l-4 shadow-sm flex items-center gap-3 ${alert.type === 'danger' ? 'bg-red-50 border-red-500 text-red-800' : 'bg-yellow-50 border-yellow-500 text-yellow-800'}`}>
+              {alert.type === 'danger' ? <AlertCircle size={20} /> : <AlertTriangle size={20} />}
+              <div className="flex-1">
+                <p className="font-bold text-sm">{alert.message}</p>
+                <p className="text-xs opacity-80">Đã dùng {(alert.ratio * 100).toFixed(0)}% ngân sách.</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Charts Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pie Chart */}
+        <Card className="min-h-[420px]">
+          <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <PieChart size={20} className="text-gray-400" /> Phân bổ chi tiêu
+          </h4>
+          <div className="h-80 w-full">
+             {!showCharts ? (
+                <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
+             ) : totalSpent > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={spendingByCategory.filter(i => i.value > 0)}
+                    cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={4} dataKey="value" label={renderCustomizedLabel}
+                  >
+                    {spendingByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={2} stroke="#fff" />)}
+                  </Pie>
+                  <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle"/>
+                </PieChart>
+              </ResponsiveContainer>
+             ) : (
+               <div className="h-full flex flex-col items-center justify-center text-gray-400"><Database size={48} className="mb-2 opacity-10" /><p className="text-sm">Chưa có dữ liệu</p></div>
+             )}
+          </div>
+        </Card>
+
+        {/* Bar Chart */}
+        <Card className="min-h-[420px]">
+          <div className="flex flex-col gap-3 mb-4">
+             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <h4 className="font-bold text-gray-800 flex items-center gap-2"><BarChart2 size={20} className="text-gray-400" /> Xu hướng chi tiêu</h4>
+              <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold w-full sm:w-auto">
+                <button onClick={() => setChartMode('daily')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Ngày</button>
+                <button onClick={() => setChartMode('monthly')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Tháng</button>
+              </div>
+            </div>
+            <div className="self-end w-full sm:w-auto">
+               <select className="w-full sm:w-auto p-2 text-base sm:text-xs border border-slate-200 rounded-lg bg-white outline-none text-gray-600 font-medium" value={chartCategoryFilter} onChange={(e) => setChartCategoryFilter(e.target.value)}>
+                 <option value="all">Tất cả mục</option>
+                 <option value="eating">Ăn uống</option>
+                 <option value="entertainment">Giải trí</option>
+                 <option value="fuel">Đi lại</option>
+                 <option value="shopping">Mua sắm</option>
+               </select>
+            </div>
+          </div>
+          <div className="h-80 w-full">
+            {!showCharts ? (
+               <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
+            ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={currentChartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis dataKey="name" tick={{fontSize: 10, fill: '#94A3B8'}} axisLine={false} tickLine={false} interval={chartMode === 'daily' ? 2 : 0} />
+                <YAxis hide />
+                <RechartsTooltip formatter={(value) => formatCurrency(value)} labelFormatter={(label, payload) => payload[0]?.payload.fullLabel || label} cursor={{fill: '#F8FAFC'}} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
+                <Bar dataKey="amount" fill={chartColor} radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Actual vs Budget */}
+      <Card>
+        <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2"><Settings size={20} className="text-gray-400" /> Thực tế vs Ngân sách</h4>
+        <div className="h-[500px] w-full">
+          {!showCharts ? (
+             <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
+          ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={spendingByCategory} layout="vertical" margin={{left: 40, right: 60}} barCategoryGap={24}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
+              <XAxis type="number" hide />
+              <YAxis dataKey="name" type="category" tick={{fontSize: 12, fill: '#4B5563', fontWeight: 600}} width={80} axisLine={false} tickLine={false} />
+              <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
+              <Legend />
+              <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false}>
+                 {spendingByCategory.map((entry, index) => {
+                    let barColor = '#3B82F6';
+                    if (entry.budget > 0) {
+                      const ratio = entry.value / entry.budget;
+                      if (ratio > 1) barColor = '#EF4444';
+                      else if (ratio >= 0.8) barColor = '#F59E0B';
+                    }
+                    return <Cell key={`cell-${index}`} fill={barColor} />;
+                 })}
+                 <LabelList dataKey="value" position="right" formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} style={{fontSize: '11px', fontWeight: 'bold', fill: '#6B7280'}} />
+              </Bar>
+              <Bar dataKey="budget" name="Ngân sách" fill="#F3F4F6" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false}>
+                 <LabelList dataKey="budget" position="right" formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} style={{fontSize: '11px', fill: '#9CA3AF'}} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+});
+
+// --- COMPONENT: TRANSACTION CONTENT (Extracted) ---
+const TransactionContent = ({ 
+  filtered, viewMonth, viewYear, search, setSearch, filterCategory, setFilterCategory, deleteTransaction 
+}) => {
+  return (
+    <div className="space-y-6 animate-fade-in pb-12">
+      <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm flex items-center justify-between">
+         <div className="flex items-center gap-3">
+           <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><Receipt size={20} /></div>
+           <div><h3 className="font-bold text-gray-800">Sổ giao dịch</h3><p className="text-xs text-gray-500">Tháng {parseInt(viewMonth) + 1}/{viewYear}</p></div>
+         </div>
+         <span className="text-xs bg-slate-100 px-3 py-1.5 rounded-full font-bold text-gray-600 whitespace-nowrap">{filtered.length} giao dịch</span>
+      </div>
+
+      <Card className="p-0 overflow-hidden border-0 shadow-sm">
+        <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row gap-4 bg-gray-50/50">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 text-gray-400" size={18} />
+            <input type="text" placeholder="Tìm kiếm..." className="w-full pl-10 p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white" value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <select className="p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-full md:min-w-[180px] text-base sm:text-sm font-medium text-gray-600" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+            <option value="all">Tất cả danh mục</option>
+            {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-gray-400 uppercase bg-white border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4 font-semibold">Thời gian</th>
+                <th className="px-6 py-4 font-semibold">Danh mục</th>
+                <th className="px-6 py-4 font-semibold">Nội dung</th>
+                <th className="px-6 py-4 text-right font-semibold">Số tiền</th>
+                <th className="px-6 py-4 text-center font-semibold"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filtered.map((tx) => (
+                <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors group bg-white">
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-medium">{new Date(tx.date).getDate()}/{new Date(tx.date).getMonth() + 1}{tx.isIncurred && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-400" title="Chi phí phát sinh"></span>}</td>
+                  <td className="px-6 py-4"><Badge color={CATEGORIES.find(c => c.id === tx.category)?.color || '#999'}>{CATEGORIES.find(c => c.id === tx.category)?.name}</Badge></td>
+                  <td className="px-6 py-4 text-gray-800 font-medium">{tx.note}</td>
+                  <td className="px-6 py-4 text-right font-bold text-gray-800">{formatCurrency(tx.amount)}</td>
+                  <td className="px-6 py-4 text-center">
+                    <button onClick={() => deleteTransaction(tx.id)} className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100"><Trash2 size={16} /></button>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={5} className="text-center py-12 bg-white"><div className="flex flex-col items-center justify-center text-gray-300 gap-2"><Search size={40} strokeWidth={1} /><p className="text-sm">Không tìm thấy giao dịch nào</p></div></td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// --- COMPONENT: BUDGET CONTENT (Extracted) ---
+const BudgetContent = ({ budgets, setBudgets, saveBudgetsToDb }) => {
+  return (
+    <div className="space-y-8 animate-fade-in pb-24">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div><h3 className="text-2xl font-bold text-gray-800">Cài đặt ngân sách</h3><p className="text-gray-500">Phân bổ hạn mức chi tiêu cho từng danh mục</p></div>
+          <button onClick={() => saveBudgetsToDb(budgets)} className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black font-bold shadow-lg transition-all active:scale-95 w-full md:w-auto justify-center"><Save size={18} /> Lưu thay đổi</button>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {CATEGORIES.map(cat => {
+          const currentVal = budgets[cat.id] || 0;
+          const Icon = cat.icon;
+          return (
+            <div key={cat.id} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow group relative overflow-hidden">
+              <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity`}><Icon size={80} color={cat.color} /></div>
+              <div className="relative z-10 flex flex-col h-full justify-between">
+                  <div className="mb-4"><div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold shadow-sm mb-3" style={{backgroundColor: cat.color}}><Icon size={24} /></div><h4 className="font-bold text-lg text-gray-800">{cat.name}</h4></div>
+                  <div className="relative mt-auto">
+                      <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Hạn mức tháng</label>
+                      <input type="number" className="w-full text-xl font-bold border-b-2 border-slate-100 focus:border-gray-800 outline-none py-2 transition-colors bg-transparent text-gray-800" value={currentVal} onChange={(e) => setBudgets({...budgets, [cat.id]: Number(e.target.value)})} placeholder="0" />
+                      <span className="absolute right-0 bottom-3 text-xs text-gray-400 font-bold">VNĐ</span>
+                  </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  );
+};
+
+// --- MAIN APP ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -106,882 +388,196 @@ export default function App() {
   // --- CHART STATE ---
   const [chartMode, setChartMode] = useState('daily');
   const [chartCategoryFilter, setChartCategoryFilter] = useState('all');
+  
+  // --- TRANSACTION VIEW STATE (Local to view, but needed here if not fully extracted state) ---
+  const [search, setSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
 
-  // --- 1. AUTHENTICATION ---
+  // --- AUTH ---
   useEffect(() => {
     const initAuth = async () => {
         try {
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                 await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                throw new Error("No token provided");
-            }
+            } else { throw new Error("No token provided"); }
         } catch (error) {
-            console.warn("Auth with token failed, falling back to anonymous:", error);
-            try {
-                await signInAnonymously(auth);
-            } catch (anonError) {
-                console.error("Anonymous auth failed:", anonError);
-            }
+            console.warn("Auth with token failed, fallback anon:", error);
+            try { await signInAnonymously(auth); } catch (e) { console.error(e); }
         }
     };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
+    return onAuthStateChanged(auth, setUser);
   }, []);
 
-  // --- 2. DATA SYNC ---
+  // --- DATA SYNC ---
   useEffect(() => {
     if (!user) return;
     setIsLoading(true);
-
-    // Sync Transactions
-    const txQuery = query(
-      collection(db, 'artifacts', appId, 'public', 'data', 'transactions')
-    );
-
-    const unsubTx = onSnapshot(txQuery, (snapshot) => {
+    const unsubTx = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions')), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       data.sort((a, b) => new Date(b.date) - new Date(a.date));
       setTransactions(data);
       setIsLoading(false);
-    }, (error) => {
-      console.error("Error fetching transactions:", error);
-      setIsLoading(false);
-    });
+    }, (e) => { console.error(e); setIsLoading(false); });
 
-    // Sync Budgets
-    const budgetRef = doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config');
-    const unsubBudget = onSnapshot(budgetRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setBudgets(docSnap.data());
-      }
-    }, (error) => console.error("Error fetching budgets:", error));
+    const unsubBudget = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config'), (s) => s.exists() && setBudgets(s.data()));
+    const unsubNotes = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'notes'), (s) => s.exists() && setNoteStats(s.data()));
 
-    // Sync Note Stats
-    const notesRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'notes');
-    const unsubNotes = onSnapshot(notesRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setNoteStats(docSnap.data());
-      }
-    }, (error) => console.error("Error fetching note stats:", error));
-
-    return () => {
-      unsubTx();
-      unsubBudget();
-      unsubNotes();
-    };
+    return () => { unsubTx(); unsubBudget(); unsubNotes(); };
   }, [user]);
 
   // --- ACTIONS ---
   const addTransaction = async (newTx) => {
     if (!user) return;
-    try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), {
-        ...newTx,
-        createdAt: serverTimestamp(),
-        createdBy: user.uid
-      });
-
-      if (newTx.note && newTx.note.trim()) {
-        const cleanNote = newTx.note.trim().replace(/\./g, '');
-        if (cleanNote) {
-          const notesRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'notes');
-          await setDoc(notesRef, {
-            [cleanNote]: increment(1)
-          }, { merge: true });
-        }
-      }
-    } catch (e) {
-      console.error("Error adding document: ", e);
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), { ...newTx, createdAt: serverTimestamp(), createdBy: user.uid });
+    if (newTx.note?.trim()) {
+      const cleanNote = newTx.note.trim().replace(/\./g, '');
+      if (cleanNote) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'notes'), { [cleanNote]: increment(1) }, { merge: true });
     }
   };
 
   const deleteTransaction = async (id) => {
-    if (!user) return;
-    if (confirm('Bạn có chắc muốn xóa giao dịch này?')) {
-      try {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id));
-      } catch (e) {
-        console.error("Error deleting document: ", e);
-      }
-    }
+    if (!user || !confirm('Bạn có chắc muốn xóa giao dịch này?')) return;
+    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id));
   };
 
   const saveBudgetsToDb = async (newBudgets) => {
     if (!user) return;
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config'), newBudgets);
-      alert("Đã cập nhật ngân sách thành công!");
-    } catch (e) {
-      console.error("Error saving budget", e);
-    }
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config'), newBudgets);
+    alert("Đã cập nhật ngân sách thành công!");
   };
 
-  // --- ANALYSIS LOGIC ---
-  const currentMonthTransactions = useMemo(() => {
-    return transactions.filter(t => {
+  // --- MEMOIZED DATA CALCULATIONS ---
+  const currentMonthTransactions = useMemo(() => transactions.filter(t => {
       const d = new Date(t.date);
       return d.getMonth() === parseInt(viewMonth) && d.getFullYear() === parseInt(viewYear);
-    });
-  }, [transactions, viewMonth, viewYear]);
+  }), [transactions, viewMonth, viewYear]);
 
   const previousMonthData = useMemo(() => {
     const prevDate = new Date(viewYear, parseInt(viewMonth) - 1, 1);
-    const pMonth = prevDate.getMonth();
-    const pYear = prevDate.getFullYear();
-    
-    const prevTransactions = transactions.filter(t => {
+    const pTransactions = transactions.filter(t => {
       const d = new Date(t.date);
-      return d.getMonth() === pMonth && d.getFullYear() === pYear;
+      return d.getMonth() === prevDate.getMonth() && d.getFullYear() === prevDate.getFullYear();
     });
-
-    const totalPrev = prevTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    return { total: totalPrev, month: pMonth + 1, year: pYear };
+    return { total: pTransactions.reduce((sum, t) => sum + Number(t.amount), 0) };
   }, [transactions, viewMonth, viewYear]);
 
-  const currentYearTransactions = useMemo(() => {
-    return transactions.filter(t => {
-      const d = new Date(t.date);
-      return d.getFullYear() === parseInt(viewYear);
-    });
-  }, [transactions, viewYear]);
+  const currentYearTransactions = useMemo(() => transactions.filter(t => new Date(t.date).getFullYear() === parseInt(viewYear)), [transactions, viewYear]);
 
   const totalSpent = currentMonthTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
   const totalBudget = Object.values(budgets).reduce((a, b) => a + b, 0);
   const spendingDiff = totalSpent - previousMonthData.total;
-
-  const totalIncurred = currentMonthTransactions
-    .filter(t => t.isIncurred === true)
-    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalIncurred = currentMonthTransactions.filter(t => t.isIncurred).reduce((sum, t) => sum + Number(t.amount), 0);
 
   const spendingByCategory = useMemo(() => {
     const data = {};
     CATEGORIES.forEach(c => data[c.id] = 0);
-    currentMonthTransactions.forEach(t => {
-      if (data[t.category] !== undefined) data[t.category] += Number(t.amount);
-    });
-    
+    currentMonthTransactions.forEach(t => { if (data[t.category] !== undefined) data[t.category] += Number(t.amount); });
     const total = Object.values(data).reduce((a, b) => a + b, 0);
-
-    return Object.keys(data)
-      .map(key => ({
-        id: key,
-        name: CATEGORY_CONFIG[key]?.label,
-        value: data[key],
-        color: CATEGORY_CONFIG[key]?.color,
-        budget: budgets[key] || 0,
-        percentage: total > 0 ? (data[key] / total) * 100 : 0
-      }))
-      .sort((a, b) => b.value - a.value);
+    return Object.keys(data).map(key => ({
+        id: key, name: CATEGORY_CONFIG[key]?.label, value: data[key], color: CATEGORY_CONFIG[key]?.color,
+        budget: budgets[key] || 0, percentage: total > 0 ? (data[key] / total) * 100 : 0
+    })).sort((a, b) => b.value - a.value);
   }, [currentMonthTransactions, budgets]);
 
   const dailySpendingData = useMemo(() => {
-    const daysInMonth = new Date(viewYear, parseInt(viewMonth) + 1, 0).getDate();
-    const data = Array.from({ length: daysInMonth }, (_, i) => ({
-      name: i + 1,
-      amount: 0,
-      fullLabel: `Ngày ${i + 1}/${parseInt(viewMonth) + 1}`
-    }));
-
+    const days = new Date(viewYear, parseInt(viewMonth) + 1, 0).getDate();
+    const data = Array.from({ length: days }, (_, i) => ({ name: i + 1, amount: 0, fullLabel: `Ngày ${i + 1}/${parseInt(viewMonth) + 1}` }));
     currentMonthTransactions.forEach(t => {
       if (chartCategoryFilter !== 'all' && t.category !== chartCategoryFilter) return;
-      const d = new Date(t.date);
-      const dayIndex = d.getDate() - 1;
-      if (data[dayIndex]) {
-        data[dayIndex].amount += Number(t.amount);
-      }
+      const day = new Date(t.date).getDate() - 1;
+      if (data[day]) data[day].amount += Number(t.amount);
     });
     return data;
   }, [currentMonthTransactions, viewMonth, viewYear, chartCategoryFilter]);
 
   const monthlySpendingData = useMemo(() => {
-    const data = Array.from({ length: 12 }, (_, i) => ({
-      name: `T${i + 1}`,
-      amount: 0,
-      fullLabel: `Tháng ${i + 1}/${viewYear}`
-    }));
-
+    const data = Array.from({ length: 12 }, (_, i) => ({ name: `T${i + 1}`, amount: 0, fullLabel: `Tháng ${i + 1}/${viewYear}` }));
     currentYearTransactions.forEach(t => {
       if (chartCategoryFilter !== 'all' && t.category !== chartCategoryFilter) return;
-      const d = new Date(t.date);
-      const monthIndex = d.getMonth();
-      if (data[monthIndex]) {
-        data[monthIndex].amount += Number(t.amount);
-      }
+      const m = new Date(t.date).getMonth();
+      if (data[m]) data[m].amount += Number(t.amount);
     });
     return data;
   }, [currentYearTransactions, viewYear, chartCategoryFilter]);
 
-  // --- SUB-COMPONENTS ---
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
-    const RADIAN = Math.PI / 180;
-    const radius = outerRadius * 1.1; 
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  const alerts = useMemo(() => {
+    const results = [];
+    spendingByCategory.forEach(item => {
+      if (['eating', 'entertainment', 'fuel', 'shopping'].includes(item.id) && item.budget > 0) {
+        const ratio = item.value / item.budget;
+        if (ratio >= 1) results.push({ id: item.id, name: item.name, ratio, type: 'danger', message: `Đã hết ngân sách ${item.name}` });
+        else if (ratio >= 0.8) results.push({ id: item.id, name: item.name, ratio, type: 'warning', message: `${item.name} sắp hết hạn mức` });
+      }
+    });
+    return results;
+  }, [spendingByCategory]);
 
-    if (percent === 0) return null;
-
-    return (
-      <text 
-        x={x} 
-        y={y} 
-        fill="#374151" 
-        textAnchor={x > cx ? 'start' : 'end'} 
-        dominantBaseline="central"
-        fontSize="12"
-        fontWeight="bold"
-      >
-        {`${(percent * 100).toFixed(0)}%`}
-      </text>
-    );
-  };
-
-  const FilterBar = () => (
-    <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl shadow-sm border border-slate-100 w-full sm:w-auto justify-between sm:justify-start">
-      <div className="flex items-center gap-2">
-        <Calendar size={18} className="text-gray-400" />
-        <select 
-          value={viewMonth} 
-          onChange={(e) => setViewMonth(parseInt(e.target.value))}
-          // iOS FIX: text-base prevents zoom on focus
-          className="p-1 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded"
-        >
-          {Array.from({ length: 12 }, (_, i) => (
-            <option key={i} value={i}>Tháng {i + 1}</option>
-          ))}
-        </select>
-      </div>
-      <span className="text-gray-200">|</span>
-      <select 
-        value={viewYear} 
-        onChange={(e) => setViewYear(parseInt(e.target.value))}
-        // iOS FIX: text-base prevents zoom on focus
-        className="p-1 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded"
-      >
-        {Array.from({ length: 5 }, (_, i) => (
-          <option key={i} value={new Date().getFullYear() - 2 + i}>
-            {new Date().getFullYear() - 2 + i}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-
-  const DashboardView = () => {
-    const currentChartData = chartMode === 'daily' ? dailySpendingData : monthlySpendingData;
-    const chartColor = chartMode === 'daily' ? '#3B82F6' : '#8B5CF6';
-
-    const targetCategories = ['eating', 'entertainment', 'fuel', 'shopping'];
-    const alerts = useMemo(() => {
-      const results = [];
-      spendingByCategory.forEach(item => {
-        if (targetCategories.includes(item.id) && item.budget > 0) {
-          const ratio = item.value / item.budget;
-          if (ratio >= 1) {
-            results.push({
-              id: item.id,
-              name: item.name,
-              ratio: ratio,
-              type: 'danger',
-              message: `Đã hết ngân sách ${item.name}`
-            });
-          } else if (ratio >= 0.8) {
-            results.push({
-              id: item.id,
-              name: item.name,
-              ratio: ratio,
-              type: 'warning',
-              message: `${item.name} sắp hết hạn mức`
-            });
-          }
-        }
-      });
-      return results;
-    }, [spendingByCategory]);
-
-    return (
-      <div className="space-y-6 animate-fade-in pb-12">
-        {/* User Welcome */}
-        <div className="mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">Xin chào, Tuấn Phan</h2>
-            <p className="text-gray-500">Đây là tình hình tài chính tháng này của bạn.</p>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-200 shadow-lg border-none relative overflow-hidden">
-            <div className="relative z-10">
-                <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">Đã chi tiêu</p>
-                <h3 className="text-3xl font-bold mt-2 tracking-tight">{formatCurrency(totalSpent)}</h3>
-                <div className="mt-3 inline-flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm">
-                  {spendingDiff > 0 ? <ArrowUpRight size={12}/> : <ArrowDownRight size={12}/>}
-                  {spendingDiff > 0 ? '+' : ''}{formatShortCurrency(spendingDiff)} so với tháng trước
-                </div>
-            </div>
-            <TrendingDown className="absolute right-[-10px] bottom-[-10px] text-white opacity-20" size={100} />
-          </Card>
-          
-          <Card>
-             <div className="flex justify-between items-start">
-              <div>
-                <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Ngân sách</p>
-                <h3 className="text-2xl font-bold text-gray-800 mt-1">{formatCurrency(totalBudget)}</h3>
-              </div>
-               <div className="p-2.5 bg-green-50 rounded-xl text-green-600">
-                <Wallet size={24} />
-              </div>
-            </div>
-            <div className="mt-4 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                <div 
-                    className="h-full rounded-full bg-green-500" 
-                    style={{width: `${totalBudget > 0 ? Math.min((totalSpent/totalBudget)*100, 100) : 0}%`}}
-                ></div>
-            </div>
-          </Card>
-          
-          <Card>
-             <div className="flex justify-between items-start">
-              <div>
-                <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Phát sinh</p>
-                <h3 className="text-2xl font-bold text-orange-600 mt-1">{formatCurrency(totalIncurred)}</h3>
-              </div>
-               <div className="p-2.5 bg-orange-50 rounded-xl text-orange-600">
-                <AlertCircle size={24} />
-              </div>
-            </div>
-          </Card>
-
-          <Card>
-             <div className="flex justify-between items-start">
-              <div>
-                <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Còn lại</p>
-                <h3 className={`text-2xl font-bold mt-1 ${totalBudget - totalSpent < 0 ? 'text-red-600' : 'text-indigo-600'}`}>
-                  {formatCurrency(totalBudget - totalSpent)}
-                </h3>
-              </div>
-               <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600">
-                <TrendingUp size={24} />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* --- ALERTS --- */}
-        {alerts.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {alerts.map((alert) => (
-              <div 
-                key={alert.id} 
-                className={`p-4 rounded-xl border-l-4 shadow-sm flex items-center gap-3 animate-fade-in ${
-                  alert.type === 'danger' 
-                    ? 'bg-red-50 border-red-500 text-red-800' 
-                    : 'bg-yellow-50 border-yellow-500 text-yellow-800'
-                }`}
-              >
-                {alert.type === 'danger' ? <AlertCircle size={20} /> : <AlertTriangle size={20} />}
-                <div className="flex-1">
-                  <p className="font-bold text-sm">{alert.message}</p>
-                  <p className="text-xs opacity-80">Đã dùng {(alert.ratio * 100).toFixed(0)}% ngân sách.</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-  
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="min-h-[420px]">
-            <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
-              <PieChart size={20} className="text-gray-400" /> Phân bổ chi tiêu
-            </h4>
-            <div className="h-80 w-full">
-               {totalSpent > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={spendingByCategory.filter(i => i.value > 0)}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={80}
-                      outerRadius={110}
-                      paddingAngle={4}
-                      dataKey="value"
-                      label={renderCustomizedLabel}
-                    >
-                      {spendingByCategory.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={2} stroke="#fff" />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip 
-                      formatter={(value) => formatCurrency(value)} 
-                      contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}}
-                    />
-                    <Legend verticalAlign="bottom" height={36} iconType="circle"/>
-                  </PieChart>
-                </ResponsiveContainer>
-               ) : (
-                 <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                   <Database size={48} className="mb-2 opacity-10" />
-                   <p className="text-sm">Chưa có dữ liệu</p>
-                 </div>
-               )}
-            </div>
-          </Card>
-  
-          <Card className="min-h-[420px]">
-            <div className="flex flex-col gap-3 mb-4">
-               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                  <BarChart2 size={20} className="text-gray-400" />
-                  Xu hướng chi tiêu
-                </h4>
-                
-                <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold w-full sm:w-auto">
-                  <button 
-                    onClick={() => setChartMode('daily')}
-                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                  >
-                    Ngày
-                  </button>
-                  <button 
-                    onClick={() => setChartMode('monthly')}
-                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                  >
-                    Tháng
-                  </button>
-                </div>
-              </div>
-              
-              <div className="self-end w-full sm:w-auto">
-                 <select
-                   // iOS FIX: text-base
-                   className="w-full sm:w-auto p-2 text-base sm:text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-100 outline-none text-gray-600 font-medium"
-                   value={chartCategoryFilter}
-                   onChange={(e) => setChartCategoryFilter(e.target.value)}
-                 >
-                   <option value="all">Tất cả mục</option>
-                   <option value="eating">Ăn uống</option>
-                   <option value="entertainment">Giải trí</option>
-                   <option value="fuel">Đi lại</option>
-                   <option value="shopping">Mua sắm</option>
-                 </select>
-              </div>
-            </div>
-
-            <div className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={currentChartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{fontSize: 10, fill: '#94A3B8'}} 
-                    axisLine={false} 
-                    tickLine={false}
-                    interval={chartMode === 'daily' ? 2 : 0} 
-                  />
-                  <YAxis hide />
-                  <RechartsTooltip 
-                    formatter={(value) => formatCurrency(value)}
-                    labelFormatter={(label, payload) => payload[0]?.payload.fullLabel || label}
-                    cursor={{fill: '#F8FAFC'}}
-                    contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}}
-                  />
-                  <Bar 
-                    dataKey="amount" 
-                    fill={chartColor} 
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={40}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        </div>
-
-        {/* --- ACTUAL VS BUDGET CHART (RESTORED) --- */}
-        <Card>
-          <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
-            <Settings size={20} className="text-gray-400" /> Thực tế vs Ngân sách
-          </h4>
-          <div className="h-[500px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
-                data={spendingByCategory} 
-                layout="vertical" 
-                margin={{left: 40, right: 60}} 
-                barCategoryGap={24}
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
-                <XAxis type="number" hide />
-                <YAxis 
-                  dataKey="name" 
-                  type="category" 
-                  tick={{fontSize: 12, fill: '#4B5563', fontWeight: 600}} 
-                  width={80}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <RechartsTooltip 
-                  formatter={(value) => formatCurrency(value)}
-                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}}
-                />
-                <Legend />
-                <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]}>
-                   {
-                      spendingByCategory.map((entry, index) => {
-                        let barColor = '#3B82F6'; // Default blue
-                        if (entry.budget > 0) {
-                          const ratio = entry.value / entry.budget;
-                          if (ratio > 1) {
-                            barColor = '#EF4444'; // Red (>100%)
-                          } else if (ratio >= 0.8) {
-                            barColor = '#F59E0B'; // Orange (80-100%)
-                          }
-                        }
-                        return <Cell key={`cell-${index}`} fill={barColor} />;
-                      })
-                   }
-                   <LabelList 
-                     dataKey="value" 
-                     position="right" 
-                     formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} 
-                     style={{fontSize: '11px', fontWeight: 'bold', fill: '#6B7280'}} 
-                   />
-                </Bar>
-                <Bar dataKey="budget" name="Ngân sách" fill="#F3F4F6" barSize={20} radius={[0, 6, 6, 0]}>
-                   <LabelList 
-                     dataKey="budget" 
-                     position="right" 
-                     formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} 
-                     style={{fontSize: '11px', fill: '#9CA3AF'}} 
-                   />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </div>
-    );
-  };
+  const filteredTransactions = useMemo(() => currentMonthTransactions.filter(t => {
+    const note = t.note ? t.note.toLowerCase() : '';
+    const amount = t.amount ? t.amount.toString() : '';
+    return (note.includes(search.toLowerCase()) || amount.includes(search)) && (filterCategory === 'all' || t.category === filterCategory);
+  }), [currentMonthTransactions, search, filterCategory]);
 
   const AddTransactionModal = ({ onClose }) => {
-    const [formData, setFormData] = useState({
-      date: new Date().toISOString().split('T')[0],
-      amount: '',
-      category: 'eating',
-      note: '',
-      isIncurred: false
-    });
+    const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], amount: '', category: 'eating', note: '', isIncurred: false });
     const [suggestions, setSuggestions] = useState([]);
-
+    
     const handleNoteChange = (e) => {
       const val = e.target.value;
       setFormData({...formData, note: val});
       if (val.length >= 3) {
-        const matches = Object.entries(noteStats)
-          .filter(([note, count]) => count >= 2 && note.toLowerCase().includes(val.toLowerCase()))
-          .sort((a, b) => b[1] - a[1])
-          .map(([note]) => note)
-          .slice(0, 5);
+        const matches = Object.entries(noteStats).filter(([n, c]) => c >= 2 && n.toLowerCase().includes(val.toLowerCase())).sort((a,b)=>b[1]-a[1]).map(([n])=>n).slice(0,5);
         setSuggestions(matches);
-      } else {
-        setSuggestions([]);
-      }
+      } else setSuggestions([]);
     };
 
-    const handleSubmit = (e) => {
-      e.preventDefault();
-      if (!formData.amount || !formData.date) return;
-      addTransaction(formData);
-      onClose();
-    };
+    const handleSubmit = (e) => { e.preventDefault(); if (!formData.amount || !formData.date) return; addTransaction(formData); onClose(); };
 
     return (
       <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm overflow-y-auto">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in overflow-hidden my-4">
-          <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-            <h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3>
-            <button onClick={onClose} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors"><X size={18} className="text-gray-600"/></button>
-          </div>
+          <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center"><h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3><button onClick={onClose} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors"><X size={18} className="text-gray-600"/></button></div>
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Số tiền</label>
-              <div className="relative">
-                <input 
-                  type="number" 
-                  required
-                  className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white"
-                  value={formData.amount}
-                  onChange={e => setFormData({...formData, amount: e.target.value})}
-                  placeholder="0"
-                  autoFocus
-                />
-                <span className="absolute right-4 top-5 text-gray-400 font-bold">VNĐ</span>
-              </div>
-            </div>
-            
-            <div 
-              className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
-              onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
-            >
-              <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>
-                {formData.isIncurred && <X size={14} className="text-white" />}
-              </div>
-              <label className="text-sm font-medium text-gray-700 cursor-pointer select-none">Đánh dấu là chi phí phát sinh</label>
-            </div>
-
+            <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Số tiền</label><div className="relative"><input type="number" required className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0" autoFocus /><span className="absolute right-4 top-5 text-gray-400 font-bold">VNĐ</span></div></div>
+            <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}><div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>{formData.isIncurred && <X size={14} className="text-white" />}</div><label className="text-sm font-medium text-gray-700 cursor-pointer select-none">Đánh dấu là chi phí phát sinh</label></div>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Ngày</label>
-                <input 
-                  type="date" 
-                  required
-                  // iOS FIX: text-base
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700"
-                  value={formData.date}
-                  onChange={e => setFormData({...formData, date: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label>
-                <select 
-                  // iOS FIX: text-base
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700"
-                  value={formData.category}
-                  onChange={e => setFormData({...formData, category: e.target.value})}
-                >
-                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
+              <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Ngày</label><input type="date" required className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+              <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label><select className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
             </div>
-            <div className="relative">
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label>
-              <input 
-                type="text" 
-                // iOS FIX: text-base
-                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300"
-                value={formData.note}
-                onChange={handleNoteChange}
-                placeholder="Nhập ghi chú..."
-              />
-              {/* Suggestion Dropdown */}
-              {suggestions.length > 0 && (
-                <div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">
-                  {suggestions.map((s, idx) => (
-                    <div 
-                      key={idx}
-                      onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }}
-                      className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2"
-                    >
-                      <List size={14} className="text-gray-400" />
-                      {s}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] transition-all">
-              Lưu Giao Dịch
-            </button>
+            <div className="relative"><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300" value={formData.note} onChange={handleNoteChange} placeholder="Nhập ghi chú..." />{suggestions.length > 0 && (<div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">{suggestions.map((s, idx) => (<div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2"><List size={14} className="text-gray-400" />{s}</div>))}</div>)}</div>
+            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] transition-all">Lưu Giao Dịch</button>
           </form>
         </div>
       </div>
     );
   };
 
-  const TransactionView = () => {
-    const [search, setSearch] = useState('');
-    const [filterCategory, setFilterCategory] = useState('all');
-
-    const filtered = currentMonthTransactions.filter(t => {
-      const note = t.note ? t.note.toLowerCase() : '';
-      const amount = t.amount ? t.amount.toString() : '';
-      const matchSearch = note.includes(search.toLowerCase()) || amount.includes(search);
-      const matchCat = filterCategory === 'all' || t.category === filterCategory;
-      return matchSearch && matchCat;
-    });
-
-    return (
-      <div className="space-y-6 animate-fade-in pb-12">
-        <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm flex items-center justify-between">
-           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                <Receipt size={20} />
-             </div>
-             <div>
-                 <h3 className="font-bold text-gray-800">Sổ giao dịch</h3>
-                 <p className="text-xs text-gray-500">Tháng {parseInt(viewMonth) + 1}/{viewYear}</p>
-             </div>
-           </div>
-           <span className="text-xs bg-slate-100 px-3 py-1.5 rounded-full font-bold text-gray-600 whitespace-nowrap">
-             {filtered.length} giao dịch
-           </span>
-        </div>
-
-        <Card className="p-0 overflow-hidden border-0 shadow-sm">
-          <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row gap-4 bg-gray-50/50">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 text-gray-400" size={18} />
-              <input 
-                type="text" 
-                placeholder="Tìm kiếm..." 
-                className="w-full pl-10 p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-            <select 
-              // iOS FIX: text-base
-              className="p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-full md:min-w-[180px] text-base sm:text-sm font-medium text-gray-600"
-              value={filterCategory}
-              onChange={e => setFilterCategory(e.target.value)}
-            >
-              <option value="all">Tất cả danh mục</option>
-              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-gray-400 uppercase bg-white border-b border-gray-100">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Thời gian</th>
-                  <th className="px-6 py-4 font-semibold">Danh mục</th>
-                  <th className="px-6 py-4 font-semibold">Nội dung</th>
-                  <th className="px-6 py-4 text-right font-semibold">Số tiền</th>
-                  <th className="px-6 py-4 text-center font-semibold"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors group bg-white">
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-medium">
-                      {new Date(tx.date).getDate()}/{new Date(tx.date).getMonth() + 1}
-                      {tx.isIncurred && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-400" title="Chi phí phát sinh"></span>}
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge color={CATEGORIES.find(c => c.id === tx.category)?.color || '#999'}>
-                        {CATEGORIES.find(c => c.id === tx.category)?.name}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 text-gray-800 font-medium">{tx.note}</td>
-                    <td className="px-6 py-4 text-right font-bold text-gray-800">{formatCurrency(tx.amount)}</td>
-                    <td className="px-6 py-4 text-center">
-                      <button 
-                        onClick={() => deleteTransaction(tx.id)}
-                        // iOS FIX: Always visible on mobile (opacity-100), hidden on desktop until hover
-                        className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="text-center py-12 bg-white">
-                      <div className="flex flex-col items-center justify-center text-gray-300 gap-2">
-                        <Search size={40} strokeWidth={1} />
-                        <p className="text-sm">Không tìm thấy giao dịch nào</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </div>
-    );
-  };
-
-  const BudgetView = () => {
-    const [tempBudgets, setTempBudgets] = useState(budgets);
-    useEffect(() => { setTempBudgets(budgets); }, [budgets]);
-
-    return (
-      <div className="space-y-8 animate-fade-in pb-24">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div>
-                <h3 className="text-2xl font-bold text-gray-800">Cài đặt ngân sách</h3>
-                <p className="text-gray-500">Phân bổ hạn mức chi tiêu cho từng danh mục</p>
-            </div>
-            <button 
-                onClick={() => saveBudgetsToDb(tempBudgets)}
-                className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black font-bold shadow-lg transition-all active:scale-95 w-full md:w-auto justify-center"
-            >
-                <Save size={18} /> Lưu thay đổi
-            </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {CATEGORIES.map(cat => {
-            const currentVal = tempBudgets[cat.id] || 0;
-            const Icon = cat.icon;
-            
-            return (
-              <div key={cat.id} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow group relative overflow-hidden">
-                <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity`}>
-                   <Icon size={80} color={cat.color} />
-                </div>
-                
-                <div className="relative z-10 flex flex-col h-full justify-between">
-                    <div className="mb-4">
-                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold shadow-sm mb-3" style={{backgroundColor: cat.color}}>
-                            <Icon size={24} />
-                        </div>
-                        <h4 className="font-bold text-lg text-gray-800">{cat.name}</h4>
-                    </div>
-
-                    <div className="relative mt-auto">
-                        <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Hạn mức tháng</label>
-                        <input 
-                            type="number" 
-                            className="w-full text-xl font-bold border-b-2 border-slate-100 focus:border-gray-800 outline-none py-2 transition-colors bg-transparent text-gray-800"
-                            value={currentVal}
-                            onChange={(e) => setTempBudgets({...tempBudgets, [cat.id]: Number(e.target.value)})}
-                            placeholder="0"
-                        />
-                        <span className="absolute right-0 bottom-3 text-xs text-gray-400 font-bold">VNĐ</span>
-                    </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  // --- MAIN RENDER ---
   const SidebarItem = ({ id, label, icon: Icon, active }) => (
-    <button 
-      onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
-      // iOS FIX: Added active:bg-gray-200 for immediate touch feedback
-      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium active:bg-gray-200 active:scale-[0.98] ${
-        active 
-        ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' 
-        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
-      }`}
-    >
-      <Icon size={20} className={active ? 'text-white' : 'text-gray-400'} />
-      {label}
+    <button onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium active:bg-gray-200 active:scale-[0.98] ${active ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>
+      <Icon size={20} className={active ? 'text-white' : 'text-gray-400'} /> {label}
     </button>
+  );
+
+  const FilterBar = () => (
+    <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl shadow-sm border border-slate-100 w-full sm:w-auto justify-between sm:justify-start">
+      <div className="flex items-center gap-2">
+        <Calendar size={18} className="text-gray-400" />
+        <select value={viewMonth} onChange={(e) => setViewMonth(parseInt(e.target.value))} className="p-1 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded">
+          {Array.from({ length: 12 }, (_, i) => <option key={i} value={i}>Tháng {i + 1}</option>)}
+        </select>
+      </div>
+      <span className="text-gray-200">|</span>
+      <select value={viewYear} onChange={(e) => setViewYear(parseInt(e.target.value))} className="p-1 text-base sm:text-sm font-semibold text-gray-700 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded">
+        {Array.from({ length: 5 }, (_, i) => <option key={i} value={new Date().getFullYear() - 2 + i}>{new Date().getFullYear() - 2 + i}</option>)}
+      </select>
+    </div>
   );
 
   return (
     <div className="min-h-screen bg-slate-50 text-gray-800 font-sans flex flex-col md:flex-row overflow-x-hidden selection:bg-blue-100 selection:text-blue-900">
-      {/* iOS FIX: Global Styles for touch manipulation and scroll */}
-      <style>{`
-        html, body {
-          -webkit-tap-highlight-color: transparent;
-        }
-        button, a, input, select {
-          touch-action: manipulation;
-        }
-      `}</style>
-
+      <style>{`html, body { -webkit-tap-highlight-color: transparent; } button, a, input, select { touch-action: manipulation; }`}</style>
+      
       {/* Mobile Header */}
       <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-30 border-b border-gray-100">
         <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">Tuấn Phan</h1>
@@ -990,73 +586,49 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none`}>
-        <div className="p-8 border-b border-slate-50 hidden md:block">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">
-                    T
-                </div>
-                <div>
-                    <h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">Tuấn Phan</h1>
-                    <p className="text-xs text-gray-400 font-medium mt-1">Personal Finance</p>
-                </div>
-            </div>
-        </div>
-        
+        <div className="p-8 border-b border-slate-50 hidden md:block"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">T</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">Tuấn Phan</h1><p className="text-xs text-gray-400 font-medium mt-1">Personal Finance</p></div></div></div>
         <nav className="p-6 space-y-2 flex-1">
           <SidebarItem id="dashboard" label="Tổng quan" icon={LayoutDashboard} active={activeTab === 'dashboard'} />
           <SidebarItem id="transactions" label="Sổ giao dịch" icon={Receipt} active={activeTab === 'transactions'} />
           <SidebarItem id="budget" label="Cài đặt ngân sách" icon={Settings} active={activeTab === 'budget'} />
         </nav>
-        
-        {/* Sidebar Footer */}
-        <div className="p-6">
-          <div className="bg-slate-50 rounded-2xl p-4 flex items-center gap-3 border border-slate-100">
-             <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
-               <Database size={14} />
-             </div>
-             <div>
-               <p className="text-xs font-bold text-gray-700">Trạng thái</p>
-               <p className="text-[10px] text-green-600 flex items-center gap-1 font-bold uppercase tracking-wider">
-                 <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Online
-               </p>
-             </div>
-          </div>
-        </div>
+        <div className="p-6"><div className="bg-slate-50 rounded-2xl p-4 flex items-center gap-3 border border-slate-100"><div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><Database size={14} /></div><div><p className="text-xs font-bold text-gray-700">Trạng thái</p><p className="text-[10px] text-green-600 flex items-center gap-1 font-bold uppercase tracking-wider"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Online</p></div></div></div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 h-screen overflow-y-auto bg-slate-50 relative scroll-smooth">
-        {/* Global Header */}
         <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-20 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
-          <div className="flex items-center gap-4 w-full sm:w-auto">
-            {(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}
-          </div>
-          
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"
-          >
-            <PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span>
-          </button>
+          <div className="flex items-center gap-4 w-full sm:w-auto">{(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}</div>
+          <button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
         </header>
 
         <div className="p-4 sm:p-8 max-w-[1600px] mx-auto pb-32">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-[60vh] text-gray-300">
-              <div className="w-12 h-12 border-4 border-gray-900 border-t-transparent rounded-full animate-spin mb-6 opacity-20"></div>
-              <p className="font-medium animate-pulse">Đang đồng bộ dữ liệu...</p>
-            </div>
+            <div className="flex flex-col items-center justify-center h-[60vh] text-gray-300"><div className="w-12 h-12 border-4 border-gray-900 border-t-transparent rounded-full animate-spin mb-6 opacity-20"></div><p className="font-medium animate-pulse">Đang đồng bộ dữ liệu...</p></div>
           ) : (
             <>
-              {activeTab === 'dashboard' && <DashboardView />}
-              {activeTab === 'transactions' && <TransactionView />}
-              {activeTab === 'budget' && <BudgetView />}
+              {activeTab === 'dashboard' && (
+                <DashboardContent 
+                  totalSpent={totalSpent} totalBudget={totalBudget} spendingDiff={spendingDiff} totalIncurred={totalIncurred} alerts={alerts} 
+                  spendingByCategory={spendingByCategory} currentChartData={chartMode === 'daily' ? dailySpendingData : monthlySpendingData} 
+                  chartMode={chartMode} setChartMode={setChartMode} 
+                  chartCategoryFilter={chartCategoryFilter} setChartCategoryFilter={setChartCategoryFilter}
+                />
+              )}
+              {activeTab === 'transactions' && (
+                <TransactionContent 
+                  filtered={filteredTransactions} viewMonth={viewMonth} viewYear={viewYear} 
+                  search={search} setSearch={setSearch} filterCategory={filterCategory} setFilterCategory={setFilterCategory} 
+                  deleteTransaction={deleteTransaction}
+                />
+              )}
+              {activeTab === 'budget' && (
+                <BudgetContent budgets={budgets} setBudgets={setBudgets} saveBudgetsToDb={saveBudgetsToDb} />
+              )}
             </>
           )}
         </div>
       </main>
-
-      {/* Modals */}
       {showAddModal && <AddTransactionModal onClose={() => setShowAddModal(false)} />}
     </div>
   );
