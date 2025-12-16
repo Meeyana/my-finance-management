@@ -281,7 +281,17 @@ const DashboardContent = React.memo(({
               <YAxis dataKey="name" type="category" tick={{fontSize: 12, fill: '#4B5563', fontWeight: 600}} width={80} axisLine={false} tickLine={false} />
               <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
               <Legend />
-              <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false} fill="#3B82F6">
+              {/* RESTORED COLOR CODING LOGIC */}
+              <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false}>
+                 {spendingByCategory.filter(item => item.value > 0).map((entry, index) => {
+                    let barColor = '#3B82F6'; // Default Blue
+                    if (entry.budget > 0) {
+                      const ratio = entry.value / entry.budget;
+                      if (ratio >= 1) barColor = '#EF4444'; // Red if >= 100%
+                      else if (ratio >= 0.8) barColor = '#F59E0B'; // Orange if >= 80%
+                    }
+                    return <Cell key={`cell-${index}`} fill={barColor} />;
+                 })}
                  <LabelList dataKey="value" position="right" formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} style={{fontSize: '11px', fontWeight: 'bold', fill: '#6B7280'}} />
               </Bar>
               <Bar dataKey="budget" name="Ngân sách" fill="#F3F4F6" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false}>
