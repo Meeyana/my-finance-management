@@ -103,7 +103,7 @@ const getFirestorePaths = (user) => {
   if (user.isAnonymous) {
     return {
       transactions: collection(db, 'artifacts', appId, 'public', 'data', 'transactions'),
-      budgetConfig: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'budgets'),
+      budgetConfig: doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config'),
       categories: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'categories'),
       visibility: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'visibility'),
       alerts: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'alerts'),
@@ -558,7 +558,7 @@ const BudgetContent = ({
             <div key={cat.id} className={`bg-white rounded-2xl p-6 border border-slate-100 shadow-sm sm:hover:shadow-md transition-all group relative overflow-hidden ${!isVisible ? 'opacity-60 grayscale-[0.5]' : ''}`}>
               
               {/* Controls: Visibility, Alert, Delete */}
-              <div className="absolute top-4 right-4 z-20 flex gap-2">
+              <div className="absolute top-4 right-4 z-10 flex gap-2">
                 {isCustom && (
                   <button 
                     onClick={() => deleteCustomCategory(cat.id)}
@@ -725,6 +725,13 @@ export default function App() {
   // --- ACTIONS (UPDATED PATHS) ---
   const addTransaction = async (newTx) => {
     if (!user) return;
+
+    // --- LIMIT CHECK FOR DEMO (50 TRANSACTIONS) ---
+    if (user.isAnonymous && transactions.length >= 50) {
+      alert("Chế độ Demo giới hạn tối đa 50 giao dịch. Vui lòng đăng ký tài khoản để sử dụng không giới hạn!");
+      return;
+    }
+
     const paths = getFirestorePaths(user);
     
     await addDoc(paths.transactions, { ...newTx, createdAt: serverTimestamp() });
@@ -751,6 +758,13 @@ export default function App() {
 
   const addNewCategory = async ({ name, budget }) => {
     if (!user) return;
+
+    // --- LIMIT CHECK FOR DEMO (5 CUSTOM CATEGORIES) ---
+    if (user.isAnonymous && Object.keys(customCategoryConfig).length >= 5) {
+      alert("Chế độ Demo giới hạn tối đa 5 danh mục tùy chỉnh. Vui lòng đăng ký tài khoản để tạo thêm!");
+      return;
+    }
+
     const paths = getFirestorePaths(user);
     const id = `custom_${Date.now()}`;
     const randomColor = getRandomColor();
