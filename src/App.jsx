@@ -628,7 +628,25 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-gray-800 font-sans flex flex-col md:flex-row overflow-x-hidden selection:bg-blue-100 selection:text-blue-900">
       <style>{`
         html, body { -webkit-tap-highlight-color: transparent; }
-        button, a, input, select { touch-action: manipulation; }
+        button, a, input, select { touch-action: manipulation; user-select: none; }
+        
+        /* Tắt hover effects trên touch devices */
+        @media (hover: none) {
+          button:hover, a:hover, select:hover {
+            background-color: inherit !important;
+            color: inherit !important;
+          }
+        }
+        
+        /* Reset focus states sau khi click */
+        button:focus-visible, select:focus-visible {
+          outline: 2px solid #3B82F6;
+          outline-offset: 2px;
+        }
+        
+        button:focus:not(:focus-visible), select:focus:not(:focus-visible) {
+          outline: none;
+        }
         
         /* iOS Dropdown Reset - Giúp dropdown phẳng, đẹp, có mũi tên custom */
         .custom-select {
@@ -638,13 +656,18 @@ export default function App() {
           background-repeat: no-repeat;
           background-position: right 0.5rem center;
           background-size: 1em;
-          padding-right: 2rem; /* Tạo khoảng trống cho mũi tên */
+          padding-right: 2rem;
         }
         
         /* Riêng cho FilterBar (chỗ chọn tháng/năm) cần chỉnh lại chút padding vì nó nhỏ */
         .items-center .custom-select {
            padding-right: 1.5rem;
            background-position: right 0rem center;
+        }
+        
+        /* Đảm bảo animations mượt mà */
+        * {
+          -webkit-tap-highlight-color: transparent;
         }
       `}</style>
       
