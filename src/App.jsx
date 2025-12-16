@@ -7,7 +7,7 @@ import {
   TrendingUp, TrendingDown, Search, Trash2, Save,
   Menu, X, Database, Calendar, AlertCircle, BarChart2, ArrowUpRight, ArrowDownRight,
   List, AlertTriangle,
-  Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal, ChevronDown
+  Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal
 } from 'lucide-react';
 
 // FIREBASE IMPORTS
@@ -632,14 +632,13 @@ export default function App() {
           border-radius: 0.75rem; font-size: 16px;
         }
 
-        /* --- UPDATED: CSS CHO CUSTOM SELECT CÓ ICON MŨI TÊN --- */
         .custom-select {
           appearance: none;
           background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
           background-repeat: no-repeat;
           background-position: right 0.5rem center;
           background-size: 1em;
-          padding-right: 2rem !important; /* Tạo khoảng trống cho icon */
+          padding-right: 2rem !important;
         }
         
         input[type="date"] {
@@ -653,22 +652,30 @@ export default function App() {
         * { -webkit-tap-highlight-color: transparent; }
       `}</style>
       
-      {/* Mobile Header */}
-      <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-30 border-b border-gray-100">
+      {/* Mobile Header (Updated Z-index and Toggle Logic) */}
+      <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-gray-100">
         <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">Tuấn Phan</h1>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 sm:hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 transition-colors"><Menu size={24}/></button>
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+          className="p-2 sm:hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 transition-colors"
+        >
+          {/* Toggle between Menu and X icon */}
+          {isMobileMenuOpen ? <X size={24}/> : <Menu size={24}/>}
+        </button>
       </div>
 
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none`}>
-        {/* --- UPDATED: MOBILE SIDEBAR HEADER WITH CLOSE BUTTON --- */}
-        <div className="flex md:hidden items-center justify-between p-6 pb-2 border-b border-gray-50">
-          <h2 className="font-bold text-xl text-gray-900">Menu</h2>
-          <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 -mr-2 text-gray-500 active:bg-gray-100 rounded-full">
-            <X size={24} />
-          </button>
-        </div>
+      {/* Overlay (Click to close) */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 md:hidden animate-fade-in backdrop-blur-sm"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
 
+      {/* Sidebar (Updated Z-index and removed internal close button) */}
+      <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none pt-[73px] md:pt-0`}>
+        {/* Note: Added pt-[73px] to mobile sidebar to avoid overlap with sticky header if needed, or remove if you want sidebar full height under header */}
+        
         <div className="p-8 border-b border-slate-50 hidden md:block"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">T</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">Tuấn Phan</h1><p className="text-xs text-gray-400 font-medium mt-1">Personal Finance</p></div></div></div>
         <nav className="p-6 space-y-2 flex-1">
           <SidebarItem id="dashboard" label="Tổng quan" icon={LayoutDashboard} active={activeTab === 'dashboard'} />
