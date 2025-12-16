@@ -899,6 +899,12 @@ export default function App() {
   const AddTransactionModal = ({ onClose }) => {
     const [mode, setMode] = useState('simple'); // 'simple' | 'advanced'
     
+    // --- LOCK BODY SCROLL ---
+    useEffect(() => {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = 'unset'; };
+    }, []);
+
     // --- STATE FOR SIMPLE MODE ---
     const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], amount: '', category: 'eating', note: '', isIncurred: false });
     
@@ -946,7 +952,6 @@ export default function App() {
       }
 
       // Add all transactions
-      // In a real app, you might want to do this in a batch write, but parallel promises work for now
       await Promise.all(validItems.map(item => addTransaction({
         ...item,
         date: advancedDate
@@ -972,9 +977,9 @@ export default function App() {
     };
 
     return (
-      <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm overflow-y-auto">
-        <div className={`bg-white rounded-2xl shadow-2xl w-full ${mode === 'advanced' ? 'max-w-2xl' : 'max-w-md'} animate-scale-in overflow-hidden my-4 transition-all duration-300`}>
-          <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center sticky top-0 z-10">
+      <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm overflow-hidden">
+        <div className={`bg-white rounded-2xl shadow-2xl w-full ${mode === 'advanced' ? 'max-w-2xl' : 'max-w-md'} animate-scale-in overflow-hidden my-4 transition-all duration-300 flex flex-col max-h-[90vh]`}>
+          <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-3">
               <h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3>
               <div className="flex bg-slate-100 rounded-lg p-1">
@@ -1000,113 +1005,149 @@ export default function App() {
             </button>
           </div>
 
-          {mode === 'simple' ? (
-            <form onSubmit={handleSubmitSimple} className="p-6 space-y-5">
-              <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Số tiền</label><div className="relative"><input type="number" required className="w-full pl-4 pr-10 py-4 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-2xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0" autoFocus /><span className="absolute right-4 top-5 text-gray-400 font-bold">VNĐ</span></div></div>
-              <div 
-                className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer active:scale-[0.98] active:bg-slate-50 ${formData.isIncurred ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`} 
-                onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
-              >
-                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>{formData.isIncurred && <X size={14} className="text-white" />}</div><label className="text-sm font-medium text-gray-700 cursor-pointer select-none">Đánh dấu là chi phí phát sinh</label>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Ngày</label><input type="date" required className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
-                <div><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label><select className="custom-select w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none bg-white text-base sm:text-sm font-medium text-gray-700" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-              </div>
-              <div className="relative"><label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300" value={formData.note} onChange={handleNoteChange} placeholder="Nhập ghi chú..." />{suggestions.length > 0 && (<div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">{suggestions.map((s, idx) => (<div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 sm:hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>))}</div>)}</div>
-              <button 
-                type="submit" 
-                className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold sm:hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] active:bg-blue-700 transition-all"
-              >
-                Lưu Giao Dịch
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleSubmitAdvanced} className="p-6 space-y-6">
-              {/* Date Selection for Batch */}
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col sm:flex-row items-center gap-4">
-                <label className="text-sm font-bold text-blue-800 whitespace-nowrap">Chọn ngày áp dụng chung:</label>
-                <input 
-                  type="date" 
-                  required 
-                  className="w-full sm:w-auto p-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-200 outline-none text-sm font-medium text-gray-700" 
-                  value={advancedDate} 
-                  onChange={e => setAdvancedDate(e.target.value)} 
-                />
-              </div>
+          <div className="overflow-y-auto custom-scrollbar p-6">
+            {mode === 'simple' ? (
+              <form onSubmit={handleSubmitSimple} className="space-y-5">
+                {/* Row 1: Amount + Category */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Số tiền</label>
+                    <input type="number" required className="w-full p-3 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0" autoFocus />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label>
+                    <select className="custom-select w-full p-3 border-2 border-slate-100 rounded-xl focus:ring-0 focus:border-blue-500 outline-none bg-white text-base font-medium text-gray-700 h-[56px]" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                      {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                </div>
 
-              {/* Rows */}
-              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                {advancedItems.map((item, index) => (
-                  <div key={index} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center bg-slate-50 p-3 rounded-xl border border-slate-200 group">
-                    <span className="text-xs font-bold text-gray-400 w-6 pt-3 sm:pt-0">#{index + 1}</span>
-                    
-                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-2 w-full">
-                      {/* Amount */}
-                      <div className="sm:col-span-3">
-                        <input 
-                          type="number" 
-                          placeholder="Số tiền" 
-                          className="w-full p-2 border border-slate-200 rounded-lg text-sm font-bold focus:border-blue-500 outline-none"
-                          value={item.amount}
-                          onChange={(e) => updateAdvancedItem(index, 'amount', e.target.value)}
-                          required
-                        />
+                {/* Row 2: Date + Incurred */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Ngày</label>
+                    <input type="date" required className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-sm font-medium text-gray-700" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                  </div>
+                  <div className="flex items-end">
+                    <div 
+                      className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl border transition-all cursor-pointer active:scale-[0.98] ${formData.isIncurred ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-white border-slate-200 text-gray-600'}`} 
+                      onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
+                    >
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>{formData.isIncurred && <X size={12} className="text-white" />}</div>
+                      <span className="text-sm font-bold select-none">Phát sinh</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: Note */}
+                <div className="relative">
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nội dung</label>
+                  <input type="text" className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-base sm:text-sm font-medium text-gray-700 placeholder:text-gray-300" value={formData.note} onChange={handleNoteChange} placeholder="Nhập ghi chú..." />
+                  {suggestions.length > 0 && (
+                    <div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">
+                      {suggestions.map((s, idx) => (
+                        <div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 sm:hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold sm:hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] active:bg-blue-700 transition-all mt-4"
+                >
+                  Lưu Giao Dịch
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmitAdvanced} className="space-y-6">
+                {/* Date Selection for Batch */}
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col sm:flex-row items-center gap-4">
+                  <label className="text-sm font-bold text-blue-800 whitespace-nowrap">Chọn ngày áp dụng chung:</label>
+                  <input 
+                    type="date" 
+                    required 
+                    className="w-full sm:w-auto p-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-200 outline-none text-sm font-medium text-gray-700" 
+                    value={advancedDate} 
+                    onChange={e => setAdvancedDate(e.target.value)} 
+                  />
+                </div>
+
+                {/* Rows */}
+                <div className="space-y-4">
+                  {advancedItems.map((item, index) => (
+                    <div key={index} className="bg-slate-50 p-3 rounded-xl border border-slate-200 relative group">
+                      <div className="absolute -left-2 -top-2 bg-gray-200 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 border border-white shadow-sm">
+                        {index + 1}
                       </div>
                       
-                      {/* Category */}
-                      <div className="sm:col-span-3">
-                        <select 
-                          className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:border-blue-500 outline-none"
-                          value={item.category}
-                          onChange={(e) => updateAdvancedItem(index, 'category', e.target.value)}
-                        >
-                          {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </div>
+                      <div className="flex flex-col gap-2">
+                        {/* Row 1: Amount & Category */}
+                        <div className="flex gap-2">
+                          <div className="w-1/2">
+                            <input 
+                              type="number" 
+                              placeholder="Số tiền" 
+                              className="w-full p-2 border border-slate-200 rounded-lg text-sm font-bold focus:border-blue-500 outline-none"
+                              value={item.amount}
+                              onChange={(e) => updateAdvancedItem(index, 'amount', e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="w-1/2">
+                            <select 
+                              className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:border-blue-500 outline-none"
+                              value={item.category}
+                              onChange={(e) => updateAdvancedItem(index, 'category', e.target.value)}
+                            >
+                              {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                          </div>
+                        </div>
 
-                      {/* Note */}
-                      <div className="sm:col-span-6">
+                        {/* Row 2: Note */}
                         <input 
                           type="text" 
-                          placeholder="Nội dung..." 
+                          placeholder="Nội dung chi tiêu..." 
                           className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none"
                           value={item.note}
                           onChange={(e) => handleNoteChange(e, index)}
                         />
                       </div>
+
+                      {advancedItems.length > 1 && (
+                        <button 
+                          type="button"
+                          onClick={() => removeAdvancedRow(index)}
+                          className="absolute -right-2 -top-2 p-1.5 bg-white text-red-400 hover:text-red-600 border border-gray-200 rounded-full shadow-sm"
+                          title="Xóa dòng này"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
                     </div>
+                  ))}
+                </div>
 
-                    <button 
-                      type="button"
-                      onClick={() => removeAdvancedRow(index)}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors self-end sm:self-center"
-                      title="Xóa dòng này"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Controls */}
-              <div className="flex flex-col sm:flex-row justify-between gap-4 pt-2">
-                <button 
-                  type="button" 
-                  onClick={addAdvancedRow}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors active:scale-95"
-                >
-                  <Plus size={18} /> Thêm dòng
-                </button>
-                <button 
-                  type="submit" 
-                  className="flex-1 bg-gray-900 text-white py-3 px-6 rounded-xl font-bold hover:bg-black shadow-lg shadow-gray-300 transition-all active:scale-[0.98]"
-                >
-                  Lưu tất cả ({advancedItems.filter(i => i.amount).length})
-                </button>
-              </div>
-            </form>
-          )}
+                {/* Controls */}
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    type="button" 
+                    onClick={addAdvancedRow}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors active:scale-95 whitespace-nowrap"
+                  >
+                    <Plus size={18} /> <span className="hidden sm:inline">Thêm dòng</span>
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="flex-1 bg-gray-900 text-white py-3 px-6 rounded-xl font-bold hover:bg-black shadow-lg shadow-gray-300 transition-all active:scale-[0.98]"
+                  >
+                    Lưu tất cả ({advancedItems.filter(i => i.amount).length})
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     );
