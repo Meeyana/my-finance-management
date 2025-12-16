@@ -8,16 +8,19 @@ import {
   Menu, X, Database, Calendar, AlertCircle, BarChart2, ArrowUpRight, ArrowDownRight,
   List, AlertTriangle,
   Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal, ChevronDown,
-  // Icons for Category Config (Keep imports for logic, but hide in UI)
   Heart, Star, Gift, Music, Briefcase, Plane, Gamepad2, GraduationCap,
   Baby, Dog, Car, Zap, Wifi, Phone, Dumbbell,
-  Eye, EyeOff, // Visibility icons
-  Bell, BellOff // Alert icons
+  Eye, EyeOff, Bell, BellOff, LogOut, Lock, User
 } from 'lucide-react';
 
 // FIREBASE IMPORTS
 import { initializeApp } from "firebase/app";
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "firebase/auth";
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  signOut,                   
+  onAuthStateChanged 
+} from "firebase/auth";
 import { 
   getFirestore, collection, addDoc, onSnapshot, query, 
   deleteDoc, doc, setDoc, updateDoc, deleteField, serverTimestamp, increment 
@@ -38,8 +41,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = 'quan-ly-chi-tieu-personal';
 
-// --- ICON LIBRARY FOR DYNAMIC MAPPING ---
-// Still needed for rendering icons in other tabs (Dashboard/Transactions)
+// --- ICON LIBRARY ---
 const ICON_LIBRARY = {
   Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal, TrendingUp,
   Heart, Star, Gift, Music, Briefcase, Plane, Gamepad2, GraduationCap,
@@ -71,7 +73,6 @@ const formatShortCurrency = (amount) => {
   return amount;
 };
 
-// Random Color Generator
 const getRandomColor = () => {
   const colors = [
     '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1', 
@@ -93,11 +94,90 @@ const Badge = ({ color, children }) => (
   </span>
 );
 
+// --- LOGIN COMPONENT ---
+const LoginScreen = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      console.error(err);
+      setError('Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border border-slate-100">
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-lg shadow-blue-200">
+            <Wallet size={32} />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">Quản Lý Chi Tiêu</h1>
+          <p className="text-gray-500 text-sm mt-1">Đăng nhập để truy cập dữ liệu cá nhân</p>
+        </div>
+
+        <form onSubmit={handleLogin} className="space-y-5">
+          {error && (
+            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl flex items-center gap-2">
+              <AlertCircle size={16} /> {error}
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Email</label>
+            <div className="relative">
+              <User className="absolute left-4 top-3.5 text-gray-400" size={20} />
+              <input 
+                type="email" 
+                required 
+                className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                placeholder="email@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Mật khẩu</label>
+            <div className="relative">
+              <Lock className="absolute left-4 top-3.5 text-gray-400" size={20} />
+              <input 
+                type="password" 
+                required 
+                className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          </div>
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold hover:bg-black transition-all active:scale-[0.98] shadow-lg shadow-gray-200 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+          >
+            {loading ? <span className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></span> : 'Đăng Nhập'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // --- COMPONENT: DASHBOARD CONTENT ---
 const DashboardContent = React.memo(({ 
   totalSpent, totalBudget, spendingDiff, totalIncurred, alerts, 
   spendingByCategory, currentChartData, chartMode, setChartMode, 
-  chartCategoryFilter, setChartCategoryFilter, allCategories, categoryVisibility
+  chartCategoryFilter, setChartCategoryFilter, allCategories, categoryVisibility,
+  userName // Receive userName prop
 }) => {
   const [showCharts, setShowCharts] = useState(false);
 
@@ -120,7 +200,7 @@ const DashboardContent = React.memo(({
   return (
     <div className="space-y-6 animate-fade-in pb-12">
       <div className="mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">Xin chào, Tuấn Phan</h2>
+          <h2 className="text-2xl font-bold text-gray-800">Xin chào, {userName}</h2>
           <p className="text-gray-500">Đây là tình hình tài chính tháng này của bạn.</p>
       </div>
 
@@ -274,21 +354,19 @@ const DashboardContent = React.memo(({
              <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
           ) : (
           <ResponsiveContainer width="100%" height="100%">
-            {/* UPDATED: Only show categories with actual spending > 0 */}
             <BarChart data={spendingByCategory.filter(item => item.value > 0)} layout="vertical" margin={{left: 40, right: 60}} barCategoryGap={24}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
               <XAxis type="number" hide />
               <YAxis dataKey="name" type="category" tick={{fontSize: 12, fill: '#4B5563', fontWeight: 600}} width={80} axisLine={false} tickLine={false} />
               <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
               <Legend />
-              {/* RESTORED COLOR CODING LOGIC */}
               <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false}>
                  {spendingByCategory.filter(item => item.value > 0).map((entry, index) => {
-                    let barColor = '#3B82F6'; // Default Blue
+                    let barColor = '#3B82F6';
                     if (entry.budget > 0) {
                       const ratio = entry.value / entry.budget;
-                      if (ratio >= 1) barColor = '#EF4444'; // Red if >= 100%
-                      else if (ratio >= 0.8) barColor = '#F59E0B'; // Orange if >= 80%
+                      if (ratio >= 1) barColor = '#EF4444';
+                      else if (ratio >= 0.8) barColor = '#F59E0B';
                     }
                     return <Cell key={`cell-${index}`} fill={barColor} />;
                  })}
@@ -519,52 +597,47 @@ export default function App() {
 
   // --- AUTH ---
   useEffect(() => {
-    const initAuth = async () => {
-        try {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else { throw new Error("No token provided"); }
-        } catch (error) {
-            console.warn("Auth with token failed, fallback anon:", error);
-            try { await signInAnonymously(auth); } catch (e) { console.error(e); }
-        }
-    };
-    initAuth();
+    // Only check auth state, do NOT auto-login anonymously
     return onAuthStateChanged(auth, setUser);
   }, []);
 
-  // --- DATA SYNC ---
+  // --- DATA SYNC (PRIVATE PER USER) ---
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setTransactions([]);
+      setBudgets(INITIAL_BUDGETS);
+      return;
+    }
     setIsLoading(true);
     
-    // Transactions
-    const unsubTx = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions')), (snapshot) => {
+    // Transactions: users/{uid}/transactions
+    const unsubTx = onSnapshot(query(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions')), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       data.sort((a, b) => new Date(b.date) - new Date(a.date));
       setTransactions(data);
       setIsLoading(false);
     }, (e) => { console.error(e); setIsLoading(false); });
 
-    // Budgets
-    const unsubBudget = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config'), (s) => s.exists() && setBudgets(s.data()));
+    // Budgets: users/{uid}/budgets/config
+    const unsubBudget = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'budgets', 'config'), (s) => s.exists() && setBudgets(s.data()));
     
-    // Custom Categories
-    const unsubCustomCats = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'categories'), (s) => {
+    // Custom Categories: users/{uid}/settings/categories
+    const unsubCustomCats = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'categories'), (s) => {
       if (s.exists()) setCustomCategoryConfig(s.data());
     });
 
-    // Visibility Settings
-    const unsubVisibility = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'visibility'), (s) => {
+    // Visibility Settings: users/{uid}/settings/visibility
+    const unsubVisibility = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'visibility'), (s) => {
       if (s.exists()) setCategoryVisibility(s.data());
     });
 
-    // Alert Settings (NEW)
-    const unsubAlerts = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'alerts'), (s) => {
+    // Alert Settings: users/{uid}/settings/alerts
+    const unsubAlerts = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'alerts'), (s) => {
       if (s.exists()) setCategoryAlerts(s.data());
     });
 
-    const unsubNotes = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'notes'), (s) => s.exists() && setNoteStats(s.data()));
+    // Notes Stats: users/{uid}/stats/notes
+    const unsubNotes = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'stats', 'notes'), (s) => s.exists() && setNoteStats(s.data()));
 
     return () => { unsubTx(); unsubBudget(); unsubNotes(); unsubCustomCats(); unsubVisibility(); unsubAlerts(); };
   }, [user]);
@@ -580,24 +653,24 @@ export default function App() {
     }));
   }, [customCategoryConfig]);
 
-  // --- ACTIONS ---
+  // --- ACTIONS (UPDATED PATHS) ---
   const addTransaction = async (newTx) => {
     if (!user) return;
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), { ...newTx, createdAt: serverTimestamp(), createdBy: user.uid });
+    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'), { ...newTx, createdAt: serverTimestamp() });
     if (newTx.note?.trim()) {
       const cleanNote = newTx.note.trim().replace(/\./g, '');
-      if (cleanNote) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'notes'), { [cleanNote]: increment(1) }, { merge: true });
+      if (cleanNote) await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'stats', 'notes'), { [cleanNote]: increment(1) }, { merge: true });
     }
   };
 
   const deleteTransaction = async (id) => {
     if (!user || !confirm('Bạn có chắc muốn xóa giao dịch này?')) return;
-    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id));
+    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'transactions', id));
   };
 
   const saveBudgetsToDb = async (newBudgets) => {
     if (!user) return;
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config'), newBudgets);
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'budgets', 'config'), newBudgets);
     alert("Đã cập nhật ngân sách thành công!");
   };
 
@@ -606,10 +679,10 @@ export default function App() {
     const id = `custom_${Date.now()}`;
     const randomColor = getRandomColor();
     // REMOVED ICON FROM SAVE
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'categories'), {
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'categories'), {
       [id]: { label: name, color: randomColor }
     }, { merge: true });
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config'), {
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'budgets', 'config'), {
       [id]: Number(budget)
     }, { merge: true });
     alert("Đã thêm danh mục mới thành công!");
@@ -618,10 +691,10 @@ export default function App() {
   const deleteCustomCategory = async (id) => {
     if (!user || !confirm('Bạn có chắc muốn xóa danh mục này? Dữ liệu chi tiêu cũ vẫn được giữ nhưng danh mục sẽ không còn hiển thị.')) return;
     
-    const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'categories');
-    const budgetRef = doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config');
-    const visibilityRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'visibility');
-    const alertsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'alerts');
+    const settingsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'categories');
+    const budgetRef = doc(db, 'artifacts', appId, 'users', user.uid, 'budgets', 'config');
+    const visibilityRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'visibility');
+    const alertsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'alerts');
 
     // Remove from settings map
     await updateDoc(settingsRef, { [id]: deleteField() });
@@ -637,7 +710,7 @@ export default function App() {
   const toggleVisibility = async (id) => {
     if (!user) return;
     const currentStatus = categoryVisibility[id] !== false; 
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'visibility'), {
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'visibility'), {
       [id]: !currentStatus
     }, { merge: true });
   };
@@ -645,9 +718,15 @@ export default function App() {
   const toggleAlert = async (id) => {
     if (!user) return;
     const currentStatus = categoryAlerts[id] !== false; // Default true
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'alerts'), {
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'alerts'), {
       [id]: !currentStatus
     }, { merge: true });
+  };
+
+  const handleLogout = async () => {
+    if (confirm("Bạn có chắc muốn đăng xuất?")) {
+      await signOut(auth);
+    }
   };
 
   // --- MEMOIZED DATA CALCULATIONS ---
@@ -713,7 +792,6 @@ export default function App() {
   const alerts = useMemo(() => {
     const results = [];
     spendingByCategory.forEach(item => {
-      // Logic check: Only Alert if budget exists AND alert is enabled for this category
       if (item.budget > 0 && categoryAlerts[item.id] !== false) {
         const ratio = item.value / item.budget;
         if (ratio >= 1) results.push({ id: item.id, name: item.name, ratio, type: 'danger', message: `Đã hết ngân sách ${item.name}` });
@@ -802,6 +880,19 @@ export default function App() {
     </div>
   );
 
+  // --- RENDER APP OR LOGIN ---
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  // Helper for name
+  const getUserName = () => {
+    if (!user) return '';
+    return user.displayName || user.email?.split('@')[0] || 'Người dùng';
+  };
+  const userName = getUserName();
+  const userInitial = userName.charAt(0).toUpperCase();
+
   return (
     <div className="min-h-screen bg-slate-50 text-gray-800 font-sans flex flex-col md:flex-row overflow-x-hidden selection:bg-blue-100 selection:text-blue-900">
       <style>{`
@@ -840,7 +931,7 @@ export default function App() {
       
       {/* Mobile Header */}
       <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-gray-100">
-        <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">Tuấn Phan</h1>
+        <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">{userName}</h1>
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
           className="p-2 sm:hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 transition-colors"
@@ -859,13 +950,22 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none pt-[73px] md:pt-0`}>
-        <div className="p-8 border-b border-slate-50 hidden md:block"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">T</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">Tuấn Phan</h1><p className="text-xs text-gray-400 font-medium mt-1">Personal Finance</p></div></div></div>
+        <div className="p-8 border-b border-slate-50 hidden md:block"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">{userInitial}</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">Personal Finance</p></div></div></div>
         <nav className="p-6 space-y-2 flex-1">
           <SidebarItem id="dashboard" label="Tổng quan" icon={LayoutDashboard} active={activeTab === 'dashboard'} />
           <SidebarItem id="transactions" label="Sổ giao dịch" icon={Receipt} active={activeTab === 'transactions'} />
           <SidebarItem id="budget" label="Cài đặt ngân sách" icon={Settings} active={activeTab === 'budget'} />
         </nav>
-        <div className="p-6"><div className="bg-slate-50 rounded-2xl p-4 flex items-center gap-3 border border-slate-100"><div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><Database size={14} /></div><div><p className="text-xs font-bold text-gray-700">Trạng thái</p><p className="text-[10px] text-green-600 flex items-center gap-1 font-bold uppercase tracking-wider"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Online</p></div></div></div>
+        <div className="p-6 space-y-2">
+          
+          <button 
+            onClick={handleLogout}
+            className="w-full bg-slate-50 hover:bg-slate-100 text-slate-600 p-4 rounded-2xl flex items-center gap-3 transition-colors font-medium active:scale-[0.98]"
+          >
+            <div className="w-8 h-8 rounded-full bg-white text-slate-500 flex items-center justify-center shadow-sm"><LogOut size={16} /></div>
+            Đăng xuất
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -888,6 +988,7 @@ export default function App() {
                   chartCategoryFilter={chartCategoryFilter} setChartCategoryFilter={setChartCategoryFilter}
                   allCategories={allCategories}
                   categoryVisibility={categoryVisibility} // Passed visibility prop
+                  userName={userName} // Pass dynamic name
                 />
               )}
               {activeTab === 'transactions' && (
