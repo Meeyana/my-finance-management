@@ -652,6 +652,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true); // Added loading state
 
   // --- FILTER STATE ---
   const [viewMonth, setViewMonth] = useState(new Date().getMonth());
@@ -664,7 +665,11 @@ export default function App() {
   // --- AUTH ---
   useEffect(() => {
     // Only check auth state, do NOT auto-login anonymously
-    return onAuthStateChanged(auth, setUser);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setIsAuthChecking(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   // --- DATA SYNC (ADAPTED FOR PUBLIC VS PRIVATE) ---
@@ -1175,6 +1180,14 @@ export default function App() {
   );
 
   // --- RENDER APP OR LOGIN ---
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
   if (!user) {
     return <LoginScreen />;
   }
