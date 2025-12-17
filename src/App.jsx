@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Wallet, Receipt, PlusCircle, Settings, 
   TrendingUp, TrendingDown, Search, Trash2, Save,
   Menu, X, Database, Calendar, AlertCircle, BarChart2, ArrowUpRight, ArrowDownRight,
-  List, AlertTriangle,
+  List, AlertTriangle, Repeat, CalendarClock, CheckCircle2, Edit,
   Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal, ChevronDown,
   Heart, Star, Gift, Music, Briefcase, Plane, Gamepad2, GraduationCap,
   Baby, Dog, Car, Zap, Wifi, Phone, Dumbbell,
@@ -67,7 +67,7 @@ const INITIAL_BUDGETS = {
 };
 
 // --- UTILS ---
-const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
 const formatShortCurrency = (amount) => {
   if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'tr';
   if (amount >= 1000) return (amount / 1000).toFixed(0) + 'k';
@@ -95,11 +95,10 @@ const Badge = ({ color, children }) => (
   </span>
 );
 
-// --- PATH HELPER FUNCTION (CRITICAL) ---
+// --- PATH HELPER FUNCTION ---
 const getFirestorePaths = (user) => {
   if (!user) return null;
 
-  // Nếu là Anonymous (Demo) -> Dùng Public Path
   if (user.isAnonymous) {
     return {
       transactions: collection(db, 'artifacts', appId, 'public', 'data', 'transactions'),
@@ -108,11 +107,11 @@ const getFirestorePaths = (user) => {
       visibility: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'visibility'),
       alerts: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'alerts'),
       notes: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'notes'),
+      recurring: collection(db, 'artifacts', appId, 'public', 'data', 'recurring'),
       isPublic: true
     };
   }
 
-  // Nếu là User thường -> Dùng Private Path
   return {
     transactions: collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'),
     budgetConfig: doc(db, 'artifacts', appId, 'users', user.uid, 'budgets', 'config'),
@@ -120,10 +119,10 @@ const getFirestorePaths = (user) => {
     visibility: doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'visibility'),
     alerts: doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'alerts'),
     notes: doc(db, 'artifacts', appId, 'users', user.uid, 'stats', 'notes'),
+    recurring: collection(db, 'artifacts', appId, 'users', user.uid, 'recurring'),
     isPublic: false
   };
 };
-
 
 // --- LOGIN COMPONENT ---
 const LoginScreen = () => {
@@ -270,7 +269,6 @@ const DashboardContent = React.memo(({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        {/* 1. SPENT (Đã chi tiêu) */}
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-200 shadow-lg border-none relative overflow-hidden">
           <div className="relative z-10">
               <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">Đã chi tiêu</p>
@@ -283,7 +281,6 @@ const DashboardContent = React.memo(({
           <TrendingDown className="absolute right-[-10px] bottom-[-10px] text-white opacity-20" size={100} />
         </Card>
         
-        {/* 2. BUDGET (Ngân sách) */}
         <Card>
            <div className="flex justify-between items-start">
             <div>
@@ -297,7 +294,6 @@ const DashboardContent = React.memo(({
           </div>
         </Card>
         
-        {/* 3. REMAINING (Còn lại) */}
         <Card>
            <div className="flex justify-between items-start">
             <div>
@@ -310,7 +306,6 @@ const DashboardContent = React.memo(({
           </div>
         </Card>
 
-        {/* 4. INCURRED (Phát sinh) */}
         <Card>
            <div className="flex justify-between items-start">
             <div>
@@ -322,7 +317,6 @@ const DashboardContent = React.memo(({
         </Card>
       </div>
 
-      {/* Alerts */}
       {alerts.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {alerts.map((alert) => (
@@ -337,9 +331,7 @@ const DashboardContent = React.memo(({
         </div>
       )}
 
-      {/* Charts Area */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pie Chart */}
         <Card className="min-h-[420px]">
           <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
             <PieChart size={20} className="text-gray-400" /> Phân bổ chi tiêu
@@ -353,7 +345,7 @@ const DashboardContent = React.memo(({
                   <Pie
                     data={spendingByCategory.filter(i => i.value > 0)}
                     cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={4} dataKey="value" label={renderCustomizedLabel}
-                    activeShape={null} // Removed active shape highlight
+                    activeShape={null} 
                   >
                     {spendingByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={2} stroke="#fff" />)}
                   </Pie>
@@ -367,7 +359,6 @@ const DashboardContent = React.memo(({
           </div>
         </Card>
 
-        {/* Bar Chart */}
         <Card className="min-h-[420px]">
           <div className="flex flex-col gap-3 mb-4">
              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -416,9 +407,27 @@ const DashboardContent = React.memo(({
         </Card>
       </div>
 
-      {/* Actual vs Budget */}
       <Card>
-        <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2"><Settings size={20} className="text-gray-400" /> Thực tế vs Ngân sách</h4>
+        <div className="mb-6">
+          <h4 className="font-bold text-gray-800 flex items-center gap-2 mb-3">
+            <Settings size={20} className="text-gray-400" /> Thực tế vs Ngân sách
+          </h4>
+          <div className="flex flex-wrap gap-3 sm:gap-4 text-xs font-medium text-gray-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+              <span>Trong hạn mức</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <span>Sắp hết ngân sách</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <span>Vượt quá ngân sách</span>
+            </div>
+          </div>
+        </div>
+        
         <div className="h-[500px] w-full">
           {!showCharts ? (
              <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
@@ -429,7 +438,6 @@ const DashboardContent = React.memo(({
               <XAxis type="number" hide />
               <YAxis dataKey="name" type="category" tick={{fontSize: 12, fill: '#4B5563', fontWeight: 600}} width={80} axisLine={false} tickLine={false} />
               <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
-              <Legend />
               <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false} activeBar={false}>
                  {spendingByCategory.filter(item => item.value > 0).map((entry, index) => {
                     let barColor = '#3B82F6';
@@ -456,7 +464,7 @@ const DashboardContent = React.memo(({
 
 // --- COMPONENT: TRANSACTION CONTENT ---
 const TransactionContent = ({ 
-  filtered, viewMonth, viewYear, search, setSearch, filterCategory, setFilterCategory, deleteTransaction, allCategories
+  filtered, viewMonth, viewYear, search, setSearch, filterCategory, setFilterCategory, deleteTransaction, onEdit, allCategories
 }) => {
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -497,17 +505,31 @@ const TransactionContent = ({
             <tbody className="divide-y divide-gray-50">
               {filtered.map((tx) => (
                 <tr key={tx.id} className="sm:hover:bg-slate-50/80 transition-colors group bg-white">
-                  <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-gray-500 font-medium">{new Date(tx.date).getDate()}/{new Date(tx.date).getMonth() + 1}{tx.isIncurred && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-400" title="Chi phí phát sinh"></span>}</td>
+                  <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-gray-500 font-medium">
+                    {new Date(tx.date).getDate()}/{new Date(tx.date).getMonth() + 1}
+                    {tx.isIncurred && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-400" title="Chi phí phát sinh"></span>}
+                    {tx.isRecurring && <span className="ml-2 text-blue-500" title="Tự động"><Repeat size={12} className="inline"/></span>}
+                  </td>
                   <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap"><Badge color={allCategories.find(c => c.id === tx.category)?.color || '#999'}>{allCategories.find(c => c.id === tx.category)?.name}</Badge></td>
                   <td className="px-2 py-3 sm:px-6 sm:py-4 text-gray-800 font-medium break-words max-w-[200px]">{tx.note}</td>
                   <td className="px-2 py-3 sm:px-6 sm:py-4 text-right font-bold text-gray-800 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
                   <td className="px-2 py-3 sm:px-6 sm:py-4 text-center">
-                    <button 
-                      onClick={() => deleteTransaction(tx.id)} 
-                      className="text-gray-300 sm:hover:text-red-500 p-2 rounded-full sm:hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 active:scale-125 active:bg-red-100 active:text-red-600"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button 
+                        onClick={() => onEdit(tx)} 
+                        className="text-gray-300 sm:hover:text-blue-500 p-2 rounded-full sm:hover:bg-blue-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 active:scale-125 active:bg-blue-100 active:text-blue-600"
+                        title="Chỉnh sửa"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button 
+                        onClick={() => deleteTransaction(tx.id)} 
+                        className="text-gray-300 sm:hover:text-red-500 p-2 rounded-full sm:hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 active:scale-125 active:bg-red-100 active:text-red-600"
+                        title="Xóa"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -554,15 +576,13 @@ const BudgetContent = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {allCategories.map(cat => {
           const currentVal = budgets[cat.id] || 0;
-          const isVisible = categoryVisibility[cat.id] !== false; // Default true
-          const isAlertOn = categoryAlerts[cat.id] !== false; // Default true
-          const isCustom = cat.id.startsWith('custom_'); // Check if custom category
+          const isVisible = categoryVisibility[cat.id] !== false; 
+          const isAlertOn = categoryAlerts[cat.id] !== false; 
+          const isCustom = cat.id.startsWith('custom_'); 
 
           return (
             <div key={cat.id} className={`bg-white rounded-2xl p-6 border border-slate-100 shadow-sm sm:hover:shadow-md transition-all group relative overflow-hidden ${!isVisible ? 'opacity-60 grayscale-[0.5]' : ''}`}>
               
-              {/* Controls: Visibility, Alert, Delete */}
-              {/* FIX Z-INDEX: Changed z-20 to z-10 to prevent overlap with sticky menu/header */}
               <div className="absolute top-4 right-4 z-10 flex gap-2">
                 {isCustom && (
                   <button 
@@ -591,20 +611,19 @@ const BudgetContent = ({
 
               <div className="relative z-10 flex flex-col h-full justify-between mt-2">
                   <div className="mb-4">
-                    {/* Simplified Header without Icon */}
                     <div className="w-10 h-2 rounded-full mb-3" style={{backgroundColor: cat.color}}></div>
                     <h4 className="font-bold text-lg text-gray-800">{cat.name}</h4>
                   </div>
                   <div className="relative mt-auto">
                       <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Hạn mức tháng</label>
                       <input type="number" className="w-full text-xl font-bold border-b-2 border-slate-100 focus:border-gray-800 outline-none py-2 transition-colors bg-transparent text-gray-800" value={currentVal === 0 ? '' : currentVal} onChange={(e) => setBudgets({...budgets, [cat.id]: Number(e.target.value)})} placeholder="0" />
-                      <span className="absolute right-0 bottom-3 text-xs text-gray-400 font-bold">VNĐ</span>
+                      <span className="absolute right-0 bottom-3 text-xs text-gray-400 font-bold">đ</span>
                   </div>
               </div>
             </div>
           )
         })}
-        {/* ADD NEW BUTTON CARD */}
+        
         <button 
           onClick={() => setShowAddModal(true)}
           className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-gray-400 sm:hover:text-blue-600 sm:hover:border-blue-300 sm:hover:bg-blue-50/50 transition-all min-h-[240px] group active:scale-[0.98]"
@@ -616,7 +635,6 @@ const BudgetContent = ({
         </button>
       </div>
 
-      {/* MODAL ADD CATEGORY */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
@@ -644,6 +662,254 @@ const BudgetContent = ({
   );
 };
 
+// --- COMPONENT: RECURRING EXPENSES ---
+const RecurringContent = ({ 
+  recurringItems, addRecurringItem, updateRecurringItem, deleteRecurringItem, allCategories 
+}) => {
+  const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null); 
+  const [formData, setFormData] = useState({ 
+    name: '', amount: '', category: 'living', day: '1', 
+    durationMonths: '', 
+    isLifetime: true,
+    durationType: 'months'
+  });
+
+  const resetForm = () => {
+    setFormData({ 
+      name: '', amount: '', category: 'living', day: '1', 
+      durationMonths: '', 
+      isLifetime: true,
+      durationType: 'months'
+    });
+    setEditingItem(null);
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    setFormData({
+      name: item.name,
+      amount: item.amount,
+      category: item.category,
+      day: item.day,
+      durationMonths: item.durationMonths || '',
+      isLifetime: !item.durationMonths,
+      durationType: 'months' 
+    });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.name || !formData.amount) return;
+
+    let finalDuration = null;
+    if (!formData.isLifetime && formData.durationMonths) {
+      finalDuration = Number(formData.durationMonths);
+      if (formData.durationType === 'years') finalDuration *= 12;
+    }
+
+    const payload = {
+      name: formData.name,
+      amount: Number(formData.amount),
+      category: formData.category,
+      day: Number(formData.day),
+      durationMonths: finalDuration,
+      startDate: editingItem ? editingItem.startDate : new Date().toISOString()
+    };
+
+    if (editingItem) {
+      await updateRecurringItem(editingItem.id, payload);
+    } else {
+      await addRecurringItem(payload);
+    }
+
+    setShowModal(false);
+    resetForm();
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in pb-24">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+          <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2">Chi tiêu cố định <Repeat size={24} className="text-blue-500"/></h3>
+          <p className="text-gray-500">Tự động tạo giao dịch cho các khoản chi hàng tháng</p>
+        </div>
+        <button 
+          onClick={() => { resetForm(); setShowModal(true); }} 
+          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl sm:hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 w-full md:w-auto justify-center"
+        >
+          <PlusCircle size={18} /> Thêm lịch chi tiêu
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {recurringItems.map(item => {
+          const category = allCategories.find(c => c.id === item.category);
+          const startDate = new Date(item.startDate);
+          const now = new Date();
+          const monthsPassed = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
+          const isExpired = item.durationMonths && monthsPassed >= item.durationMonths;
+
+          return (
+            <div key={item.id} className={`bg-white rounded-2xl p-6 border border-slate-100 shadow-sm relative group overflow-hidden hover:shadow-md transition-all ${isExpired ? 'opacity-60 grayscale-[0.8]' : ''}`}>
+               <div className="absolute top-0 right-0 p-4 opacity-10">
+                 <Repeat size={100} />
+               </div>
+               
+               <div className="relative z-10 flex flex-col h-full">
+                  <div className="flex justify-between items-start mb-2">
+                     <div className="w-16 h-1.5 rounded-full" style={{ backgroundColor: category?.color || '#999' }}></div>
+                     <div className="flex gap-1 -mr-2 -mt-2">
+                        <button 
+                          onClick={() => handleEdit(item)}
+                          className="text-gray-300 hover:text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button 
+                          onClick={() => deleteRecurringItem(item.id)}
+                          className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                     </div>
+                  </div>
+                  
+                  <h4 className="font-bold text-lg text-gray-800 mb-1 line-clamp-1 mt-2">
+                    {item.name} {isExpired && <span className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full ml-1">(Đã hết hạn)</span>}
+                  </h4>
+                  <p className="text-sm text-gray-500 mb-4">{category?.name}</p>
+                  
+                  <div className="mt-auto pt-4 border-t border-slate-50 space-y-2">
+                    <p className="text-2xl font-bold text-blue-600">{formatCurrency(item.amount)}</p>
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 bg-slate-50 py-1.5 px-3 rounded-lg w-fit">
+                        <CalendarClock size={14} /> 
+                        Ngày {item.day} hàng tháng
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 bg-slate-50 py-1.5 px-3 rounded-lg w-fit">
+                        <CheckCircle2 size={14} className={item.durationMonths ? "text-orange-500" : "text-green-500"} /> 
+                        {item.durationMonths ? `Kéo dài ${item.durationMonths} tháng` : 'Trọn đời'}
+                      </div>
+                    </div>
+                  </div>
+               </div>
+            </div>
+          );
+        })}
+        
+        {recurringItems.length === 0 && (
+          <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+             <Repeat size={48} className="mb-4 opacity-20" />
+             <p>Chưa có khoản chi cố định nào.</p>
+             <button onClick={() => { resetForm(); setShowModal(true); }} className="text-blue-600 font-bold hover:underline mt-2">Tạo ngay</button>
+          </div>
+        )}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in max-h-[90vh] overflow-y-auto">
+             <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                <h3 className="text-lg font-bold text-gray-800">{editingItem ? 'Chỉnh sửa khoản chi' : 'Thêm khoản chi cố định'}</h3>
+                <button onClick={() => setShowModal(false)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18}/></button>
+             </div>
+             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div>
+                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên khoản chi</label>
+                   <input required type="text" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="Ví dụ: Tiền nhà, Internet..." value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                </div>
+                <div>
+                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số tiền hàng tháng</label>
+                   <input required type="number" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="0" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Danh mục</label>
+                    <select className="custom-select w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                      {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày lên sổ</label>
+                    <select className="custom-select w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white" value={formData.day} onChange={e => setFormData({...formData, day: e.target.value})}>
+                      {Array.from({length: 31}, (_, i) => i + 1).map(d => (
+                        <option key={d} value={d}>Ngày {d}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-4">
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">Thời gian áp dụng</label>
+                  
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, isLifetime: true})}
+                      className={`flex-1 py-3 px-4 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${formData.isLifetime ? 'bg-white border-blue-500 text-blue-600 shadow-sm ring-1 ring-blue-500' : 'bg-transparent border-slate-200 text-gray-500 hover:bg-white hover:border-slate-300'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${formData.isLifetime ? 'border-blue-500' : 'border-gray-400'}`}>
+                        {formData.isLifetime && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
+                      </div>
+                      Trọn đời
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, isLifetime: false})}
+                      className={`flex-1 py-3 px-4 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${!formData.isLifetime ? 'bg-white border-blue-500 text-blue-600 shadow-sm ring-1 ring-blue-500' : 'bg-transparent border-slate-200 text-gray-500 hover:bg-white hover:border-slate-300'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${!formData.isLifetime ? 'border-blue-500' : 'border-gray-400'}`}>
+                        {!formData.isLifetime && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
+                      </div>
+                      Có thời hạn
+                    </button>
+                  </div>
+                  
+                  {!formData.isLifetime && (
+                    <div className="flex gap-3 animate-fade-in pt-1">
+                       <div className="relative flex-1">
+                         <input 
+                           type="number" 
+                           required 
+                           min="1"
+                           className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 text-sm font-bold text-gray-700"
+                           placeholder="Nhập số lượng..."
+                           value={formData.durationMonths}
+                           onChange={e => setFormData({...formData, durationMonths: e.target.value})}
+                         />
+                       </div>
+                       <div className="w-1/3">
+                         <select 
+                           className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white text-sm font-bold text-gray-700 h-full"
+                           value={formData.durationType}
+                           onChange={e => setFormData({...formData, durationType: e.target.value})}
+                         >
+                           <option value="months">Tháng</option>
+                           <option value="years">Năm</option>
+                         </select>
+                       </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2">
+                  <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200">
+                    {editingItem ? 'Cập nhật' : 'Lưu thiết lập'}
+                  </button>
+                  <p className="text-xs text-center text-gray-400 mt-3">Hệ thống sẽ tự động tạo giao dịch khi đến ngày này hàng tháng.</p>
+                </div>
+             </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- MAIN APP ---
 export default function App() {
   const [user, setUser] = useState(null);
@@ -652,12 +918,14 @@ export default function App() {
   const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
   const [customCategoryConfig, setCustomCategoryConfig] = useState({}); 
   const [categoryVisibility, setCategoryVisibility] = useState({}); 
-  const [categoryAlerts, setCategoryAlerts] = useState({}); // New State for Alerts
+  const [categoryAlerts, setCategoryAlerts] = useState({}); 
   const [noteStats, setNoteStats] = useState({});
+  const [recurringItems, setRecurringItems] = useState([]); 
   const [isLoading, setIsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [isAuthChecking, setIsAuthChecking] = useState(true); // Added loading state
+  const [editingTransaction, setEditingTransaction] = useState(null); 
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // --- FILTER STATE ---
   const [viewMonth, setViewMonth] = useState(new Date().getMonth());
@@ -669,21 +937,20 @@ export default function App() {
 
   // --- AUTH ---
   useEffect(() => {
-    // Only check auth state, do NOT auto-login anonymously
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsAuthChecking(false);
-      // *** FIX: Ensure menu is CLOSED when logging in/out ***
       setIsMobileMenuOpen(false); 
     });
     return () => unsubscribe();
   }, []);
 
-  // --- DATA SYNC (ADAPTED FOR PUBLIC VS PRIVATE) ---
+  // --- DATA SYNC ---
   useEffect(() => {
     if (!user) {
       setTransactions([]);
       setBudgets(INITIAL_BUDGETS);
+      setRecurringItems([]);
       return;
     }
     setIsLoading(true);
@@ -691,7 +958,6 @@ export default function App() {
     const paths = getFirestorePaths(user);
     if (!paths) return;
     
-    // Transactions
     const unsubTx = onSnapshot(query(paths.transactions), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       data.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -699,53 +965,100 @@ export default function App() {
       setIsLoading(false);
     }, (e) => { console.error(e); setIsLoading(false); });
 
-    // Budgets Config
     const unsubBudget = onSnapshot(paths.budgetConfig, (s) => s.exists() && setBudgets(s.data()));
     
-    // Custom Categories
     const unsubCustomCats = onSnapshot(paths.categories, (s) => {
       if (s.exists()) setCustomCategoryConfig(s.data());
     });
 
-    // Visibility Settings
     const unsubVisibility = onSnapshot(paths.visibility, (s) => {
       if (s.exists()) setCategoryVisibility(s.data());
     });
 
-    // Alert Settings
     const unsubAlerts = onSnapshot(paths.alerts, (s) => {
       if (s.exists()) setCategoryAlerts(s.data());
     });
 
-    // Notes Stats
     const unsubNotes = onSnapshot(paths.notes, (s) => s.exists() && setNoteStats(s.data()));
 
-    return () => { unsubTx(); unsubBudget(); unsubNotes(); unsubCustomCats(); unsubVisibility(); unsubAlerts(); };
+    const unsubRecurring = onSnapshot(paths.recurring, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setRecurringItems(data);
+    });
+
+    return () => { 
+      unsubTx(); unsubBudget(); unsubNotes(); unsubCustomCats(); 
+      unsubVisibility(); unsubAlerts(); unsubRecurring(); 
+    };
   }, [user]);
 
-  // --- DYNAMIC CATEGORY MERGE ---
+  // --- RECURRING AUTOMATION LOGIC ---
+  useEffect(() => {
+    if (!user || recurringItems.length === 0) return;
+
+    const checkAndExecuteRecurring = async () => {
+      const now = new Date();
+      const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`; 
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const paths = getFirestorePaths(user);
+
+      recurringItems.forEach(async (item) => {
+        if (item.durationMonths) {
+            const startDate = new Date(item.startDate);
+            const monthsPassed = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
+            if (monthsPassed >= item.durationMonths) {
+                return;
+            }
+        }
+
+        if (item.lastExecuted === currentMonthKey) return;
+
+        const targetDay = Math.min(item.day, daysInMonth);
+
+        if (now.getDate() >= targetDay) {
+          try {
+             await addDoc(paths.transactions, {
+               amount: item.amount,
+               category: item.category,
+               date: new Date().toISOString().split('T')[0], 
+               note: `${item.name} (Tự động)`,
+               createdAt: serverTimestamp(),
+               isRecurring: true
+             });
+
+             const itemRef = doc(paths.recurring, item.id);
+             await updateDoc(itemRef, {
+               lastExecuted: currentMonthKey
+             });
+             
+             console.log(`Executed recurring expense: ${item.name}`);
+          } catch (error) {
+            console.error("Error executing recurring expense:", error);
+          }
+        }
+      });
+    };
+
+    checkAndExecuteRecurring();
+  }, [recurringItems, user]);
+
   const allCategories = useMemo(() => {
     const mergedConfig = { ...DEFAULT_CATEGORY_CONFIG, ...customCategoryConfig };
     return Object.keys(mergedConfig).map(key => ({
       id: key,
       name: mergedConfig[key].label,
       color: mergedConfig[key].color,
-      icon: ICON_LIBRARY[mergedConfig[key].icon] || Star // Default icon fallback
+      icon: ICON_LIBRARY[mergedConfig[key].icon] || Star 
     }));
   }, [customCategoryConfig]);
 
-  // --- ACTIONS (UPDATED PATHS) ---
   const addTransaction = async (newTx) => {
     if (!user) return;
-
-    // --- LIMIT CHECK FOR DEMO (50 TRANSACTIONS) ---
     if (user.isAnonymous && transactions.length >= 50) {
       alert("Chế độ Demo giới hạn tối đa 50 giao dịch. Vui lòng đăng ký tài khoản để sử dụng không giới hạn!");
       return;
     }
-
     const paths = getFirestorePaths(user);
-    
     await addDoc(paths.transactions, { ...newTx, createdAt: serverTimestamp() });
     
     if (newTx.note?.trim()) {
@@ -754,10 +1067,17 @@ export default function App() {
     }
   };
 
+  const updateTransaction = async (id, updatedTx) => {
+    if (!user) return;
+    const paths = getFirestorePaths(user);
+    const cleanTx = Object.fromEntries(Object.entries(updatedTx).filter(([_, v]) => v !== undefined));
+    await updateDoc(doc(paths.transactions, id), cleanTx);
+    alert("Đã cập nhật giao dịch thành công!");
+  };
+
   const deleteTransaction = async (id) => {
     if (!user || !confirm('Bạn có chắc muốn xóa giao dịch này?')) return;
     const paths = getFirestorePaths(user);
-    // Use doc() with the collection ref and ID
     await deleteDoc(doc(paths.transactions, id));
   };
 
@@ -770,13 +1090,10 @@ export default function App() {
 
   const addNewCategory = async ({ name, budget }) => {
     if (!user) return;
-
-    // --- LIMIT CHECK FOR DEMO (5 CUSTOM CATEGORIES) ---
     if (user.isAnonymous && Object.keys(customCategoryConfig).length >= 5) {
       alert("Chế độ Demo giới hạn tối đa 5 danh mục tùy chỉnh. Vui lòng đăng ký tài khoản để tạo thêm!");
       return;
     }
-
     const paths = getFirestorePaths(user);
     const id = `custom_${Date.now()}`;
     const randomColor = getRandomColor();
@@ -794,14 +1111,8 @@ export default function App() {
   const deleteCustomCategory = async (id) => {
     if (!user || !confirm('Bạn có chắc muốn xóa danh mục này?')) return;
     const paths = getFirestorePaths(user);
-    
-    // Remove from settings map
     await updateDoc(paths.categories, { [id]: deleteField() });
-    
-    // Clean up budget config
     await updateDoc(paths.budgetConfig, { [id]: deleteField() });
-    
-    // Clean up other configs (try-catch because they might not exist)
     try { await updateDoc(paths.visibility, { [id]: deleteField() }); } catch(e) {}
     try { await updateDoc(paths.alerts, { [id]: deleteField() }); } catch(e) {}
   };
@@ -810,18 +1121,41 @@ export default function App() {
     if (!user) return;
     const paths = getFirestorePaths(user);
     const currentStatus = categoryVisibility[id] !== false; 
-    await setDoc(paths.visibility, {
-      [id]: !currentStatus
-    }, { merge: true });
+    await setDoc(paths.visibility, { [id]: !currentStatus }, { merge: true });
   };
 
   const toggleAlert = async (id) => {
     if (!user) return;
     const paths = getFirestorePaths(user);
     const currentStatus = categoryAlerts[id] !== false; 
-    await setDoc(paths.alerts, {
-      [id]: !currentStatus
-    }, { merge: true });
+    await setDoc(paths.alerts, { [id]: !currentStatus }, { merge: true });
+  };
+
+  // --- NEW ACTIONS FOR RECURRING ---
+  const addRecurringItem = async (item) => {
+    if (!user) return;
+    const paths = getFirestorePaths(user);
+    await addDoc(paths.recurring, {
+      ...item,
+      amount: Number(item.amount),
+      day: Number(item.day),
+      lastExecuted: '', // Initial state
+      startDate: new Date().toISOString() // Start tracking duration from now
+    });
+    alert("Đã thêm lịch chi tiêu cố định thành công!");
+  };
+
+  const updateRecurringItem = async (id, updatedData) => {
+    if (!user) return;
+    const paths = getFirestorePaths(user);
+    await updateDoc(doc(paths.recurring, id), updatedData);
+    alert("Đã cập nhật lịch chi tiêu cố định thành công!");
+  }
+
+  const deleteRecurringItem = async (id) => {
+    if (!user || !confirm('Xóa khoản chi cố định này?')) return;
+    const paths = getFirestorePaths(user);
+    await deleteDoc(doc(paths.recurring, id));
   };
 
   const handleLogout = async () => {
@@ -852,7 +1186,6 @@ export default function App() {
   const spendingDiff = totalSpent - previousMonthData.total;
   const totalIncurred = currentMonthTransactions.filter(t => t.isIncurred).reduce((sum, t) => sum + Number(t.amount), 0);
 
-  // --- FILTERED SPENDING DATA ---
   const spendingByCategory = useMemo(() => {
     const data = {};
     allCategories.forEach(c => data[c.id] = 0);
@@ -908,41 +1241,47 @@ export default function App() {
     return (note.includes(search.toLowerCase()) || amount.includes(search)) && (filterCategory === 'all' || t.category === filterCategory);
   }), [currentMonthTransactions, search, filterCategory]);
 
-  const AddTransactionModal = ({ onClose }) => {
-    const [mode, setMode] = useState('simple'); // 'simple' | 'advanced'
+  const AddTransactionModal = ({ onClose, transactionToEdit }) => {
+    const [mode, setMode] = useState(transactionToEdit ? 'simple' : 'simple'); 
     
-    // --- LOCK BODY SCROLL ---
     useEffect(() => {
       document.body.style.overflow = 'hidden';
       return () => { document.body.style.overflow = 'unset'; };
     }, []);
 
-    // --- STATE FOR SIMPLE MODE ---
-    const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], amount: '', category: 'eating', note: '', isIncurred: false });
+    const [formData, setFormData] = useState(transactionToEdit ? {
+      date: transactionToEdit.date,
+      amount: transactionToEdit.amount,
+      category: transactionToEdit.category,
+      note: transactionToEdit.note,
+      isIncurred: transactionToEdit.isIncurred || false
+    } : { 
+      date: new Date().toISOString().split('T')[0], 
+      amount: '', 
+      category: 'eating', 
+      note: '', 
+      isIncurred: false 
+    });
     
-    // --- STATE FOR ADVANCED MODE ---
     const [advancedDate, setAdvancedDate] = useState(new Date().toISOString().split('T')[0]);
     const [advancedItems, setAdvancedItems] = useState([
       { amount: '', category: 'eating', note: '', isIncurred: false }
     ]);
-    const [activeRowIndex, setActiveRowIndex] = useState(null); // Track which row is focused for suggestions
+    const [activeRowIndex, setActiveRowIndex] = useState(null); 
 
     const [suggestions, setSuggestions] = useState([]);
     
     const handleNoteChange = (e, index = null) => {
       const val = e.target.value;
-      
-      // Update data
       if (mode === 'simple') {
         setFormData({...formData, note: val});
       } else {
         const newItems = [...advancedItems];
         newItems[index].note = val;
         setAdvancedItems(newItems);
-        setActiveRowIndex(index); // Ensure we know which row is active
+        setActiveRowIndex(index); 
       }
 
-      // Generate suggestions
       if (val.length >= 3) {
         const matches = Object.entries(noteStats).filter(([n, c]) => c >= 2 && n.toLowerCase().includes(val.toLowerCase())).sort((a,b)=>b[1]-a[1]).map(([n])=>n).slice(0,5);
         setSuggestions(matches);
@@ -961,32 +1300,34 @@ export default function App() {
         setActiveRowIndex(null);
     }
 
-    const handleSubmitSimple = (e) => { 
+    const handleSubmitSimple = async (e) => { 
       e.preventDefault(); 
       if (!formData.amount || !formData.date) return; 
-      addTransaction(formData); 
+      
+      if (transactionToEdit) {
+        await updateTransaction(transactionToEdit.id, formData);
+      } else {
+        await addTransaction(formData); 
+      }
       onClose(); 
     };
 
     const handleSubmitAdvanced = async (e) => {
       e.preventDefault();
-      // Filter out empty rows
       const validItems = advancedItems.filter(item => item.amount && Number(item.amount) > 0);
       if (validItems.length === 0) return;
 
-      // Check limit before adding batch
       if (user.isAnonymous && (transactions.length + validItems.length) > 50) {
         alert(`Bạn đang ở chế độ Demo. Thêm ${validItems.length} giao dịch sẽ vượt quá giới hạn 50.`);
         return;
       }
 
-      // Add all transactions
       await Promise.all(validItems.map(item => addTransaction({
         ...item,
         date: advancedDate
       })));
       
-      alert(`Đã thêm thành công ${validItems.length} giao dịch!`); // Added Success Alert
+      alert(`Đã thêm thành công ${validItems.length} giao dịch!`); 
       onClose();
     };
 
@@ -1011,7 +1352,7 @@ export default function App() {
         <div className={`bg-white rounded-2xl shadow-2xl w-full ${mode === 'advanced' ? 'max-w-2xl' : 'max-w-md'} animate-scale-in overflow-hidden my-4 transition-all duration-300 flex flex-col max-h-[90vh]`}>
           <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-3">
-              <h3 className="text-lg font-bold text-gray-800">Thêm giao dịch</h3>
+              <h3 className="text-lg font-bold text-gray-800">{transactionToEdit ? 'Cập nhật giao dịch' : 'Thêm giao dịch'}</h3>
               <div className="flex bg-slate-100 rounded-lg p-1">
                 <button 
                   onClick={() => setMode('simple')}
@@ -1019,12 +1360,14 @@ export default function App() {
                 >
                   Đơn giản
                 </button>
-                <button 
-                  onClick={() => setMode('advanced')}
-                  className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${mode === 'advanced' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Nâng cao
-                </button>
+                {!transactionToEdit && (
+                  <button 
+                    onClick={() => setMode('advanced')}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${mode === 'advanced' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Nâng cao
+                  </button>
+                )}
               </div>
             </div>
             <button 
@@ -1086,12 +1429,11 @@ export default function App() {
                   type="submit" 
                   className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold sm:hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] active:bg-blue-700 transition-all mt-4"
                 >
-                  Lưu Giao Dịch
+                  {transactionToEdit ? 'Lưu Thay Đổi' : 'Lưu Giao Dịch'}
                 </button>
               </form>
             ) : (
               <form onSubmit={handleSubmitAdvanced} className="space-y-6">
-                {/* Date Selection for Batch */}
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col sm:flex-row items-center gap-4">
                   <label className="text-sm font-bold text-blue-800 whitespace-nowrap">Chọn ngày áp dụng chung:</label>
                   <input 
@@ -1102,50 +1444,23 @@ export default function App() {
                     onChange={e => setAdvancedDate(e.target.value)} 
                   />
                 </div>
-
-                {/* Rows */}
                 <div className="space-y-4">
                   {advancedItems.map((item, index) => (
                     <div key={index} className="bg-slate-50 p-3 rounded-xl border border-slate-200 relative group">
-                      <div className="absolute -left-2 -top-2 bg-gray-200 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 border border-white shadow-sm">
-                        {index + 1}
-                      </div>
-                      
+                      <div className="absolute -left-2 -top-2 bg-gray-200 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 border border-white shadow-sm">{index + 1}</div>
                       <div className="flex flex-col gap-2">
-                        {/* Row 1: Amount & Category */}
                         <div className="flex gap-2">
                           <div className="w-1/2">
-                            <input 
-                              type="number" 
-                              placeholder="Số tiền" 
-                              className="w-full p-2 border border-slate-200 rounded-lg text-sm font-bold focus:border-blue-500 outline-none"
-                              value={item.amount}
-                              onChange={(e) => updateAdvancedItem(index, 'amount', e.target.value)}
-                              required
-                            />
+                            <input type="number" placeholder="Số tiền" className="w-full p-2 border border-slate-200 rounded-lg text-sm font-bold focus:border-blue-500 outline-none" value={item.amount} onChange={(e) => updateAdvancedItem(index, 'amount', e.target.value)} required />
                           </div>
                           <div className="w-1/2">
-                            <select 
-                              className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:border-blue-500 outline-none"
-                              value={item.category}
-                              onChange={(e) => updateAdvancedItem(index, 'category', e.target.value)}
-                            >
+                            <select className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:border-blue-500 outline-none" value={item.category} onChange={(e) => updateAdvancedItem(index, 'category', e.target.value)}>
                               {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                           </div>
                         </div>
-
-                        {/* Row 2: Note WITH SUGGESTIONS */}
                         <div className="relative">
-                            <input 
-                            type="text" 
-                            placeholder="Nội dung chi tiêu..." 
-                            className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none"
-                            value={item.note}
-                            onChange={(e) => handleNoteChange(e, index)}
-                            onFocus={() => setActiveRowIndex(index)}
-                            />
-                            {/* Render suggestions for THIS specific row */}
+                            <input type="text" placeholder="Nội dung chi tiêu..." className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none" value={item.note} onChange={(e) => handleNoteChange(e, index)} onFocus={() => setActiveRowIndex(index)} />
                             {suggestions.length > 0 && activeRowIndex === index && (
                                 <div className="absolute z-50 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">
                                 {suggestions.map((s, idx) => (
@@ -1155,36 +1470,15 @@ export default function App() {
                             )}
                         </div>
                       </div>
-
                       {advancedItems.length > 1 && (
-                        <button 
-                          type="button"
-                          onClick={() => removeAdvancedRow(index)}
-                          className="absolute -right-2 -top-2 p-1.5 bg-white text-red-400 hover:text-red-600 border border-gray-200 rounded-full shadow-sm"
-                          title="Xóa dòng này"
-                        >
-                          <X size={14} />
-                        </button>
+                        <button type="button" onClick={() => removeAdvancedRow(index)} className="absolute -right-2 -top-2 p-1.5 bg-white text-red-400 hover:text-red-600 border border-gray-200 rounded-full shadow-sm" title="Xóa dòng này"><X size={14} /></button>
                       )}
                     </div>
                   ))}
                 </div>
-
-                {/* Controls */}
                 <div className="flex gap-3 pt-2">
-                  <button 
-                    type="button" 
-                    onClick={addAdvancedRow}
-                    className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors active:scale-95 whitespace-nowrap"
-                  >
-                    <Plus size={18} /> <span className="hidden sm:inline">Thêm dòng</span>
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="flex-1 bg-gray-900 text-white py-3 px-6 rounded-xl font-bold hover:bg-black shadow-lg shadow-gray-300 transition-all active:scale-[0.98]"
-                  >
-                    Lưu tất cả ({advancedItems.filter(i => i.amount).length})
-                  </button>
+                  <button type="button" onClick={addAdvancedRow} className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors active:scale-95 whitespace-nowrap"><Plus size={18} /> <span className="hidden sm:inline">Thêm dòng</span></button>
+                  <button type="submit" className="flex-1 bg-gray-900 text-white py-3 px-6 rounded-xl font-bold hover:bg-black shadow-lg shadow-gray-300 transition-all active:scale-[0.98]">Lưu tất cả ({advancedItems.filter(i => i.amount).length})</button>
                 </div>
               </form>
             )}
@@ -1215,7 +1509,6 @@ export default function App() {
     </div>
   );
 
-  // --- RENDER APP OR LOGIN ---
   if (isAuthChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -1228,7 +1521,6 @@ export default function App() {
     return <LoginScreen />;
   }
 
-  // Helper for name
   const getUserName = () => {
     if (!user) return '';
     if (user.isAnonymous) return 'Demo User';
@@ -1238,7 +1530,6 @@ export default function App() {
   const userInitial = userName.charAt(0).toUpperCase();
 
   return (
-    // CHANGED: fixed inset-0 to lock viewport, overflow-hidden to prevent body scroll
     <div className="fixed inset-0 bg-slate-50 text-gray-800 font-sans flex flex-col md:flex-row overflow-hidden selection:bg-blue-100 selection:text-blue-900">
       <style>{`
         html, body { -webkit-tap-highlight-color: transparent; }
@@ -1254,16 +1545,8 @@ export default function App() {
           border-radius: 0.75rem; font-size: 16px;
         }
 
-        /* Disable focus outline for charts */
-        .recharts-surface:focus {
-            outline: none;
-        }
-        path.recharts-sector:focus,
-        path.recharts-rectangle:focus,
-        g.recharts-layer:focus,
-        .recharts-wrapper:focus {
-            outline: none !important;
-        }
+        .recharts-surface:focus { outline: none; }
+        path.recharts-sector:focus, path.recharts-rectangle:focus, g.recharts-layer:focus, .recharts-wrapper:focus { outline: none !important; }
 
         .custom-select {
           appearance: none;
@@ -1292,7 +1575,6 @@ export default function App() {
       `}</style>
       
       {/* Mobile Header */}
-      {/* CHANGED: Removed sticky, added flex-none, z-40 */}
       <div className="flex-none md:hidden bg-white px-5 py-4 flex justify-between items-center z-40 border-b border-gray-100 shadow-sm">
         <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">{userName} {user.isAnonymous && <Globe size={16} className="text-blue-500" />}</h1>
         <button 
@@ -1303,7 +1585,6 @@ export default function App() {
         </button>
       </div>
 
-      {/* Overlay */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-50 md:hidden animate-fade-in backdrop-blur-sm"
@@ -1312,13 +1593,12 @@ export default function App() {
       )}
 
       {/* Sidebar */}
-      {/* CHANGED: z-[60] to sit above everything on mobile */}
       <aside className={`fixed inset-y-0 left-0 z-[60] w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:z-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none pt-0`}>
-        {/* Removed pt-[73px] padding since it slides OVER header now, added standard padding */}
         <div className="p-8 border-b border-slate-50 flex-none"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">{userInitial}</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">{user.isAnonymous ? 'Public Shared Dashboard' : 'Personal Finance'}</p></div></div></div>
         <nav className="p-6 space-y-2 flex-1 overflow-y-auto">
           <SidebarItem id="dashboard" label="Tổng quan" icon={LayoutDashboard} active={activeTab === 'dashboard'} />
           <SidebarItem id="transactions" label="Sổ giao dịch" icon={Receipt} active={activeTab === 'transactions'} />
+          <SidebarItem id="recurring" label="Chi tiêu cố định" icon={Repeat} active={activeTab === 'recurring'} />
           <SidebarItem id="budget" label="Cài đặt ngân sách" icon={Settings} active={activeTab === 'budget'} />
         </nav>
         <div className="p-6 space-y-2 flex-none">
@@ -1332,13 +1612,10 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main Content */}
-      {/* CHANGED: flex-1 overflow-y-auto to handle scroll internally */}
       <main className="flex-1 overflow-y-auto relative scroll-smooth bg-slate-50 w-full">
-        {/* Inner Header - Sticky relative to Main */}
         <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-30 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
           <div className="flex items-center gap-4 w-full sm:w-auto">{(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}</div>
-          <button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
+          <button onClick={() => { setEditingTransaction(null); setShowAddModal(true); }} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
         </header>
 
         <div className="p-4 sm:p-8 max-w-[1600px] mx-auto pb-32">
@@ -1363,6 +1640,7 @@ export default function App() {
                   filtered={filteredTransactions} viewMonth={viewMonth} viewYear={viewYear} 
                   search={search} setSearch={setSearch} filterCategory={filterCategory} setFilterCategory={setFilterCategory} 
                   deleteTransaction={deleteTransaction}
+                  onEdit={(tx) => { setEditingTransaction(tx); setShowAddModal(true); }}
                   allCategories={allCategories}
                 />
               )}
@@ -1379,11 +1657,20 @@ export default function App() {
                   deleteCustomCategory={deleteCustomCategory} 
                 />
               )}
+              {activeTab === 'recurring' && (
+                <RecurringContent 
+                  recurringItems={recurringItems}
+                  addRecurringItem={addRecurringItem}
+                  updateRecurringItem={updateRecurringItem}
+                  deleteRecurringItem={deleteRecurringItem}
+                  allCategories={allCategories}
+                />
+              )}
             </>
           )}
         </div>
       </main>
-      {showAddModal && <AddTransactionModal onClose={() => setShowAddModal(false)} />}
+      {showAddModal && <AddTransactionModal onClose={() => { setShowAddModal(false); setEditingTransaction(null); }} transactionToEdit={editingTransaction} />}
     </div>
   );
 }
