@@ -270,6 +270,7 @@ const DashboardContent = React.memo(({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {/* 1. SPENT (Đã chi tiêu) */}
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-200 shadow-lg border-none relative overflow-hidden">
           <div className="relative z-10">
               <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">Đã chi tiêu</p>
@@ -282,6 +283,7 @@ const DashboardContent = React.memo(({
           <TrendingDown className="absolute right-[-10px] bottom-[-10px] text-white opacity-20" size={100} />
         </Card>
         
+        {/* 2. BUDGET (Ngân sách) */}
         <Card>
            <div className="flex justify-between items-start">
             <div>
@@ -295,16 +297,7 @@ const DashboardContent = React.memo(({
           </div>
         </Card>
         
-        <Card>
-           <div className="flex justify-between items-start">
-            <div>
-              <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Phát sinh</p>
-              <h3 className="text-2xl font-bold text-orange-600 mt-1">{formatCurrency(totalIncurred)}</h3>
-            </div>
-             <div className="p-2.5 bg-orange-50 rounded-xl text-orange-600"><AlertCircle size={24} /></div>
-          </div>
-        </Card>
-
+        {/* 3. REMAINING (Còn lại) - MOVED HERE */}
         <Card>
            <div className="flex justify-between items-start">
             <div>
@@ -314,6 +307,17 @@ const DashboardContent = React.memo(({
               </h3>
             </div>
              <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600"><TrendingUp size={24} /></div>
+          </div>
+        </Card>
+
+        {/* 4. INCURRED (Phát sinh) - MOVED TO END */}
+        <Card>
+           <div className="flex justify-between items-start">
+            <div>
+              <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Phát sinh</p>
+              <h3 className="text-2xl font-bold text-orange-600 mt-1">{formatCurrency(totalIncurred)}</h3>
+            </div>
+             <div className="p-2.5 bg-orange-50 rounded-xl text-orange-600"><AlertCircle size={24} /></div>
           </div>
         </Card>
       </div>
@@ -558,7 +562,8 @@ const BudgetContent = ({
             <div key={cat.id} className={`bg-white rounded-2xl p-6 border border-slate-100 shadow-sm sm:hover:shadow-md transition-all group relative overflow-hidden ${!isVisible ? 'opacity-60 grayscale-[0.5]' : ''}`}>
               
               {/* Controls: Visibility, Alert, Delete */}
-              <div className="absolute top-4 right-4 z-20 flex gap-2">
+              {/* FIX Z-INDEX: Changed z-20 to z-10 to prevent overlap with sticky menu/header */}
+              <div className="absolute top-4 right-4 z-10 flex gap-2">
                 {isCustom && (
                   <button 
                     onClick={() => deleteCustomCategory(cat.id)}
@@ -918,24 +923,41 @@ export default function App() {
     const [advancedItems, setAdvancedItems] = useState([
       { amount: '', category: 'eating', note: '', isIncurred: false }
     ]);
+    const [activeRowIndex, setActiveRowIndex] = useState(null); // Track which row is focused for suggestions
 
     const [suggestions, setSuggestions] = useState([]);
     
     const handleNoteChange = (e, index = null) => {
       const val = e.target.value;
+      
+      // Update data
       if (mode === 'simple') {
         setFormData({...formData, note: val});
       } else {
         const newItems = [...advancedItems];
         newItems[index].note = val;
         setAdvancedItems(newItems);
+        setActiveRowIndex(index); // Ensure we know which row is active
       }
 
+      // Generate suggestions
       if (val.length >= 3) {
         const matches = Object.entries(noteStats).filter(([n, c]) => c >= 2 && n.toLowerCase().includes(val.toLowerCase())).sort((a,b)=>b[1]-a[1]).map(([n])=>n).slice(0,5);
         setSuggestions(matches);
       } else setSuggestions([]);
     };
+
+    const handleSelectSuggestion = (val, index = null) => {
+        if (mode === 'simple') {
+            setFormData({...formData, note: val});
+        } else {
+            const newItems = [...advancedItems];
+            newItems[index].note = val;
+            setAdvancedItems(newItems);
+        }
+        setSuggestions([]);
+        setActiveRowIndex(null);
+    }
 
     const handleSubmitSimple = (e) => { 
       e.preventDefault(); 
@@ -962,6 +984,7 @@ export default function App() {
         date: advancedDate
       })));
       
+      alert(`Đã thêm thành công ${validItems.length} giao dịch!`); // Added Success Alert
       onClose();
     };
 
@@ -1051,7 +1074,7 @@ export default function App() {
                   {suggestions.length > 0 && (
                     <div className="absolute z-10 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">
                       {suggestions.map((s, idx) => (
-                        <div key={idx} onClick={() => { setFormData({...formData, note: s}); setSuggestions([]); }} className="px-4 py-2 sm:hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>
+                        <div key={idx} onClick={() => handleSelectSuggestion(s)} className="px-4 py-2 sm:hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>
                       ))}
                     </div>
                   )}
@@ -1110,14 +1133,25 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Row 2: Note */}
-                        <input 
-                          type="text" 
-                          placeholder="Nội dung chi tiêu..." 
-                          className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none"
-                          value={item.note}
-                          onChange={(e) => handleNoteChange(e, index)}
-                        />
+                        {/* Row 2: Note WITH SUGGESTIONS */}
+                        <div className="relative">
+                            <input 
+                            type="text" 
+                            placeholder="Nội dung chi tiêu..." 
+                            className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none"
+                            value={item.note}
+                            onChange={(e) => handleNoteChange(e, index)}
+                            onFocus={() => setActiveRowIndex(index)}
+                            />
+                            {/* Render suggestions for THIS specific row */}
+                            {suggestions.length > 0 && activeRowIndex === index && (
+                                <div className="absolute z-50 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">
+                                {suggestions.map((s, idx) => (
+                                    <div key={idx} onClick={() => handleSelectSuggestion(s, index)} className="px-4 py-2 sm:hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>
+                                ))}
+                                </div>
+                            )}
+                        </div>
                       </div>
 
                       {advancedItems.length > 1 && (
@@ -1254,7 +1288,7 @@ export default function App() {
         * { -webkit-tap-highlight-color: transparent; }
       `}</style>
       
-      {/* Mobile Header */}
+      {/* Mobile Header - Adjusted Z-Index */}
       <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-gray-100">
         <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">{userName} {user.isAnonymous && <Globe size={16} className="text-blue-500" />}</h1>
         <button 
@@ -1268,13 +1302,13 @@ export default function App() {
       {/* Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-30 md:hidden animate-fade-in backdrop-blur-sm"
+          className="fixed inset-0 bg-black/50 z-40 md:hidden animate-fade-in backdrop-blur-sm"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none pt-[73px] md:pt-0`}>
+      {/* Sidebar - INCREASED Z-INDEX TO 50 TO BE ON TOP OF HEADER AND ICONS */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none pt-[73px] md:pt-0`}>
         <div className="p-8 border-b border-slate-50 hidden md:block"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">{userInitial}</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">{user.isAnonymous ? 'Public Shared Dashboard' : 'Personal Finance'}</p></div></div></div>
         <nav className="p-6 space-y-2 flex-1">
           <SidebarItem id="dashboard" label="Tổng quan" icon={LayoutDashboard} active={activeTab === 'dashboard'} />
@@ -1295,7 +1329,8 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 h-screen overflow-y-auto bg-slate-50 relative scroll-smooth">
-        <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-20 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
+        {/* INCREASED HEADER Z-INDEX TO 30 */}
+        <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-30 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
           <div className="flex items-center gap-4 w-full sm:w-auto">{(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}</div>
           <button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
         </header>
