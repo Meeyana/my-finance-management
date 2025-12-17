@@ -1353,22 +1353,22 @@ export default function App() {
           <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-3">
               <h3 className="text-lg font-bold text-gray-800">{transactionToEdit ? 'Cập nhật giao dịch' : 'Thêm giao dịch'}</h3>
-              <div className="flex bg-slate-100 rounded-lg p-1">
-                <button 
-                  onClick={() => setMode('simple')}
-                  className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${mode === 'simple' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Đơn giản
-                </button>
-                {!transactionToEdit && (
+              {!transactionToEdit && (
+                <div className="flex bg-slate-100 rounded-lg p-1">
+                  <button 
+                    onClick={() => setMode('simple')}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${mode === 'simple' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Đơn giản
+                  </button>
                   <button 
                     onClick={() => setMode('advanced')}
                     className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${mode === 'advanced' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
                     Nâng cao
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
             <button 
               onClick={onClose} 
