@@ -1238,7 +1238,8 @@ export default function App() {
   const userInitial = userName.charAt(0).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-slate-50 text-gray-800 font-sans flex flex-col md:flex-row overflow-x-hidden selection:bg-blue-100 selection:text-blue-900">
+    // CHANGED: fixed inset-0 to lock viewport, overflow-hidden to prevent body scroll
+    <div className="fixed inset-0 bg-slate-50 text-gray-800 font-sans flex flex-col md:flex-row overflow-hidden selection:bg-blue-100 selection:text-blue-900">
       <style>{`
         html, body { -webkit-tap-highlight-color: transparent; }
         button, a, input, select { touch-action: manipulation; user-select: none; }
@@ -1290,8 +1291,9 @@ export default function App() {
         * { -webkit-tap-highlight-color: transparent; }
       `}</style>
       
-      {/* Mobile Header - FIX: INCREASED Z-INDEX TO 60 TO BE ABOVE SIDEBAR */}
-      <div className="md:hidden bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-[60] border-b border-gray-100">
+      {/* Mobile Header */}
+      {/* CHANGED: Removed sticky, added flex-none, z-40 */}
+      <div className="flex-none md:hidden bg-white px-5 py-4 flex justify-between items-center z-40 border-b border-gray-100 shadow-sm">
         <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">{userName} {user.isAnonymous && <Globe size={16} className="text-blue-500" />}</h1>
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
@@ -1304,21 +1306,22 @@ export default function App() {
       {/* Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-[40] md:hidden animate-fade-in backdrop-blur-sm"
+          className="fixed inset-0 bg-black/50 z-50 md:hidden animate-fade-in backdrop-blur-sm"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      {/* Sidebar - INCREASED Z-INDEX TO 50 TO BE ON TOP OF CONTENT BUT BELOW HEADER */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none pt-[73px] md:pt-0`}>
-        <div className="p-8 border-b border-slate-50 hidden md:block"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">{userInitial}</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">{user.isAnonymous ? 'Public Shared Dashboard' : 'Personal Finance'}</p></div></div></div>
-        <nav className="p-6 space-y-2 flex-1">
+      {/* Sidebar */}
+      {/* CHANGED: z-[60] to sit above everything on mobile */}
+      <aside className={`fixed inset-y-0 left-0 z-[60] w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:z-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none pt-0`}>
+        {/* Removed pt-[73px] padding since it slides OVER header now, added standard padding */}
+        <div className="p-8 border-b border-slate-50 flex-none"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">{userInitial}</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">{user.isAnonymous ? 'Public Shared Dashboard' : 'Personal Finance'}</p></div></div></div>
+        <nav className="p-6 space-y-2 flex-1 overflow-y-auto">
           <SidebarItem id="dashboard" label="Tổng quan" icon={LayoutDashboard} active={activeTab === 'dashboard'} />
           <SidebarItem id="transactions" label="Sổ giao dịch" icon={Receipt} active={activeTab === 'transactions'} />
           <SidebarItem id="budget" label="Cài đặt ngân sách" icon={Settings} active={activeTab === 'budget'} />
         </nav>
-        <div className="p-6 space-y-2">
-          
+        <div className="p-6 space-y-2 flex-none">
           <button 
             onClick={handleLogout}
             className="w-full bg-slate-50 hover:bg-slate-100 text-slate-600 p-4 rounded-2xl flex items-center gap-3 transition-colors font-medium active:scale-[0.98]"
@@ -1330,8 +1333,9 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 h-screen overflow-y-auto bg-slate-50 relative scroll-smooth">
-        {/* Header Z-INDEX 30 */}
+      {/* CHANGED: flex-1 overflow-y-auto to handle scroll internally */}
+      <main className="flex-1 overflow-y-auto relative scroll-smooth bg-slate-50 w-full">
+        {/* Inner Header - Sticky relative to Main */}
         <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-30 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
           <div className="flex items-center gap-4 w-full sm:w-auto">{(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}</div>
           <button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
