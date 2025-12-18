@@ -935,6 +935,16 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
 
+  // --- NOTIFICATION STATE ---
+  const [notification, setNotification] = useState(null);
+  const notificationTimeoutRef = React.useRef(null);
+
+  const showSuccess = (msg) => {
+     if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
+     setNotification(msg);
+     notificationTimeoutRef.current = setTimeout(() => setNotification(null), 3000);
+  };
+
   // --- AUTH ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -1072,7 +1082,7 @@ export default function App() {
     const paths = getFirestorePaths(user);
     const cleanTx = Object.fromEntries(Object.entries(updatedTx).filter(([_, v]) => v !== undefined));
     await updateDoc(doc(paths.transactions, id), cleanTx);
-    alert("Đã cập nhật giao dịch thành công!");
+    showSuccess("Đã cập nhật giao dịch thành công!");
   };
 
   const deleteTransaction = async (id) => {
@@ -1085,7 +1095,7 @@ export default function App() {
     if (!user) return;
     const paths = getFirestorePaths(user);
     await setDoc(paths.budgetConfig, newBudgets);
-    alert("Đã cập nhật ngân sách thành công!");
+    showSuccess("Đã cập nhật ngân sách thành công!");
   };
 
   const addNewCategory = async ({ name, budget }) => {
@@ -1105,7 +1115,7 @@ export default function App() {
     await setDoc(paths.budgetConfig, {
       [id]: Number(budget)
     }, { merge: true });
-    alert("Đã thêm danh mục mới thành công!");
+    showSuccess("Đã thêm danh mục mới thành công!");
   };
 
   const deleteCustomCategory = async (id) => {
@@ -1142,14 +1152,14 @@ export default function App() {
       lastExecuted: '', // Initial state
       startDate: new Date().toISOString() // Start tracking duration from now
     });
-    alert("Đã thêm lịch chi tiêu cố định thành công!");
+    showSuccess("Đã thêm lịch chi tiêu cố định thành công!");
   };
 
   const updateRecurringItem = async (id, updatedData) => {
     if (!user) return;
     const paths = getFirestorePaths(user);
     await updateDoc(doc(paths.recurring, id), updatedData);
-    alert("Đã cập nhật lịch chi tiêu cố định thành công!");
+    showSuccess("Đã cập nhật lịch chi tiêu cố định thành công!");
   }
 
   const deleteRecurringItem = async (id) => {
@@ -1308,6 +1318,7 @@ export default function App() {
         await updateTransaction(transactionToEdit.id, formData);
       } else {
         await addTransaction(formData); 
+        showSuccess("Đã thêm giao dịch mới thành công!");
       }
       onClose(); 
     };
@@ -1327,7 +1338,7 @@ export default function App() {
         date: advancedDate
       })));
       
-      alert(`Đã thêm thành công ${validItems.length} giao dịch!`); 
+      showSuccess(`Đã thêm thành công ${validItems.length} giao dịch!`);
       onClose();
     };
 
@@ -1670,6 +1681,28 @@ export default function App() {
           )}
         </div>
       </main>
+
+      {/* --- SUCCESS NOTIFICATION TOAST --- */}
+      {notification && (
+        <div className="fixed top-6 right-6 z-[100] animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="bg-white border-l-4 border-green-500 shadow-2xl rounded-xl p-4 flex items-center gap-4 min-w-[300px] max-w-sm">
+            <div className="bg-green-100 p-2 rounded-full text-green-600">
+              <CheckCircle2 size={24} />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-gray-800 text-sm">Thành công!</h4>
+              <p className="text-gray-500 text-xs mt-0.5">{notification}</p>
+            </div>
+            <button 
+              onClick={() => setNotification(null)}
+              className="text-gray-400 hover:text-gray-600 p-1"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {showAddModal && <AddTransactionModal onClose={() => { setShowAddModal(false); setEditingTransaction(null); }} transactionToEdit={editingTransaction} />}
     </div>
   );
