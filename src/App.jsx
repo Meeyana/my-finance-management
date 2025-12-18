@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LabelList 
 } from 'recharts';
@@ -10,7 +10,8 @@ import {
   Coffee, ShoppingBag, BookOpen, Home, Fuel, Film, MoreHorizontal, ChevronDown,
   Heart, Star, Gift, Music, Briefcase, Plane, Gamepad2, GraduationCap,
   Baby, Dog, Car, Zap, Wifi, Phone, Dumbbell,
-  Eye, EyeOff, Bell, BellOff, LogOut, Lock, User, Globe, Plus
+  Eye, EyeOff, Bell, BellOff, LogOut, Lock, User, Globe, Plus, DollarSign, Calculator,
+  ClipboardList
 } from 'lucide-react';
 
 // FIREBASE IMPORTS
@@ -20,7 +21,8 @@ import {
   signInWithEmailAndPassword, 
   signInAnonymously,
   signOut,                   
-  onAuthStateChanged 
+  onAuthStateChanged,
+  signInWithCustomToken
 } from "firebase/auth";
 import { 
   getFirestore, collection, addDoc, onSnapshot, query, 
@@ -36,7 +38,6 @@ const firebaseConfig = {
   messagingSenderId: "31622801510",
   appId: "1:31622801510:web:2d6eeb5ab18f7e3a06a5a7"
 };
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -67,8 +68,14 @@ const INITIAL_BUDGETS = {
 };
 
 // --- UTILS ---
-const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
+const formatCurrency = (amount) => {
+  if (amount === undefined || amount === null || isNaN(amount)) return '0đ';
+  return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
+};
+
 const formatShortCurrency = (amount) => {
+  if (!amount || isNaN(amount)) return '0';
+  if (amount >= 1000000000) return (amount / 1000000000).toFixed(1) + ' tỷ';
   if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'tr';
   if (amount >= 1000) return (amount / 1000).toFixed(0) + 'k';
   return amount;
@@ -83,8 +90,8 @@ const getRandomColor = () => {
   return colors[Math.floor(Math.random() * colors.length)];
 };
 
-const Card = ({ children, className = "" }) => (
-  <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-5 sm:p-6 ${className}`}>
+const Card = ({ children, className = "", ...props }) => (
+  <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-5 sm:p-6 ${className}`} {...props}>
     {children}
   </div>
 );
@@ -99,28 +106,22 @@ const Badge = ({ color, children }) => (
 const getFirestorePaths = (user) => {
   if (!user) return null;
 
-  if (user.isAnonymous) {
-    return {
-      transactions: collection(db, 'artifacts', appId, 'public', 'data', 'transactions'),
-      budgetConfig: doc(db, 'artifacts', appId, 'public', 'data', 'budgets', 'config'),
-      categories: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'categories'),
-      visibility: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'visibility'),
-      alerts: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'alerts'),
-      notes: doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'notes'),
-      recurring: collection(db, 'artifacts', appId, 'public', 'data', 'recurring'),
-      isPublic: true
-    };
-  }
+  const basePath = ['artifacts', appId];
+  const userPath = user.isAnonymous 
+    ? [...basePath, 'public', 'data'] 
+    : [...basePath, 'users', user.uid];
 
   return {
-    transactions: collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'),
-    budgetConfig: doc(db, 'artifacts', appId, 'users', user.uid, 'budgets', 'config'),
-    categories: doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'categories'),
-    visibility: doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'visibility'),
-    alerts: doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'alerts'),
-    notes: doc(db, 'artifacts', appId, 'users', user.uid, 'stats', 'notes'),
-    recurring: collection(db, 'artifacts', appId, 'users', user.uid, 'recurring'),
-    isPublic: false
+    transactions: collection(db, ...userPath, 'transactions'),
+    budgetConfig: doc(db, ...userPath, 'budgets', 'config'),
+    categories: doc(db, ...userPath, 'settings', 'categories'),
+    visibility: doc(db, ...userPath, 'settings', 'visibility'),
+    alerts: doc(db, ...userPath, 'settings', 'alerts'),
+    notes: doc(db, ...userPath, 'stats', 'notes'),
+    recurring: collection(db, ...userPath, 'recurring'),
+    monthlyStats: (year, month) => doc(db, ...userPath, 'monthly_stats', `${year}-${month}`),
+    allMonthlyStats: collection(db, ...userPath, 'monthly_stats'),
+    isPublic: user.isAnonymous
   };
 };
 
@@ -148,14 +149,16 @@ const LoginScreen = () => {
     setLoading(true);
     setError('');
     try {
-      await signInAnonymously(auth);
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
+      }
     } catch (err) {
       console.error("Lỗi đăng nhập demo:", err);
       let msg = 'Không thể truy cập demo. Vui lòng thử lại.';
       if (err.code === 'auth/operation-not-allowed') {
-        msg = 'Lỗi: Bạn chưa bật "Anonymous Sign-in" trong Firebase Console -> Authentication.';
-      } else if (err.code === 'auth/network-request-failed') {
-        msg = 'Lỗi kết nối mạng. Vui lòng kiểm tra lại internet.';
+        msg = 'Lỗi: Bạn chưa bật "Anonymous Sign-in" trong Firebase Console.';
       }
       setError(msg);
       setLoading(false);
@@ -233,18 +236,31 @@ const LoginScreen = () => {
 
 // --- DASHBOARD CONTENT ---
 const DashboardContent = React.memo(({ 
-  totalSpent, totalBudget, spendingDiff, totalIncurred, alerts, 
+  totalSpent, monthlyIncome, updateMonthlyIncome, spendingDiff, totalIncurred, alerts, 
   spendingByCategory, currentChartData, chartMode, setChartMode, 
   chartCategoryFilter, setChartCategoryFilter, allCategories, categoryVisibility,
   userName, isPublic
 }) => {
   const [showCharts, setShowCharts] = useState(false);
+  const [showIncomeModal, setShowIncomeModal] = useState(false); 
+  const [tempIncome, setTempIncome] = useState(monthlyIncome);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowCharts(true), 200);
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    setTempIncome(monthlyIncome);
+  }, [monthlyIncome]);
+
+  const handleSaveIncome = (e) => {
+    e.preventDefault();
+    updateMonthlyIncome(Number(tempIncome));
+    setShowIncomeModal(false);
+  };
+
+  const remaining = monthlyIncome - totalSpent;
   const chartColor = chartMode === 'daily' ? '#3B82F6' : '#8B5CF6';
 
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
@@ -281,25 +297,27 @@ const DashboardContent = React.memo(({
           <TrendingDown className="absolute right-[-10px] bottom-[-10px] text-white opacity-20" size={100} />
         </Card>
         
-        <Card>
+        {/* SCORECARD THU NHẬP (CÓ POPUP) */}
+        <Card className="cursor-pointer hover:shadow-md transition-all relative group" onClick={() => setShowIncomeModal(true)}>
            <div className="flex justify-between items-start">
             <div>
-              <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Ngân sách</p>
-              <h3 className="text-2xl font-bold text-gray-800 mt-1">{formatCurrency(totalBudget)}</h3>
+              <p className="text-gray-500 text-sm font-medium uppercase tracking-wider mb-1">Thu nhập tháng</p>
+              <h3 className="text-2xl font-bold text-gray-800 mt-1 flex items-center gap-2">
+                {formatCurrency(monthlyIncome)}
+                <Edit size={16} className="text-gray-300 group-hover:text-blue-500 transition-colors" />
+              </h3>
             </div>
-             <div className="p-2.5 bg-green-50 rounded-xl text-green-600"><Wallet size={24} /></div>
-          </div>
-          <div className="mt-4 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-              <div className="h-full rounded-full bg-green-500" style={{width: `${totalBudget > 0 ? Math.min((totalSpent/totalBudget)*100, 100) : 0}%`}}></div>
+            <div className="p-2.5 bg-green-50 rounded-xl text-green-600"><DollarSign size={24} /></div>
           </div>
         </Card>
         
+        {/* SCORECARD CÒN LẠI (STYLE GỐC) */}
         <Card>
            <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Còn lại</p>
-              <h3 className={`text-2xl font-bold mt-1 ${totalBudget - totalSpent < 0 ? 'text-red-600' : 'text-indigo-600'}`}>
-                {formatCurrency(totalBudget - totalSpent)}
+              <h3 className={`text-2xl font-bold mt-1 ${remaining < 0 ? 'text-red-600' : 'text-indigo-600'}`}>
+                {formatCurrency(remaining)}
               </h3>
             </div>
              <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600"><TrendingUp size={24} /></div>
@@ -317,6 +335,32 @@ const DashboardContent = React.memo(({
         </Card>
       </div>
 
+      {/* POPUP NHẬP THU NHẬP */}
+      {showIncomeModal && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-scale-in p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-800">Cập nhật thu nhập</h3>
+              <button onClick={(e) => { e.stopPropagation(); setShowIncomeModal(false); }} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18}/></button>
+            </div>
+            <form onSubmit={handleSaveIncome}>
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Tổng thu nhập tháng này</label>
+                <input 
+                  type="number" 
+                  autoFocus
+                  className="w-full p-3 border-2 border-slate-200 rounded-xl outline-none focus:border-blue-500 text-xl font-bold text-gray-800" 
+                  placeholder="0"
+                  value={tempIncome === 0 ? '' : tempIncome}
+                  onChange={(e) => setTempIncome(e.target.value)}
+                />
+              </div>
+              <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700">Lưu thay đổi</button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {alerts.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {alerts.map((alert) => (
@@ -324,7 +368,7 @@ const DashboardContent = React.memo(({
               {alert.type === 'danger' ? <AlertCircle size={20} /> : <AlertTriangle size={20} />}
               <div className="flex-1">
                 <p className="font-bold text-sm">{alert.message}</p>
-                <p className="text-xs opacity-80">Đã dùng {(alert.ratio * 100).toFixed(0)}% ngân sách.</p>
+                <p className="text-xs opacity-80">Đã dùng {(alert.ratio * 100).toFixed(0)}% ngân sách danh mục.</p>
               </div>
             </div>
           ))}
@@ -410,8 +454,9 @@ const DashboardContent = React.memo(({
       <Card>
         <div className="mb-6">
           <h4 className="font-bold text-gray-800 flex items-center gap-2 mb-3">
-            <Settings size={20} className="text-gray-400" /> Thực tế vs Ngân sách
+            <Settings size={20} className="text-gray-400" /> Thực tế vs Hạn mức (Categories)
           </h4>
+          <p className="text-sm text-gray-500 mb-2">So sánh chi tiêu thực tế với định mức bạn đặt cho từng danh mục.</p>
           <div className="flex flex-wrap gap-3 sm:gap-4 text-xs font-medium text-gray-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-blue-500"></div>
@@ -419,11 +464,11 @@ const DashboardContent = React.memo(({
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <span>Sắp hết ngân sách</span>
+              <span>Sắp hết hạn mức</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <span>Vượt quá ngân sách</span>
+              <span>Vượt quá hạn mức</span>
             </div>
           </div>
         </div>
@@ -433,13 +478,13 @@ const DashboardContent = React.memo(({
              <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
           ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={spendingByCategory.filter(item => item.value > 0)} layout="vertical" margin={{left: 40, right: 60}} barCategoryGap={24}>
+            <BarChart data={spendingByCategory.filter(item => item.value > 0 || item.budget > 0)} layout="vertical" margin={{left: 40, right: 60}} barCategoryGap={24}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
               <XAxis type="number" hide />
               <YAxis dataKey="name" type="category" tick={{fontSize: 12, fill: '#4B5563', fontWeight: 600}} width={80} axisLine={false} tickLine={false} />
               <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
               <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false} activeBar={false}>
-                 {spendingByCategory.filter(item => item.value > 0).map((entry, index) => {
+                 {spendingByCategory.map((entry, index) => {
                     let barColor = '#3B82F6';
                     if (entry.budget > 0) {
                       const ratio = entry.value / entry.budget;
@@ -450,7 +495,7 @@ const DashboardContent = React.memo(({
                  })}
                  <LabelList dataKey="value" position="right" formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} style={{fontSize: '11px', fontWeight: 'bold', fill: '#6B7280'}} />
               </Bar>
-              <Bar dataKey="budget" name="Ngân sách" fill="#F3F4F6" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false} activeBar={false}>
+              <Bar dataKey="budget" name="Định mức" fill="#F3F4F6" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false} activeBar={false}>
                  <LabelList dataKey="budget" position="right" formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} style={{fontSize: '11px', fill: '#9CA3AF'}} />
               </Bar>
             </BarChart>
@@ -564,7 +609,7 @@ const BudgetContent = ({
   return (
     <div className="space-y-8 animate-fade-in pb-24">
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div><h3 className="text-2xl font-bold text-gray-800">Cài đặt ngân sách</h3><p className="text-gray-500">Quản lý hạn mức và hiển thị cho từng danh mục</p></div>
+          <div><h3 className="text-2xl font-bold text-gray-800">Cài đặt hạn mức chi tiêu</h3><p className="text-gray-500">Đặt giới hạn cho từng danh mục để nhận cảnh báo khi vượt quá</p></div>
           <button 
             onClick={() => saveBudgetsToDb(budgets)} 
             className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl sm:hover:bg-black font-bold shadow-lg transition-all active:scale-95 active:bg-black w-full md:w-auto justify-center"
@@ -648,7 +693,7 @@ const BudgetContent = ({
                    <input required type="text" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="Ví dụ: Du lịch, Thú cưng..." value={newCat.name} onChange={e => setNewCat({...newCat, name: e.target.value})} />
                 </div>
                 <div>
-                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngân sách dự kiến</label>
+                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hạn mức dự kiến</label>
                    <input required type="number" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="0" value={newCat.budget} onChange={e => setNewCat({...newCat, budget: e.target.value})} />
                 </div>
                 <div className="pt-2">
@@ -910,12 +955,97 @@ const RecurringContent = ({
   );
 };
 
+// --- NEW COMPONENT: DEBT AUDIT CONTENT ---
+const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
+  const stats = useMemo(() => {
+    const monthlyData = {};
+
+    transactions.forEach(tx => {
+      const d = new Date(tx.date);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (!monthlyData[key]) monthlyData[key] = { spent: 0, income: 0, month: d.getMonth(), year: d.getFullYear() };
+      monthlyData[key].spent += Number(tx.amount);
+    });
+
+    Object.keys(allMonthlyIncome).forEach(key => {
+      if (!monthlyData[key]) {
+        const [year, month] = key.split('-');
+        monthlyData[key] = { spent: 0, income: 0, month: parseInt(month), year: parseInt(year) };
+      }
+      monthlyData[key].income = allMonthlyIncome[key];
+    });
+
+    const list = Object.values(monthlyData).map(item => ({
+      ...item,
+      balance: item.income - item.spent
+    })).sort((a, b) => {
+       if (b.year !== a.year) return b.year - a.year;
+       return b.month - a.month;
+    });
+
+    const totalBalance = list.reduce((sum, item) => sum + item.balance, 0);
+
+    return { list, totalBalance };
+  }, [transactions, allMonthlyIncome]);
+
+  return (
+    <div className="space-y-6 animate-fade-in pb-12">
+      <Card className={`${stats.totalBalance >= 0 ? 'bg-gradient-to-br from-green-500 to-green-600' : 'bg-gradient-to-br from-red-500 to-red-600'} text-white border-none shadow-lg`}>
+         <div className="flex flex-col items-center justify-center py-6">
+            <h3 className="text-blue-100 text-sm font-medium uppercase tracking-wider mb-2">Tổng tích lũy (Dư/Nợ)</h3>
+            <div className="text-4xl font-bold flex items-center gap-2">
+              {stats.totalBalance >= 0 ? <TrendingUp size={36} /> : <TrendingDown size={36} />}
+              {formatCurrency(stats.totalBalance)}
+            </div>
+            <p className="mt-2 opacity-80 text-sm">Tính trên tất cả các tháng đã ghi nhận</p>
+         </div>
+      </Card>
+
+      <Card className="p-0 overflow-hidden border-0 shadow-sm">
+        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
+           <div className="p-2 bg-blue-100 rounded-lg text-blue-600"><ClipboardList size={20}/></div>
+           <h3 className="font-bold text-gray-800">Bảng kê chi tiết theo tháng</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-gray-500 uppercase bg-white border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4 font-bold">Tháng</th>
+                <th className="px-6 py-4 font-bold text-right text-green-600">Thu nhập</th>
+                <th className="px-6 py-4 font-bold text-right text-blue-600">Chi tiêu</th>
+                <th className="px-6 py-4 font-bold text-right">Dư / Thiếu</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {stats.list.map((item, idx) => (
+                <tr key={idx} className="hover:bg-slate-50 transition-colors bg-white">
+                  <td className="px-6 py-4 font-bold text-gray-700">Tháng {item.month + 1}/{item.year}</td>
+                  <td className="px-6 py-4 text-right font-medium text-gray-600">{formatCurrency(item.income)}</td>
+                  <td className="px-6 py-4 text-right font-medium text-gray-600">{formatCurrency(item.spent)}</td>
+                  <td className={`px-6 py-4 text-right font-bold ${item.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {item.balance > 0 ? '+' : ''}{formatCurrency(item.balance)}
+                  </td>
+                </tr>
+              ))}
+              {stats.list.length === 0 && (
+                <tr><td colSpan={4} className="text-center py-12 text-gray-400">Chưa có dữ liệu</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
 // --- MAIN APP ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
+  const [monthlyIncome, setMonthlyIncome] = useState(0); 
+  const [allMonthlyIncome, setAllMonthlyIncome] = useState({});
   const [customCategoryConfig, setCustomCategoryConfig] = useState({}); 
   const [categoryVisibility, setCategoryVisibility] = useState({}); 
   const [categoryAlerts, setCategoryAlerts] = useState({}); 
@@ -935,7 +1065,6 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
 
-  // --- NOTIFICATION STATE ---
   const [notification, setNotification] = useState(null);
   const notificationTimeoutRef = React.useRef(null);
 
@@ -945,8 +1074,16 @@ export default function App() {
      notificationTimeoutRef.current = setTimeout(() => setNotification(null), 3000);
   };
 
-  // --- AUTH ---
   useEffect(() => {
+    const initAuth = async () => {
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
+      }
+    };
+    initAuth();
+    
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsAuthChecking(false);
@@ -955,12 +1092,12 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- DATA SYNC ---
   useEffect(() => {
     if (!user) {
       setTransactions([]);
       setBudgets(INITIAL_BUDGETS);
       setRecurringItems([]);
+      setMonthlyIncome(0);
       return;
     }
     setIsLoading(true);
@@ -980,15 +1117,12 @@ export default function App() {
     const unsubCustomCats = onSnapshot(paths.categories, (s) => {
       if (s.exists()) setCustomCategoryConfig(s.data());
     });
-
     const unsubVisibility = onSnapshot(paths.visibility, (s) => {
       if (s.exists()) setCategoryVisibility(s.data());
     });
-
     const unsubAlerts = onSnapshot(paths.alerts, (s) => {
       if (s.exists()) setCategoryAlerts(s.data());
     });
-
     const unsubNotes = onSnapshot(paths.notes, (s) => s.exists() && setNoteStats(s.data()));
 
     const unsubRecurring = onSnapshot(paths.recurring, (snapshot) => {
@@ -1002,7 +1136,30 @@ export default function App() {
     };
   }, [user]);
 
-  // --- RECURRING AUTOMATION LOGIC ---
+  useEffect(() => {
+    if (!user) return;
+    const paths = getFirestorePaths(user);
+    if (!paths) return;
+
+    const unsubMonthlyStats = onSnapshot(paths.monthlyStats(viewYear, viewMonth), (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        setMonthlyIncome(docSnapshot.data().income || 0);
+      } else {
+        setMonthlyIncome(0);
+      }
+    });
+
+    const unsubAllStats = onSnapshot(paths.allMonthlyStats, (snapshot) => {
+       const data = {};
+       snapshot.forEach(doc => {
+         data[doc.id] = doc.data().income || 0;
+       });
+       setAllMonthlyIncome(data);
+    });
+
+    return () => { unsubMonthlyStats(); unsubAllStats(); };
+  }, [user, viewMonth, viewYear]);
+
   useEffect(() => {
     if (!user || recurringItems.length === 0) return;
 
@@ -1064,10 +1221,6 @@ export default function App() {
 
   const addTransaction = async (newTx) => {
     if (!user) return;
-    if (user.isAnonymous && transactions.length >= 50) {
-      alert("Chế độ Demo giới hạn tối đa 50 giao dịch. Vui lòng đăng ký tài khoản để sử dụng không giới hạn!");
-      return;
-    }
     const paths = getFirestorePaths(user);
     await addDoc(paths.transactions, { ...newTx, createdAt: serverTimestamp() });
     
@@ -1095,15 +1248,18 @@ export default function App() {
     if (!user) return;
     const paths = getFirestorePaths(user);
     await setDoc(paths.budgetConfig, newBudgets);
-    showSuccess("Đã cập nhật ngân sách thành công!");
+    showSuccess("Đã cập nhật hạn mức danh mục thành công!");
+  };
+
+  const updateMonthlyIncome = async (amount) => {
+    if (!user) return;
+    const paths = getFirestorePaths(user);
+    await setDoc(paths.monthlyStats(viewYear, viewMonth), { income: amount }, { merge: true });
+    showSuccess(`Đã cập nhật thu nhập tháng ${viewMonth + 1}/${viewYear}`);
   };
 
   const addNewCategory = async ({ name, budget }) => {
     if (!user) return;
-    if (user.isAnonymous && Object.keys(customCategoryConfig).length >= 5) {
-      alert("Chế độ Demo giới hạn tối đa 5 danh mục tùy chỉnh. Vui lòng đăng ký tài khoản để tạo thêm!");
-      return;
-    }
     const paths = getFirestorePaths(user);
     const id = `custom_${Date.now()}`;
     const randomColor = getRandomColor();
@@ -1141,7 +1297,6 @@ export default function App() {
     await setDoc(paths.alerts, { [id]: !currentStatus }, { merge: true });
   };
 
-  // --- NEW ACTIONS FOR RECURRING ---
   const addRecurringItem = async (item) => {
     if (!user) return;
     const paths = getFirestorePaths(user);
@@ -1149,8 +1304,8 @@ export default function App() {
       ...item,
       amount: Number(item.amount),
       day: Number(item.day),
-      lastExecuted: '', // Initial state
-      startDate: new Date().toISOString() // Start tracking duration from now
+      lastExecuted: '', 
+      startDate: new Date().toISOString()
     });
     showSuccess("Đã thêm lịch chi tiêu cố định thành công!");
   };
@@ -1192,7 +1347,6 @@ export default function App() {
   const currentYearTransactions = useMemo(() => transactions.filter(t => new Date(t.date).getFullYear() === parseInt(viewYear)), [transactions, viewYear]);
 
   const totalSpent = currentMonthTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-  const totalBudget = Object.values(budgets).reduce((a, b) => a + b, 0);
   const spendingDiff = totalSpent - previousMonthData.total;
   const totalIncurred = currentMonthTransactions.filter(t => t.isIncurred).reduce((sum, t) => sum + Number(t.amount), 0);
 
@@ -1238,7 +1392,7 @@ export default function App() {
     spendingByCategory.forEach(item => {
       if (item.budget > 0 && categoryAlerts[item.id] !== false) {
         const ratio = item.value / item.budget;
-        if (ratio >= 1) results.push({ id: item.id, name: item.name, ratio, type: 'danger', message: `Đã hết ngân sách ${item.name}` });
+        if (ratio >= 1) results.push({ id: item.id, name: item.name, ratio, type: 'danger', message: `Đã hết hạn mức ${item.name}` });
         else if (ratio >= 0.8) results.push({ id: item.id, name: item.name, ratio, type: 'warning', message: `${item.name} sắp hết hạn mức` });
       }
     });
@@ -1327,11 +1481,6 @@ export default function App() {
       e.preventDefault();
       const validItems = advancedItems.filter(item => item.amount && Number(item.amount) > 0);
       if (validItems.length === 0) return;
-
-      if (user.isAnonymous && (transactions.length + validItems.length) > 50) {
-        alert(`Bạn đang ở chế độ Demo. Thêm ${validItems.length} giao dịch sẽ vượt quá giới hạn 50.`);
-        return;
-      }
 
       await Promise.all(validItems.map(item => addTransaction({
         ...item,
@@ -1610,7 +1759,10 @@ export default function App() {
           <SidebarItem id="dashboard" label="Tổng quan" icon={LayoutDashboard} active={activeTab === 'dashboard'} />
           <SidebarItem id="transactions" label="Sổ giao dịch" icon={Receipt} active={activeTab === 'transactions'} />
           <SidebarItem id="recurring" label="Chi tiêu cố định" icon={Repeat} active={activeTab === 'recurring'} />
-          <SidebarItem id="budget" label="Cài đặt ngân sách" icon={Settings} active={activeTab === 'budget'} />
+          <SidebarItem id="budget" label="Cài đặt hạn mức" icon={Settings} active={activeTab === 'budget'} />
+          <div className="pt-4 border-t border-slate-50 mt-4">
+             <SidebarItem id="debt" label="Dư nợ" icon={ClipboardList} active={activeTab === 'debt'} />
+          </div>
         </nav>
         <div className="p-6 space-y-2 flex-none">
           <button 
@@ -1626,7 +1778,9 @@ export default function App() {
       <main className="flex-1 overflow-y-auto relative scroll-smooth bg-slate-50 w-full">
         <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-30 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
           <div className="flex items-center gap-4 w-full sm:w-auto">{(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}</div>
-          <button onClick={() => { setEditingTransaction(null); setShowAddModal(true); }} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
+          {activeTab !== 'debt' && (
+            <button onClick={() => { setEditingTransaction(null); setShowAddModal(true); }} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
+          )}
         </header>
 
         <div className="p-4 sm:p-8 max-w-[1600px] mx-auto pb-32">
@@ -1636,7 +1790,12 @@ export default function App() {
             <>
               {activeTab === 'dashboard' && (
                 <DashboardContent 
-                  totalSpent={totalSpent} totalBudget={totalBudget} spendingDiff={spendingDiff} totalIncurred={totalIncurred} alerts={alerts} 
+                  totalSpent={totalSpent} 
+                  monthlyIncome={monthlyIncome} 
+                  updateMonthlyIncome={updateMonthlyIncome} 
+                  spendingDiff={spendingDiff} 
+                  totalIncurred={totalIncurred} 
+                  alerts={alerts} 
                   spendingByCategory={spendingByCategory} currentChartData={chartMode === 'daily' ? dailySpendingData : monthlySpendingData} 
                   chartMode={chartMode} setChartMode={setChartMode} 
                   chartCategoryFilter={chartCategoryFilter} setChartCategoryFilter={setChartCategoryFilter}
@@ -1675,6 +1834,12 @@ export default function App() {
                   updateRecurringItem={updateRecurringItem}
                   deleteRecurringItem={deleteRecurringItem}
                   allCategories={allCategories}
+                />
+              )}
+              {activeTab === 'debt' && (
+                <DebtAuditContent 
+                  transactions={transactions}
+                  allMonthlyIncome={allMonthlyIncome}
                 />
               )}
             </>
