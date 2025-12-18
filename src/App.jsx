@@ -1075,20 +1075,28 @@ export default function App() {
   };
 
   useEffect(() => {
-    const initAuth = async () => {
+    // Logic kiểm tra token tùy chỉnh (nếu có tích hợp từ server khác)
+    const checkCustomToken = async () => {
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
+        try {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } catch (error) {
+          console.error("Lỗi token tùy chỉnh:", error);
+        }
       }
     };
-    initAuth();
     
+    // Gọi hàm kiểm tra token (nhưng KHÔNG tự động sign in anonymous ở đây nữa)
+    checkCustomToken();
+    
+    // Lắng nghe trạng thái đăng nhập từ Firebase
+    // Firebase sẽ tự động kiểm tra LocalStorage để khôi phục user cũ (nếu có)
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsAuthChecking(false);
       setIsMobileMenuOpen(false); 
     });
+
     return () => unsubscribe();
   }, []);
 
