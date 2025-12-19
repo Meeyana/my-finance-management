@@ -611,10 +611,13 @@ const TransactionContent = ({
 const BudgetContent = ({ 
   budgets, setBudgets, saveBudgetsToDb, allCategories, onAddCategory, 
   categoryVisibility, toggleVisibility, 
-  categoryAlerts, toggleAlert, deleteCustomCategory
+  categoryAlerts, toggleAlert, deleteCustomCategory, updateCategoryName
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCat, setNewCat] = useState({ name: '', budget: '' });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editName, setEditName] = useState('');
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -622,6 +625,21 @@ const BudgetContent = ({
     await onAddCategory(newCat);
     setShowAddModal(false);
     setNewCat({ name: '', budget: '' });
+  };
+
+  const handleEditClick = (cat) => {
+    setEditingCategory(cat);
+    setEditName(cat.name);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateName = async (e) => {
+    e.preventDefault();
+    if (!editName.trim() || !editingCategory) return;
+    await updateCategoryName(editingCategory.id, editName.trim());
+    setShowEditModal(false);
+    setEditingCategory(null);
+    setEditName('');
   };
 
   return (
@@ -647,6 +665,13 @@ const BudgetContent = ({
             <div key={cat.id} className={`bg-white rounded-2xl p-6 border border-slate-100 shadow-sm sm:hover:shadow-md transition-all group relative overflow-hidden ${!isVisible ? 'opacity-60 grayscale-[0.5]' : ''}`}>
               
               <div className="absolute top-4 right-4 z-10 flex gap-2">
+                <button 
+                  onClick={() => handleEditClick(cat)}
+                  className="p-2 rounded-full shadow-sm transition-colors bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-600"
+                  title="Chỉnh sửa tên"
+                >
+                  <Edit size={16} />
+                </button>
                 {isCustom && (
                   <button 
                     onClick={() => deleteCustomCategory(cat.id)}
@@ -716,6 +741,43 @@ const BudgetContent = ({
                 </div>
                 <div className="pt-2">
                   <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200">Tạo danh mục</button>
+                </div>
+             </form>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && editingCategory && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
+             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="text-lg font-bold text-gray-800">Chỉnh sửa tên danh mục</h3>
+                <button onClick={() => { setShowEditModal(false); setEditingCategory(null); setEditName(''); }} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18}/></button>
+             </div>
+             <form onSubmit={handleUpdateName} className="p-6 space-y-4">
+                <div>
+                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên danh mục</label>
+                   <input 
+                     required 
+                     type="text" 
+                     autoFocus
+                     className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" 
+                     placeholder="Nhập tên mới..." 
+                     value={editName} 
+                     onChange={e => setEditName(e.target.value)} 
+                   />
+                </div>
+                <div className="pt-2 flex gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => { setShowEditModal(false); setEditingCategory(null); setEditName(''); }} 
+                    className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button type="submit" className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200">
+                    Lưu thay đổi
+                  </button>
                 </div>
              </form>
           </div>
@@ -1328,6 +1390,30 @@ export default function App() {
     try { await updateDoc(paths.alerts, { [id]: deleteField() }); } catch(e) {}
   };
 
+  const updateCategoryName = async (id, newName) => {
+    if (!user || !newName.trim()) return;
+    const paths = getFirestorePaths(user);
+    
+    // Check if it's a default category
+    const defaultCategory = DEFAULT_CATEGORY_CONFIG[id];
+    if (defaultCategory) {
+      // For default categories, save the modified label while preserving icon and color
+      await setDoc(paths.categories, {
+        [id]: { ...defaultCategory, label: newName.trim() }
+      }, { merge: true });
+    } else {
+      // For custom categories, use existing logic
+      const currentCategory = customCategoryConfig[id];
+      if (!currentCategory) return;
+      
+      await setDoc(paths.categories, {
+        [id]: { ...currentCategory, label: newName.trim() }
+      }, { merge: true });
+    }
+    
+    showSuccess("Đã cập nhật tên danh mục thành công!");
+  };
+
   const toggleVisibility = async (id) => {
     if (!user) return;
     const paths = getFirestorePaths(user);
@@ -1869,7 +1955,8 @@ export default function App() {
                   toggleVisibility={toggleVisibility}
                   categoryAlerts={categoryAlerts} 
                   toggleAlert={toggleAlert} 
-                  deleteCustomCategory={deleteCustomCategory} 
+                  deleteCustomCategory={deleteCustomCategory}
+                  updateCategoryName={updateCategoryName}
                 />
               )}
               {activeTab === 'recurring' && (
