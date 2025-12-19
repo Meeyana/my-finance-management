@@ -1208,6 +1208,16 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
+      <div className="flex flex-col gap-1">
+        <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <ClipboardList size={20} className="text-gray-400" />
+          Dư nợ & Tích lũy
+        </h3>
+        <p className="text-sm text-gray-500">
+          Xem tổng dư/nợ, xu hướng thu-chi và bảng kê chi tiết theo tháng. Bạn có thể lọc theo khoảng tháng/năm để phân tích giai đoạn cụ thể.
+        </p>
+      </div>
+
       <Card className={`${stats.totalBalance >= 0 ? 'bg-gradient-to-br from-green-500 to-green-600' : 'bg-gradient-to-br from-red-500 to-red-600'} text-white border-none shadow-lg`}>
          <div className="flex flex-col items-center justify-center py-6">
             <h3 className="text-blue-100 text-sm font-medium uppercase tracking-wider mb-2">Tổng tích lũy (Dư/Nợ)</h3>
