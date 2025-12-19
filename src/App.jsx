@@ -131,6 +131,9 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // 1. THÊM STATE ĐỂ QUẢN LÝ ẨN/HIỆN
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -145,6 +148,7 @@ const LoginScreen = () => {
     }
   };
 
+  // ... (giữ nguyên hàm handleDemoLogin) ...
   const handleDemoLogin = async () => {
     setLoading(true);
     setError('');
@@ -196,20 +200,34 @@ const LoginScreen = () => {
               />
             </div>
           </div>
+          
+          {/* --- PHẦN INPUT MẬT KHẨU ĐÃ CHỈNH SỬA --- */}
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Mật khẩu</label>
             <div className="relative">
               <Lock className="absolute left-4 top-3.5 text-gray-400" size={20} />
               <input 
-                type="password" 
+                // Thay đổi type dựa trên state showPassword
+                type={showPassword ? "text" : "password"} 
                 required 
-                className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                // Thêm padding-right (pr-12) để chữ không đè lên icon con mắt
+                className="w-full pl-12 pr-12 py-3 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+              {/* Nút con mắt */}
+              <button
+                type="button" // Quan trọng: type="button" để không submit form
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-3.5 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
           </div>
+          {/* ----------------------------------------- */}
+
           <button 
             type="submit" 
             disabled={loading}
@@ -1115,7 +1133,26 @@ export default function App() {
     
     const unsubTx = onSnapshot(query(paths.transactions), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      data.sort((a, b) => new Date(b.date) - new Date(a.date));
+      
+      // --- CẬP NHẬT LOGIC SẮP XẾP ---
+      data.sort((a, b) => {
+        // 1. So sánh theo ngày giao dịch (Date chọn trên lịch)
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        
+        if (dateB !== dateA) {
+          return dateB - dateA; // Ngày lớn hơn (mới hơn) xếp trước
+        }
+        
+        // 2. Nếu cùng ngày, so sánh theo thời gian tạo thực tế (createdAt)
+        // Lưu ý: createdAt có thể null giây lát khi vừa tạo xong (latency compensation)
+        const timeA = a.createdAt?.seconds || 0;
+        const timeB = b.createdAt?.seconds || 0;
+        
+        return timeB - timeA; // Tạo sau (mới hơn) xếp trước
+      });
+      // -------------------------------
+
       setTransactions(data);
       setIsLoading(false);
     }, (e) => { console.error(e); setIsLoading(false); });
