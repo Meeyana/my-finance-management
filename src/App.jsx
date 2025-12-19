@@ -1037,20 +1037,107 @@ const RecurringContent = ({
 
 // --- NEW COMPONENT: DEBT AUDIT CONTENT ---
 const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
+  const [startMonth, setStartMonth] = useState('');
+  const [startYear, setStartYear] = useState('');
+  const [endMonth, setEndMonth] = useState('');
+  const [endYear, setEndYear] = useState('');
+  const [showFilter, setShowFilter] = useState(false);
+
+  // Get min and max month/year from data
+  const monthRange = useMemo(() => {
+    if (transactions.length === 0 && Object.keys(allMonthlyIncome).length === 0) {
+      return { minMonth: null, minYear: null, maxMonth: null, maxYear: null };
+    }
+    
+    let minMonth = null;
+    let minYear = null;
+    let maxMonth = null;
+    let maxYear = null;
+
+    // Check transactions
+    transactions.forEach(tx => {
+      const d = new Date(tx.date);
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      
+      if (minYear === null || year < minYear || (year === minYear && month < minMonth)) {
+        minYear = year;
+        minMonth = month;
+      }
+      if (maxYear === null || year > maxYear || (year === maxYear && month > maxMonth)) {
+        maxYear = year;
+        maxMonth = month;
+      }
+    });
+
+    // Check income data
+    Object.keys(allMonthlyIncome).forEach(key => {
+      const [year, month] = key.split('-');
+      const y = parseInt(year);
+      const m = parseInt(month);
+      
+      if (minYear === null || y < minYear || (y === minYear && m < minMonth)) {
+        minYear = y;
+        minMonth = m;
+      }
+      if (maxYear === null || y > maxYear || (y === maxYear && m > maxMonth)) {
+        maxYear = y;
+        maxMonth = m;
+      }
+    });
+
+    return { minMonth, minYear, maxMonth, maxYear };
+  }, [transactions, allMonthlyIncome]);
+
   const stats = useMemo(() => {
     const monthlyData = {};
 
-    transactions.forEach(tx => {
+    // Filter transactions by month/year range if set
+    const filteredTransactions = transactions.filter(tx => {
+      if (!startMonth && !startYear && !endMonth && !endYear) return true;
+      const txDate = new Date(tx.date);
+      const txYear = txDate.getFullYear();
+      const txMonth = txDate.getMonth();
+      
+      if (startYear && startMonth !== '') {
+        const startM = parseInt(startMonth);
+        const startY = parseInt(startYear);
+        if (txYear < startY || (txYear === startY && txMonth < startM)) return false;
+      }
+      if (endYear && endMonth !== '') {
+        const endM = parseInt(endMonth);
+        const endY = parseInt(endYear);
+        if (txYear > endY || (txYear === endY && txMonth > endM)) return false;
+      }
+      return true;
+    });
+
+    filteredTransactions.forEach(tx => {
       const d = new Date(tx.date);
       const key = `${d.getFullYear()}-${d.getMonth()}`;
       if (!monthlyData[key]) monthlyData[key] = { spent: 0, income: 0, month: d.getMonth(), year: d.getFullYear() };
       monthlyData[key].spent += Number(tx.amount);
     });
 
+    // Filter income data by month/year range if set
     Object.keys(allMonthlyIncome).forEach(key => {
+      const [year, month] = key.split('-');
+      const y = parseInt(year);
+      const m = parseInt(month);
+      
+      if (startYear && startMonth !== '') {
+        const startM = parseInt(startMonth);
+        const startY = parseInt(startYear);
+        if (y < startY || (y === startY && m < startM)) return;
+      }
+      if (endYear && endMonth !== '') {
+        const endM = parseInt(endMonth);
+        const endY = parseInt(endYear);
+        if (y > endY || (y === endY && m > endM)) return;
+      }
+
       if (!monthlyData[key]) {
-        const [year, month] = key.split('-');
-        monthlyData[key] = { spent: 0, income: 0, month: parseInt(month), year: parseInt(year) };
+        monthlyData[key] = { spent: 0, income: 0, month: m, year: y };
       }
       monthlyData[key].income = allMonthlyIncome[key];
     });
@@ -1066,7 +1153,47 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
     const totalBalance = list.reduce((sum, item) => sum + item.balance, 0);
 
     return { list, totalBalance };
-  }, [transactions, allMonthlyIncome]);
+  }, [transactions, allMonthlyIncome, startMonth, startYear, endMonth, endYear]);
+
+  const handleResetFilter = () => {
+    setStartMonth('');
+    setStartYear('');
+    setEndMonth('');
+    setEndYear('');
+    setShowFilter(false);
+  };
+
+  const getFilterDescription = () => {
+    if (!startMonth && !startYear && !endMonth && !endYear) {
+      return 'Tính trên tất cả các tháng đã ghi nhận';
+    }
+    if (startMonth && startYear && endMonth && endYear) {
+      return `Từ tháng ${parseInt(startMonth) + 1}/${startYear} đến tháng ${parseInt(endMonth) + 1}/${endYear}`;
+    }
+    if (startMonth && startYear) {
+      return `Từ tháng ${parseInt(startMonth) + 1}/${startYear}`;
+    }
+    if (endMonth && endYear) {
+      return `Đến tháng ${parseInt(endMonth) + 1}/${endYear}`;
+    }
+    return 'Tính trên tất cả các tháng đã ghi nhận';
+  };
+
+  // Generate year options
+  const getYearOptions = () => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    if (monthRange.minYear && monthRange.maxYear) {
+      for (let y = monthRange.minYear; y <= monthRange.maxYear; y++) {
+        years.push(y);
+      }
+    } else {
+      for (let y = currentYear - 5; y <= currentYear + 2; y++) {
+        years.push(y);
+      }
+    }
+    return years;
+  };
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -1077,15 +1204,102 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
               {stats.totalBalance >= 0 ? <TrendingUp size={36} /> : <TrendingDown size={36} />}
               {formatCurrency(stats.totalBalance)}
             </div>
-            <p className="mt-2 opacity-80 text-sm">Tính trên tất cả các tháng đã ghi nhận</p>
+            <p className="mt-2 opacity-80 text-sm">{getFilterDescription()}</p>
          </div>
       </Card>
 
       <Card className="p-0 overflow-hidden border-0 shadow-sm">
-        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
-           <div className="p-2 bg-blue-100 rounded-lg text-blue-600"><ClipboardList size={20}/></div>
-           <h3 className="font-bold text-gray-800">Bảng kê chi tiết theo tháng</h3>
+        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+           <div className="flex items-center gap-2">
+             <div className="p-2 bg-blue-100 rounded-lg text-blue-600"><ClipboardList size={20}/></div>
+             <h3 className="font-bold text-gray-800">Bảng kê chi tiết theo tháng</h3>
+           </div>
+           <div className="flex items-center gap-2 w-full sm:w-auto">
+             <button
+               onClick={() => setShowFilter(!showFilter)}
+               className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+             >
+               <Calendar size={16} />
+               {(startMonth || startYear || endMonth || endYear) ? 'Đang lọc' : 'Lọc theo tháng/năm'}
+               {(startMonth || startYear || endMonth || endYear) && (
+                 <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">1</span>
+               )}
+             </button>
+             {(startMonth || startYear || endMonth || endYear) && (
+               <button
+                 onClick={handleResetFilter}
+                 className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-200 transition-colors"
+               >
+                 Xóa bộ lọc
+               </button>
+             )}
+           </div>
         </div>
+        
+        {showFilter && (
+          <div className="p-4 bg-blue-50/50 border-b border-gray-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Từ tháng/năm</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={startMonth}
+                    onChange={(e) => setStartMonth(e.target.value)}
+                    className="custom-select w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white text-sm font-medium text-gray-700"
+                  >
+                    <option value="">Chọn tháng</option>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option key={i} value={i}>Tháng {i + 1}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={startYear}
+                    onChange={(e) => setStartYear(e.target.value)}
+                    className="custom-select w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white text-sm font-medium text-gray-700"
+                  >
+                    <option value="">Chọn năm</option>
+                    {getYearOptions().map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Đến tháng/năm</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={endMonth}
+                    onChange={(e) => setEndMonth(e.target.value)}
+                    className="custom-select w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white text-sm font-medium text-gray-700"
+                  >
+                    <option value="">Chọn tháng</option>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option key={i} value={i}>Tháng {i + 1}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={endYear}
+                    onChange={(e) => setEndYear(e.target.value)}
+                    className="custom-select w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white text-sm font-medium text-gray-700"
+                  >
+                    <option value="">Chọn năm</option>
+                    {getYearOptions().map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            {(startMonth || startYear || endMonth || endYear) && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-gray-600">
+                <span>Hiển thị:</span>
+                <span className="font-bold">{stats.list.length} tháng</span>
+                <span>•</span>
+                <span>Tổng: {formatCurrency(stats.totalBalance)}</span>
+              </div>
+            )}
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-500 uppercase bg-white border-b border-gray-100">
