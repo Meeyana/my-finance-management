@@ -26,7 +26,7 @@ import {
 } from "firebase/auth";
 import { 
   getFirestore, collection, addDoc, onSnapshot, query, 
-  deleteDoc, doc, setDoc, updateDoc, deleteField, serverTimestamp, increment 
+  deleteDoc, doc, setDoc, updateDoc, deleteField, serverTimestamp, increment
 } from "firebase/firestore";
 
 // --- FIREBASE SETUP ---
@@ -1147,6 +1147,9 @@ export default function App() {
 
   const [notification, setNotification] = useState(null);
   const notificationTimeoutRef = React.useRef(null);
+  const hasInitialLoadRef = React.useRef(false);
+  const dataLoadedRef = React.useRef(false);
+  const loadedUserIdRef = React.useRef(null);
 
   const showSuccess = (msg) => {
      if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
@@ -1186,14 +1189,35 @@ export default function App() {
       setBudgets(INITIAL_BUDGETS);
       setRecurringItems([]);
       setMonthlyIncome(0);
+      hasInitialLoadRef.current = false;
+      dataLoadedRef.current = false;
+      loadedUserIdRef.current = null;
       return;
     }
-    setIsLoading(true);
 
     const paths = getFirestorePaths(user);
     if (!paths) return;
     
-    const unsubTx = onSnapshot(query(paths.transactions), (snapshot) => {
+    // Check if this is a different user - if so, reset loading state
+    const currentUserId = user.uid || (user.isAnonymous ? 'anonymous' : null);
+    const isDifferentUser = loadedUserIdRef.current !== currentUserId;
+    
+    if (isDifferentUser) {
+      hasInitialLoadRef.current = false;
+      dataLoadedRef.current = false;
+      loadedUserIdRef.current = currentUserId;
+    }
+    
+    // Only show loading on very first load for this user
+    // onSnapshot uses cache-first by default, so subsequent visits won't show loading
+    const isFirstLoad = !hasInitialLoadRef.current;
+    if (isFirstLoad) {
+      setIsLoading(true);
+      hasInitialLoadRef.current = true;
+    }
+
+    // Helper function to process transactions
+    const processTransactions = (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       // --- CẬP NHẬT LOGIC SẮP XẾP ---
@@ -1216,10 +1240,29 @@ export default function App() {
       // -------------------------------
 
       setTransactions(data);
-      setIsLoading(false);
-    }, (e) => { console.error(e); setIsLoading(false); });
+      if (isFirstLoad && !dataLoadedRef.current) {
+        setIsLoading(false);
+        dataLoadedRef.current = true;
+      }
+    };
+    
+    // Set up real-time listeners (these use cache-first by default)
+    // This means if data exists in cache, it will be used immediately without API call
+    const unsubTx = onSnapshot(
+      query(paths.transactions), 
+      processTransactions,
+      (e) => { 
+        console.error(e); 
+        if (isFirstLoad) {
+          setIsLoading(false);
+          dataLoadedRef.current = true;
+        }
+      }
+    );
 
-    const unsubBudget = onSnapshot(paths.budgetConfig, (s) => s.exists() && setBudgets(s.data()));
+    const unsubBudget = onSnapshot(paths.budgetConfig, (s) => {
+      if (s.exists()) setBudgets(s.data());
+    });
     
     const unsubCustomCats = onSnapshot(paths.categories, (s) => {
       if (s.exists()) setCustomCategoryConfig(s.data());
