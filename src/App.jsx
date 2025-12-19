@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LabelList 
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LabelList, LineChart, Line
 } from 'recharts';
 import { 
   LayoutDashboard, Wallet, Receipt, PlusCircle, Settings, 
@@ -1155,6 +1155,17 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
     return { list, totalBalance };
   }, [transactions, allMonthlyIncome, startMonth, startYear, endMonth, endYear]);
 
+  const trendData = useMemo(() => {
+    return [...stats.list]
+      .sort((a, b) => (a.year - b.year) || (a.month - b.month))
+      .map(item => ({
+        name: `T${item.month + 1}/${item.year}`,
+        income: item.income,
+        spent: item.spent,
+        balance: item.balance
+      }));
+  }, [stats.list]);
+
   const handleResetFilter = () => {
     setStartMonth('');
     setStartYear('');
@@ -1206,6 +1217,36 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
             </div>
             <p className="mt-2 opacity-80 text-sm">{getFilterDescription()}</p>
          </div>
+      </Card>
+
+      <Card>
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
+            <BarChart2 size={20} className="text-gray-400" />
+            <h4 className="font-bold text-gray-800">Xu hướng thu / chi</h4>
+          </div>
+          <span className="text-xs text-gray-500 font-semibold">{trendData.length} tháng</span>
+        </div>
+        <div className="h-72">
+          {trendData.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-gray-400">
+              <Database size={40} className="mb-2 opacity-20" />
+              <p className="text-sm">Chưa có dữ liệu</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94A3B8' }} />
+                <YAxis hide />
+                <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }} />
+                <Legend />
+                <Line type="monotone" dataKey="income" name="Thu nhập" stroke="#10B981" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="spent" name="Chi tiêu" stroke="#3B82F6" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
       </Card>
 
       <Card className="p-0 overflow-hidden border-0 shadow-sm">
