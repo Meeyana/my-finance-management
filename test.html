@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Firebase Query</title>
+</head>
+<body>
+    <h1>Mở Console (F12) để xem kết quả nhé!</h1>
+    <p id="status">Đang kết nối...</p>
+
+    <script type="module">
+        // 1. Nhập thư viện Firebase trực tiếp từ CDN (Không cần cài đặt)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // 2. Cấu hình của BẠN
+        const firebaseConfig = {
+            apiKey: 'AIzaSyAc3uMaQ-1oQJW-J2U6I4qqfpf-XUKgRp0',
+            authDomain: 'quan-ly-chi-tieu-1ce0f.firebaseapp.com',
+            projectId: 'quan-ly-chi-tieu-1ce0f',
+            storageBucket: 'quan-ly-chi-tieu-1ce0f.firebasestorage.app',
+            messagingSenderId: '31622801510',
+            appId: '1:31622801510:web:2d6eeb5ab18f7e3a06a5a7',
+        };
+
+        // 3. Khởi tạo
+        console.log("🚀 Bắt đầu khởi tạo Firebase...");
+        const app = initializeApp(firebaseConfig);
+        console.log(app);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // ID ứng dụng (lấy từ code gốc của bạn)
+        const appId = 'quan-ly-chi-tieu-personal';
+
+        // 4. Hàm chạy chính
+        async function runTest() {
+            try {
+                // BƯỚC 1: Đăng nhập (Phải đăng nhập mới được đọc dữ liệu - Luật của Firebase)
+                // Ở đây mình dùng đăng nhập ẩn danh cho nhanh
+                console.log("🔐 Đang đăng nhập ẩn danh...");
+                await signInAnonymously(auth);
+                console.log(auth);
+                console.log("✅ Đăng nhập thành công! User ID:", auth.currentUser.uid);
+
+                // BƯỚC 2: Định nghĩa đường dẫn (Path)
+                // Dựa theo code App_v4.jsx của bạn, đường dẫn cho khách vãng lai là:
+                // artifacts -> quan-ly-chi-tieu-personal -> public -> data -> transactions
+                const pathSegments = ['artifacts', appId, 'public', 'data', 'transactions'];
+                
+                console.log("📂 Đang trỏ tới đường dẫn:", pathSegments.join('/'));
+                
+                // Tạo tham chiếu (Reference) tới collection
+                const transactionsRef = collection(db, ...pathSegments);
+
+                // BƯỚC 3: QUERY (Lấy dữ liệu về)
+                console.log("⏳ Đang tải dữ liệu từ Google Server...");
+                const snapshot = await getDocs(transactionsRef);
+                console.log(snapshot);               
+                console.log(snapshot.docs[0].data.bind.name);
+                console.log(Object.getPrototypeOf(Object.getPrototypeOf(snapshot)));
+
+                // BƯỚC 4: Hiển thị kết quả
+                if (snapshot.empty) {
+                    console.warn("⚠️ Kết nối thành công nhưng không có giao dịch nào (Collection rỗng).");
+                    document.getElementById('status').innerText = "Kết nối OK - Không có dữ liệu.";
+                } else {
+                    console.log(`🎉 Đã tìm thấy ${snapshot.size} giao dịch!`);
+                    
+                    // In chi tiết từng giao dịch ra Console dạng bảng cho đẹp
+                    const dataList = snapshot.docs.map(doc => ({
+                        ID: doc.id,
+                        ...doc.data(),
+                        // Convert ngày tháng cho dễ đọc nếu có
+                        date: doc.data().date 
+                    }));
+                    
+                    console.table(dataList); // Dùng console.table nhìn siêu đẹp
+                    document.getElementById('status').innerText = `Thành công! Xem Console để thấy ${snapshot.size} dòng dữ liệu.`;
+                }
+
+            } catch (error) {
+                console.error("❌ Lỗi rồi:", error);
+                document.getElementById('status').innerText = "Lỗi: " + error.message;
+            }
+        }
+
+        // Chạy ngay
+        runTest();
+    </script>
+</body>
+</html>

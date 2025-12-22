@@ -11,7 +11,7 @@ import {
   Heart, Star, Gift, Music, Briefcase, Plane, Gamepad2, GraduationCap,
   Baby, Dog, Car, Zap, Wifi, Phone, Dumbbell,
   Eye, EyeOff, Bell, BellOff, LogOut, Lock, User, Globe, Plus, DollarSign, Calculator,
-  ClipboardList
+  ClipboardList, ArrowLeft, Filter
 } from 'lucide-react';
 
 // FIREBASE IMPORTS
@@ -30,6 +30,8 @@ import { auth, db, appId, getFirestorePaths } from '../../lib/firebase';
 import { formatCurrency, formatShortCurrency, getRandomColor } from '../../utils/format';
 import { Card, Badge } from '../../components/common/Card';
 import LoginScreen from '../auth/LoginScreen';
+import HabitTracker from '../habits/HabitTracker';
+import { useNavigate } from 'react-router-dom';
 
 // --- ICON LIBRARY ---
 const ICON_LIBRARY = {
@@ -55,7 +57,7 @@ const INITIAL_BUDGETS = {
   living: 0, fuel: 0, shopping: 0, other: 0
 };
 
-// --- DASHBOARD CONTENT ---
+// --- DASHBOARD CONTENT (UPDATED V3 - SYNC REMAINING) ---
 const DashboardContent = React.memo(({ 
   totalSpent, monthlyIncome, updateMonthlyIncome, spendingDiff, totalIncurred, alerts, 
   spendingByCategory, currentChartData, chartMode, setChartMode, 
@@ -65,6 +67,10 @@ const DashboardContent = React.memo(({
   const [showCharts, setShowCharts] = useState(false);
   const [showIncomeModal, setShowIncomeModal] = useState(false); 
   const [tempIncome, setTempIncome] = useState(monthlyIncome);
+
+  // --- STATE: Filter ---
+  const [excludedCats, setExcludedCats] = useState([]); 
+  const [showFilterMenu, setShowFilterMenu] = useState(false); 
 
   useEffect(() => {
     const timer = setTimeout(() => setShowCharts(true), 200);
@@ -81,7 +87,35 @@ const DashboardContent = React.memo(({
     setShowIncomeModal(false);
   };
 
-  const remaining = monthlyIncome - totalSpent;
+  // --- LOGIC TÍNH TOÁN FILTER ---
+  const filteredTotalSpent = useMemo(() => {
+    if (excludedCats.length === 0) return totalSpent;
+    return spendingByCategory
+      .filter(item => !excludedCats.includes(item.id))
+      .reduce((sum, item) => sum + item.value, 0);
+  }, [totalSpent, spendingByCategory, excludedCats]);
+
+  const toggleExclude = (catId) => {
+    setExcludedCats(prev => 
+      prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]
+    );
+  };
+
+  const handleSelectAll = () => setExcludedCats([]);
+
+  const handleDeselectAll = () => {
+    const allVisibleIds = allCategories
+      .filter(c => categoryVisibility[c.id] !== false)
+      .map(c => c.id);
+    setExcludedCats(allVisibleIds);
+  };
+  // ------------------------------
+
+  // --- CẬP NHẬT LOGIC: TÍNH CÒN LẠI THEO SỐ ĐÃ LỌC ---
+  // Trước đây: const remaining = monthlyIncome - totalSpent;
+  const remaining = monthlyIncome - filteredTotalSpent; 
+  // ----------------------------------------------------
+
   const chartColor = chartMode === 'daily' ? '#3B82F6' : '#8B5CF6';
 
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
@@ -94,7 +128,7 @@ const DashboardContent = React.memo(({
   };
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div className="space-y-6 animate-fade-in pb-12" onClick={() => setShowFilterMenu(false)}>
       <div className="mb-4 flex justify-between items-start">
           <div>
             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -106,10 +140,65 @@ const DashboardContent = React.memo(({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-200 shadow-lg border-none relative overflow-hidden">
+        
+        {/* --- CARD ĐÃ CHI TIÊU --- */}
+        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-200 shadow-lg border-none relative overflow-visible">
           <div className="relative z-10">
-              <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">Đã chi tiêu</p>
-              <h3 className="text-3xl font-bold mt-2 tracking-tight">{formatCurrency(totalSpent)}</h3>
+              <div className="flex justify-between items-start">
+                <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">
+                  {excludedCats.length > 0 ? 'Chi tiêu (Tùy chỉnh)' : 'Đã chi tiêu'}
+                </p>
+                
+                {/* Nút Filter */}
+                <div className="relative" onClick={e => e.stopPropagation()}>
+                  <button 
+                    onClick={() => setShowFilterMenu(!showFilterMenu)}
+                    className={`p-1.5 rounded-lg transition-colors ${showFilterMenu ? 'bg-white text-blue-600' : 'bg-white/20 text-white hover:bg-white/30'}`}
+                  >
+                    <Filter size={16} />
+                  </button>
+
+                  {/* Dropdown Menu Filter */}
+                  {showFilterMenu && (
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50 animate-scale-in">
+                      
+                      <div className="flex gap-2 mb-2 pb-2 border-b border-gray-100 px-1">
+                        <button 
+                          onClick={handleSelectAll}
+                          className="flex-1 py-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          Chọn tất cả
+                        </button>
+                        <button 
+                          onClick={handleDeselectAll}
+                          className="flex-1 py-1.5 text-[11px] font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          Bỏ chọn hết
+                        </button>
+                      </div>
+
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-1 px-2">Danh mục hiển thị</p>
+                      <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
+                        {allCategories.filter(c => categoryVisibility[c.id] !== false).map(cat => (
+                          <div 
+                            key={cat.id} 
+                            onClick={() => toggleExclude(cat.id)}
+                            className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-gray-700 text-sm select-none"
+                          >
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${excludedCats.includes(cat.id) ? 'border-gray-300 bg-white' : 'border-blue-500 bg-blue-500'}`}>
+                              {!excludedCats.includes(cat.id) && <CheckCircle2 size={12} className="text-white" />}
+                            </div>
+                            <span className={`transition-opacity ${excludedCats.includes(cat.id) ? 'opacity-50' : 'font-medium'}`}>{cat.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <h3 className="text-3xl font-bold mt-2 tracking-tight">{formatCurrency(filteredTotalSpent)}</h3>
+              
               <div className="mt-3 inline-flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm">
                 {spendingDiff > 0 ? <ArrowUpRight size={12}/> : <ArrowDownRight size={12}/>}
                 {spendingDiff > 0 ? '+' : ''}{formatShortCurrency(spendingDiff)} so với tháng trước
@@ -118,7 +207,7 @@ const DashboardContent = React.memo(({
           <TrendingDown className="absolute right-[-10px] bottom-[-10px] text-white opacity-20" size={100} />
         </Card>
         
-        {/* SCORECARD THU NHẬP (CÓ POPUP) */}
+        {/* SCORECARD THU NHẬP */}
         <Card className="cursor-pointer hover:shadow-md transition-all relative group" onClick={() => setShowIncomeModal(true)}>
            <div className="flex justify-between items-start">
             <div>
@@ -132,11 +221,13 @@ const DashboardContent = React.memo(({
           </div>
         </Card>
         
-        {/* SCORECARD CÒN LẠI (STYLE GỐC) */}
+        {/* --- SCORECARD CÒN LẠI (Sẽ tự động cập nhật theo 'remaining' mới) --- */}
         <Card>
            <div className="flex justify-between items-start">
             <div>
-              <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Còn lại</p>
+              <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">
+                 {excludedCats.length > 0 ? 'Còn lại (Theo lọc)' : 'Còn lại'}
+              </p>
               <h3 className={`text-2xl font-bold mt-1 ${remaining < 0 ? 'text-red-600' : 'text-indigo-600'}`}>
                 {formatCurrency(remaining)}
               </h3>
@@ -182,6 +273,7 @@ const DashboardContent = React.memo(({
         </div>
       )}
 
+      {/* ALERTS */}
       {alerts.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {alerts.map((alert) => (
@@ -196,6 +288,7 @@ const DashboardContent = React.memo(({
         </div>
       )}
 
+      {/* BIỂU ĐỒ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="min-h-[420px]">
           <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
@@ -204,22 +297,37 @@ const DashboardContent = React.memo(({
           <div className="h-80 w-full">
              {!showCharts ? (
                 <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
-             ) : totalSpent > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={spendingByCategory.filter(i => i.value > 0)}
-                    cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={4} dataKey="value" label={renderCustomizedLabel}
-                    activeShape={null} 
-                  >
-                    {spendingByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={2} stroke="#fff" />)}
-                  </Pie>
-                  <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
-                  <Legend verticalAlign="bottom" height={36} iconType="circle"/>
-                </PieChart>
-              </ResponsiveContainer>
              ) : (
-               <div className="h-full flex flex-col items-center justify-center text-gray-400"><Database size={48} className="mb-2 opacity-10" /><p className="text-sm">Chưa có dữ liệu</p></div>
+               /* LOGIC MỚI: Tạo biến tạm chartData để check độ dài */
+               (() => {
+                 // Lọc data: Phải > 0 VÀ không nằm trong danh sách loại trừ (filter dashboard)
+                 // Lưu ý: spendingByCategory đã tự động loại bỏ các mục ẩn từ "Cài đặt hạn mức" rồi
+                 const chartData = spendingByCategory.filter(i => i.value > 0 && !excludedCats.includes(i.id));
+
+                 // Kiểm tra nếu có data thì vẽ, không thì hiện "Chưa có dữ liệu"
+                 if (chartData.length > 0) {
+                   return (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={chartData} // Dùng data đã lọc
+                          cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={4} dataKey="value" label={renderCustomizedLabel}
+                          activeShape={null} 
+                        >
+                          {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={2} stroke="#fff" />)}
+                        </Pie>
+                        <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
+                        <Legend verticalAlign="bottom" height={36} iconType="circle"/>
+                      </PieChart>
+                    </ResponsiveContainer>
+                   );
+                 } else {
+                   // Giao diện khi không có dữ liệu (hoặc đã bị ẩn hết)
+                   return (
+                     <div className="h-full flex flex-col items-center justify-center text-gray-400"><Database size={48} className="mb-2 opacity-10" /><p className="text-sm">Chưa có dữ liệu</p></div>
+                   );
+                 }
+               })()
              )}
           </div>
         </Card>
@@ -467,38 +575,46 @@ const BudgetContent = ({
           return (
             <div key={cat.id} className={`bg-white rounded-2xl p-6 border border-slate-100 shadow-sm sm:hover:shadow-md transition-all group relative overflow-hidden ${!isVisible ? 'opacity-60 grayscale-[0.5]' : ''}`}>
               
-              <div className="absolute top-4 right-4 z-10 flex gap-2">
-                <button 
-                  onClick={() => handleEditClick(cat)}
-                  className="p-2 rounded-full shadow-sm transition-colors bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-600"
-                  title="Chỉnh sửa tên"
-                >
-                  <Edit size={16} />
-                </button>
-                {isCustom && (
-                  <button 
-                    onClick={() => deleteCustomCategory(cat.id)}
-                    className="p-2 rounded-full shadow-sm transition-colors bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600"
-                    title="Xóa danh mục"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-                <button 
-                  onClick={() => toggleAlert(cat.id)}
-                  className={`p-2 rounded-full shadow-sm transition-colors ${isAlertOn ? 'bg-white text-yellow-500 hover:bg-yellow-50' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                  title={isAlertOn ? "Đang bật cảnh báo" : "Đã tắt cảnh báo"}
-                >
-                  {isAlertOn ? <Bell size={16} /> : <BellOff size={16} />}
-                </button>
-                <button 
-                  onClick={() => toggleVisibility(cat.id)}
-                  className={`p-2 rounded-full shadow-sm transition-colors ${isVisible ? 'bg-white text-blue-600 hover:bg-blue-50' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                  title={isVisible ? "Đang hiển thị" : "Đã ẩn"}
-                >
-                  {isVisible ? <Eye size={16} /> : <EyeOff size={16} />}
-                </button>
-              </div>
+              <div className="absolute top-3 right-3 z-20 flex gap-1.5">
+  
+        {/* Nút Edit */}
+        <button 
+          onClick={() => handleEditClick(cat)}
+          className="w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-600 active:scale-90"
+          title="Chỉnh sửa tên"
+        >
+          <Edit size={16} strokeWidth={2.5} /> {/* Tăng độ dày icon cho dễ nhìn */}
+        </button>
+
+        {/* Nút Xóa (cho Custom Category) */}
+        {isCustom && (
+          <button 
+            onClick={() => deleteCustomCategory(cat.id)}
+            className="w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 active:scale-90"
+            title="Xóa danh mục"
+          >
+            <Trash2 size={16} strokeWidth={2.5} />
+          </button>
+        )}
+
+        {/* Nút Alert */}
+        <button 
+          onClick={() => toggleAlert(cat.id)}
+          className={`w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all active:scale-90 ${isAlertOn ? 'bg-white text-yellow-500 hover:bg-yellow-50 border border-yellow-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+          title={isAlertOn ? "Đang bật cảnh báo" : "Đã tắt cảnh báo"}
+        >
+          {isAlertOn ? <Bell size={16} strokeWidth={2.5} /> : <BellOff size={16} />}
+        </button>
+
+        {/* Nút Visibility */}
+        <button 
+          onClick={() => toggleVisibility(cat.id)}
+          className={`w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all active:scale-90 ${isVisible ? 'bg-white text-blue-600 hover:bg-blue-50 border border-blue-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+          title={isVisible ? "Đang hiển thị" : "Đã ẩn"}
+        >
+          {isVisible ? <Eye size={16} strokeWidth={2.5} /> : <EyeOff size={16} />}
+        </button>
+      </div>
 
               <div className="relative z-10 flex flex-col h-full justify-between mt-2">
                   <div className="mb-4">
@@ -1187,8 +1303,8 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
 };
 
 // --- MAIN APP ---
-export default function FinanceApp() {
-  const [user, setUser] = useState(null);
+export default function FinanceApp({ user }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
@@ -1203,7 +1319,7 @@ export default function FinanceApp() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null); 
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  //const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // --- FILTER STATE ---
   const [viewMonth, setViewMonth] = useState(new Date().getMonth());
@@ -1225,31 +1341,91 @@ export default function FinanceApp() {
      notificationTimeoutRef.current = setTimeout(() => setNotification(null), 3000);
   };
 
+  // --- DEBUG RENDER (Thêm dòng này ngay dưới khai báo state để check) ---
+  console.log(`>>> [RENDER] isLoading: ${isLoading} | Transactions: ${transactions.length} | Budgets: ${Object.keys(budgets).length}`);
+
+  // --- LOGIC FETCH DATA (FIXED: Budgets Collection) ---
   useEffect(() => {
-    // Logic kiểm tra token tùy chỉnh (nếu có tích hợp từ server khác)
-    const checkCustomToken = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        try {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } catch (error) {
-          console.error("Lỗi token tùy chỉnh:", error);
-        }
+    // 1. Kiểm tra User
+    if (!user) return;
+    console.log(">>> [FinanceApp] Effect started for User:", user.uid);
+    setIsLoading(true);
+
+    const paths = getFirestorePaths(user);
+    if (!paths) { setIsLoading(false); return; }
+
+    // --- SAFETY TIMEOUT (Phòng hờ treo mạng) ---
+    const safetyTimer = setTimeout(() => {
+      console.warn(">>> [Timeout] Force loading off");
+      setIsLoading(false);
+    }, 3000);
+
+    // --- 2. LISTENER TRANSACTIONS (Giao dịch) ---
+    const unsubTx = onSnapshot(query(paths.transactions), (snapshot) => {
+      try {
+        console.log(`>>> [Data] Received ${snapshot.docs.length} transactions`);
+        const data = snapshot.docs.map(doc => {
+           const d = doc.data();
+           return { id: doc.id, ...d, date: d.date || new Date().toISOString() };
+        });
+        
+        // Sort giảm dần theo ngày
+        data.sort((a, b) => new Date(b.date) - new Date(a.date));
+        setTransactions(data);
+
+        // QUAN TRỌNG: Tắt loading ngay khi có giao dịch
+        setIsLoading(false);
+        clearTimeout(safetyTimer);
+      } catch (e) {
+        console.error("Tx Error:", e);
+        setIsLoading(false);
       }
-    };
-    
-    // Gọi hàm kiểm tra token (nhưng KHÔNG tự động sign in anonymous ở đây nữa)
-    checkCustomToken();
-    
-    // Lắng nghe trạng thái đăng nhập từ Firebase
-    // Firebase sẽ tự động kiểm tra LocalStorage để khôi phục user cũ (nếu có)
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setIsAuthChecking(false);
-      setIsMobileMenuOpen(false); 
     });
 
-    return () => unsubscribe();
-  }, []);
+    // --- 3. LISTENER BUDGETS (FIX: Xử lý dạng Collection) ---
+    // Vì 'budgets' là collection, ta phải truy cập vào sub-collection của đường dẫn gốc
+    // Nếu paths.budgetConfig trong firebase.js đang trỏ sai, ta tự dựng lại path thủ công cho chắc ăn:
+    
+    let budgetQuery = paths.budgetConfig; // Mặc định dùng cái cũ
+    
+    // Nếu user nói budgets là collection, ta thử query dạng collection:
+    // Cách fix nhanh: Lấy parent path của transactions (là folder user) -> trỏ vào 'budgets'
+    try {
+        // Hack: Dựng lại path collection budgets từ path transactions
+        // transactions path: .../public/data/transactions
+        // budgets path mong muốn: .../public/data/budgets
+        const parentPath = paths.transactions.parent; // .../public/data
+        if (parentPath) {
+            const budgetsColRef = collection(parentPath, 'budgets');
+            
+            onSnapshot(budgetsColRef, (snapshot) => {
+                const newBudgets = { ...INITIAL_BUDGETS };
+                // Giả sử mỗi doc có id là tên category (vd: 'eating') và data có field 'amount' hoặc là số trực tiếp
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    // Logic map: Nếu doc có field 'value' hoặc 'budget', hoặc lấy chính data làm value
+                    const val = d.value || d.budget || d.amount || 0;
+                    newBudgets[doc.id] = Number(val);
+                });
+                console.log(">>> [Data] Budgets loaded:", newBudgets);
+                setBudgets(newBudgets);
+            });
+        }
+    } catch (err) {
+        console.warn(">>> [Budgets] Error fetching collection, fallback to default", err);
+    }
+
+    // --- 4. CÁC LISTENER KHÁC (Giữ nguyên, thêm try-catch) ---
+    const unsubCustomCats = onSnapshot(paths.categories, (s) => s.exists() && setCustomCategoryConfig(s.data()));
+    const unsubVisibility = onSnapshot(paths.visibility, (s) => s.exists() && setCategoryVisibility(s.data()));
+    const unsubAlerts = onSnapshot(paths.alerts, (s) => s.exists() && setCategoryAlerts(s.data()));
+    
+    // Cleanup
+    return () => { 
+        clearTimeout(safetyTimer);
+        unsubTx(); unsubCustomCats(); unsubVisibility(); unsubAlerts();
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -1911,13 +2087,7 @@ export default function FinanceApp() {
     </div>
   );
 
-  if (isAuthChecking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-      </div>
-    );
-  }
+  
 
   if (!user) {
     return <LoginScreen />;
@@ -1994,9 +2164,20 @@ export default function FinanceApp() {
         />
       )}
 
-      {/* Sidebar */}
+      {/* --- CẬP NHẬT SIDEBAR --- */}
       <aside className={`fixed inset-y-0 left-0 z-[60] w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:z-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none pt-0`}>
-        <div className="p-8 border-b border-slate-50 flex-none"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">{userInitial}</div><div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">{user.isAnonymous ? 'Public Shared Dashboard' : 'Personal Finance'}</p></div></div></div>
+        
+        {/* User Info (Đã xóa nút Back ở đây) */}
+        <div className="p-8 border-b border-slate-50 flex-none">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-blue-200 shadow-lg">
+                  {userInitial}
+                </div>
+                <div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">{user.isAnonymous ? 'Public Shared Dashboard' : 'Personal Finance'}</p></div>
+            </div>
+        </div>
+
+        {/* Nav Items */}
         <nav className="p-6 space-y-2 flex-1 overflow-y-auto">
           <SidebarItem id="dashboard" label="Tổng quan" icon={LayoutDashboard} active={activeTab === 'dashboard'} />
           <SidebarItem id="transactions" label="Sổ giao dịch" icon={Receipt} active={activeTab === 'transactions'} />
@@ -2006,7 +2187,19 @@ export default function FinanceApp() {
              <SidebarItem id="debt" label="Dư nợ" icon={ClipboardList} active={activeTab === 'debt'} />
           </div>
         </nav>
-        <div className="p-6 space-y-2 flex-none">
+
+        {/* --- BOTTOM ACTIONS (CẬP NHẬT MỚI) --- */}
+        <div className="p-6 space-y-2 flex-none border-t border-slate-50">
+          {/* Nút Quay lại Menu */}
+          <button 
+            onClick={() => navigate('/')}
+            className="w-full bg-white hover:bg-slate-50 text-slate-600 p-4 rounded-2xl flex items-center gap-3 transition-colors font-medium border border-slate-100 active:scale-[0.98]"
+          >
+            <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><ArrowLeft size={16} /></div>
+            Quay lại Menu
+          </button>
+
+          {/* Nút Đăng xuất */}
           <button 
             onClick={handleLogout}
             className="w-full bg-slate-50 hover:bg-slate-100 text-slate-600 p-4 rounded-2xl flex items-center gap-3 transition-colors font-medium active:scale-[0.98]"
@@ -2084,6 +2277,9 @@ export default function FinanceApp() {
                   transactions={transactions}
                   allMonthlyIncome={allMonthlyIncome}
                 />
+              )}
+              {activeTab === 'habits' && (
+                <HabitTracker user={user} />
               )}
             </>
           )}

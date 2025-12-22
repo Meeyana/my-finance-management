@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Đăng Nhập User Cụ Thể</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; display: block; margin-bottom: 10px; width: 300px;}
+        button { padding: 10px 20px; background: #2563EB; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;}
+        button:hover { background: #1d4ed8; }
+        .log-box { background: #f4f4f5; padding: 15px; border-radius: 10px; margin-top: 20px; font-family: monospace; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h2>Đăng nhập User cụ thể</h2>
+    
+    <input type="email" id="email" placeholder="Nhập email (vd: test@gmail.com)" value="phandinhtuan1112@gmail.com">
+    <input type="password" id="password" placeholder="Nhập mật khẩu (vd: 123456)" value="Gfdtgerr1">
+    <button onclick="handleLogin()">Đăng Nhập & Lấy Dữ Liệu</button>
+
+    <div id="console" class="log-box">Chờ thao tác...</div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        // Lần này nhập thêm signInWithEmailAndPassword
+        import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: 'AIzaSyAc3uMaQ-1oQJW-J2U6I4qqfpf-XUKgRp0',
+            authDomain: 'quan-ly-chi-tieu-1ce0f.firebaseapp.com',
+            projectId: 'quan-ly-chi-tieu-1ce0f',
+            storageBucket: 'quan-ly-chi-tieu-1ce0f.firebasestorage.app',
+            messagingSenderId: '31622801510',
+            appId: '1:31622801510:web:2d6eeb5ab18f7e3a06a5a7',
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        console.log(auth);
+        const db = getFirestore(app);
+        const appId = 'quan-ly-chi-tieu-personal';
+
+        // Hàm log ra màn hình cho dễ nhìn
+        function log(msg) {
+            document.getElementById('console').innerText += "\n" + msg;
+            console.log(msg);
+        }
+
+        // Đưa hàm ra window để nút bấm HTML gọi được
+        window.handleLogin = async function() {
+            document.getElementById('console').innerText = "⏳ Đang xử lý...";
+            
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('password').value;
+
+            try {
+                // 1. ĐĂNG NHẬP (QUAN TRỌNG NHẤT)
+                log(`🔑 Đang đăng nhập với: ${email}...`);
+                const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+                console.log(userCredential);
+                const user = userCredential.user;
+                console.log(user);
+
+                log(`✅ Đăng nhập thành công!`);
+                log(`👤 User UID: ${user.uid}`);
+                log(`📧 Email: ${user.email}`);
+
+                // 2. XÁC ĐỊNH ĐƯỜNG DẪN RIÊNG TƯ
+                // Logic này lấy y hệt từ file App_v4.jsx của bạn (hàm getFirestorePaths)
+                // Đường dẫn: artifacts -> [appId] -> users -> [UID CỦA USER] -> transactions
+                const pathSegments = ['artifacts', appId, 'users', user.uid, 'transactions'];
+                
+                log(`📂 Đang trỏ vào kho dữ liệu cá nhân: \n   ${pathSegments.join('/')}`);
+
+                // 3. LẤY DỮ LIỆU
+                const transactionsRef = collection(db, ...pathSegments);
+                console.log(transactionsRef);
+                const docSnap = await getDocs(transactionsRef);
+                console.log(docSnap);
+                console.log(docSnap.docs[0].data());
+
+                const datafetch = docSnap.forEach(doc => {
+                    log(`${doc.id}, ${doc.data().note}, ${doc.data().amount}`);
+                })
+               
+
+            } catch (error) {
+                log(`❌ Lỗi: ${error.message}`);
+                if (error.code === 'auth/invalid-credential') {
+                    log("👉 Gợi ý: Kiểm tra lại email hoặc mật khẩu.");
+                }
+            }
+        };
+    </script>
+</body>
+</html>
