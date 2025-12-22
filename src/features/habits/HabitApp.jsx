@@ -588,10 +588,26 @@ const GoalMetrics = ({ goals }) => {
 };
 
 // 5. Goals View (THÊM MỚI - Module Mục tiêu)
-// --- COMPONENT: GOALS VIEW (GIỮ NGUYÊN DESIGN GỐC + BADGE HOÀN THÀNH) ---
-const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateProgress, onAddClick, viewDate, setViewDate }) => {
+// --- COMPONENT: GOALS VIEW (CLICK BADGE ĐỂ CHỈNH LẠI) ---
+const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, onAddClick, viewDate, setViewDate }) => {
   
-  // Helper: Label thời gian
+  // State Modal
+  const [updatingGoal, setUpdatingGoal] = useState(null);
+  const [tempAmount, setTempAmount] = useState('');
+
+  const openUpdateModal = (goal) => {
+    setUpdatingGoal(goal);
+    setTempAmount(goal.currentAmount);
+  };
+
+  const handleSaveUpdate = () => {
+    if (updatingGoal) {
+      onUpdateValue(updatingGoal, tempAmount);
+      setUpdatingGoal(null);
+    }
+  };
+
+  // Helper Logic
   const getDateLabel = () => {
     const y = viewDate.getFullYear();
     const m = viewDate.getMonth() + 1;
@@ -638,7 +654,6 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateProgres
            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">Mục tiêu dài hạn</h2>
            <p className="text-gray-500 mt-1 text-sm">Quản lý các cột mốc quan trọng</p>
         </div>
-        
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full md:w-auto">
            <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-100 w-full sm:w-auto">
              {[{id: 'month', label: 'Tháng'}, {id: 'quarter', label: 'Quý'}, {id: 'year', label: 'Năm'}].map(f => (
@@ -661,48 +676,31 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateProgres
           const themeColor = goal.color || '#6366F1'; 
           
           return (
-            <div 
-                key={goal.id} 
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden group"
-            >
-               {/* Progress Bar: Vẫn dùng màu của mục tiêu cho đẹp */}
+            <div key={goal.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
                <div className="absolute bottom-0 left-0 h-1 w-full bg-slate-50">
-                  <div 
-                    className="h-full transition-all duration-1000" 
-                    style={{width: `${percent}%`, backgroundColor: themeColor}}
-                  ></div>
+                  <div className="h-full transition-all duration-1000" style={{width: `${percent}%`, backgroundColor: themeColor}}></div>
                </div>
 
-               {/* LAYOUT NGANG */}
                <div className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
-                  
-                  {/* CỘT 1: ICON (Giữ nguyên màu gốc của user chọn) */}
-                  <div 
-                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xl sm:text-2xl shrink-0" 
-                      style={{ backgroundColor: `${themeColor}15`, color: themeColor }}
-                    >
+                  {/* ICON */}
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xl sm:text-2xl shrink-0" style={{ backgroundColor: `${themeColor}15`, color: themeColor }}>
                         {goal.icon || '🎯'}
                   </div>
 
-                  {/* CỘT 2: THÔNG TIN */}
+                  {/* INFO */}
                   <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-gray-500 bg-gray-100/80">
                           {goal.type === 'year' ? `Năm` : goal.type === 'quarter' ? 'Quý' : 'Tháng'}
                         </span>
                       </div>
-
-                      <h3 className="font-bold leading-tight truncate text-base text-gray-800">
-                          {goal.name}
-                      </h3>
-                      
+                      <h3 className="font-bold leading-tight truncate text-base text-gray-800">{goal.name}</h3>
                       <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5 truncate">
                          <span className="flex items-center gap-1"><CalendarDays size={10}/> {new Date(goal.deadline).toLocaleDateString('vi-VN')}</span>
-                         {goal.description && <span className="truncate border-l border-gray-200 pl-2">{goal.description}</span>}
                       </div>
                   </div>
 
-                  {/* CỘT 3: SỐ LIỆU & STATUS */}
+                  {/* STATS & ACTION */}
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
                       <div className="text-right">
                          <div className="text-sm sm:text-base font-black leading-none" style={{color: isCompleted ? '#22c55e' : themeColor}}>
@@ -713,22 +711,27 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateProgres
                          </div>
                       </div>
 
-                      {/* --- LOGIC HIỂN THỊ --- */}
+                      {/* --- LOGIC HIỂN THỊ NÚT BẤM --- */}
                       {!isCompleted ? (
-                        // Chưa xong: Hiện nút +/-
-                        <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-lg border border-slate-100">
-                           <button onClick={() => onUpdateProgress(goal, -1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-gray-500 hover:text-indigo-600 font-bold active:scale-95 text-xs">-</button>
-                           <button onClick={() => onUpdateProgress(goal, 1)} className="w-6 h-6 flex items-center justify-center rounded-md shadow-sm text-white font-bold active:scale-95 text-xs" style={{backgroundColor: themeColor}}>+</button>
-                        </div>
+                        // Chưa xong: Hiện nút Cập nhật
+                        <button 
+                          onClick={() => openUpdateModal(goal)}
+                          className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-colors"
+                        >
+                          Cập nhật
+                        </button>
                       ) : (
-                        // Đã xong: Hiện Badge Hoàn thành (Có icon tick nhỏ kế bên)
-                        <div className="flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-lg border border-green-200 shadow-sm animate-fade-in">
+                        // Đã xong: Hiện Badge (Bấm vào để mở Modal sửa lại)
+                        <button 
+                            onClick={() => openUpdateModal(goal)} // <-- Logic mở lại modal ở đây
+                            className="flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-lg border border-green-200 shadow-sm hover:bg-green-200 transition-colors cursor-pointer"
+                        >
                             <CheckCircle2 size={12} strokeWidth={3} />
                             <span className="text-[10px] font-extrabold uppercase tracking-wide">Hoàn thành</span>
-                        </div>
+                        </button>
                       )}
                       
-                      {/* Nút Edit/Delete */}
+                      {/* Edit/Delete Buttons */}
                       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm p-1 rounded-lg shadow-sm z-10">
                          <button onClick={() => onEdit(goal)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400"><Edit size={14}/></button>
                          <button onClick={() => onDelete(goal.id)} className="p-1.5 hover:bg-red-50 rounded text-red-400 hover:text-red-500"><Trash2 size={14}/></button>
@@ -738,7 +741,6 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateProgres
             </div>
           )
         })}
-        
         {filteredGoals.length === 0 && (
            <div className="col-span-full py-8 text-center border-2 border-dashed border-slate-100 rounded-3xl">
               <p className="text-gray-400 text-sm font-medium">Không có mục tiêu trong {getDateLabel()}.</p>
@@ -746,7 +748,69 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateProgres
            </div>
         )}
       </div>
+      
       <GoalMetrics goals={filteredGoals} />
+
+      {/* --- MODAL CẬP NHẬT --- */}
+      {updatingGoal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setUpdatingGoal(null)}></div>
+           
+           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 transform transition-all scale-100">
+              <div className="flex justify-between items-start mb-6">
+                 <div>
+                    <h3 className="text-lg font-bold text-gray-800">Cập nhật tiến độ</h3>
+                    <p className="text-xs text-gray-400 mt-1">{updatingGoal.name}</p>
+                 </div>
+                 <button onClick={() => setUpdatingGoal(null)} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:bg-slate-100"><X size={18}/></button>
+              </div>
+
+              <div className="flex flex-col items-center gap-6 mb-6">
+                 <div className="flex items-center justify-center gap-4 w-full">
+                    {/* Nút Trừ */}
+                    <button 
+                       onClick={() => setTempAmount(Math.max(0, Number(tempAmount) - 1))}
+                       className="w-14 h-14 flex items-center justify-center rounded-2xl bg-slate-50 border border-slate-100 text-slate-400 hover:bg-slate-100 hover:text-slate-600 font-bold text-2xl active:scale-95 transition-all shadow-sm"
+                    >
+                       -
+                    </button>
+
+                    {/* Input */}
+                    <div className="flex flex-col items-center">
+                        <div className="flex items-baseline gap-1.5 border-b-2 border-indigo-100 px-2 pb-1 focus-within:border-indigo-500 transition-colors">
+                           <input 
+                              type="number" 
+                              className="w-24 text-4xl font-black text-center text-gray-800 outline-none bg-transparent p-0"
+                              value={tempAmount}
+                              onChange={(e) => setTempAmount(Number(e.target.value))}
+                              onFocus={(e) => e.target.select()}
+                           />
+                           <span className="text-sm font-bold text-gray-400 whitespace-nowrap">
+                              / {updatingGoal.targetAmount} {updatingGoal.unit}
+                           </span>
+                        </div>
+                    </div>
+
+                    {/* Nút Cộng */}
+                    <button 
+                       onClick={() => setTempAmount(Number(tempAmount) + 1)}
+                       className="w-14 h-14 flex items-center justify-center rounded-2xl text-white font-bold text-2xl shadow-lg shadow-indigo-200 active:scale-95 transition-all"
+                       style={{ backgroundColor: updatingGoal.color || '#4f46e5' }}
+                    >
+                       +
+                    </button>
+                 </div>
+              </div>
+
+              <button 
+                 onClick={handleSaveUpdate}
+                 className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-sm hover:bg-black active:scale-[0.98] transition-all shadow-lg"
+              >
+                 Lưu thay đổi
+              </button>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -928,6 +992,14 @@ export default function HabitApp({ user }) {
     const base = getBasePath(user);
     const newAmount = Math.max(0, (goal.currentAmount || 0) + amount);
     await updateDoc(doc(db, `${base}/goals`, goal.id), { currentAmount: newAmount });
+  };
+
+  // Hàm cập nhật giá trị chính xác (dùng cho nhập số trực tiếp)
+  const updateGoalValue = async (goal, newValue) => {
+    const base = getBasePath(user);
+    // Đảm bảo không nhỏ hơn 0
+    const finalValue = Math.max(0, Number(newValue));
+    await updateDoc(doc(db, `${base}/goals`, goal.id), { currentAmount: finalValue });
   };
 
   // --- COMMON HANDLERS ---
@@ -1193,7 +1265,7 @@ export default function HabitApp({ user }) {
                  setShowModal(true);
               }}
               onDelete={deleteGoal}
-              onUpdateProgress={updateGoalProgress}
+              onUpdateValue={updateGoalValue}
               onAddClick={() => {
                 setModalType('goal');
                 setShowModal(true);
