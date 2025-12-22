@@ -309,7 +309,7 @@ const WeeklyView = ({ habits, currentDate, navigateDate }) => {
       </div>
 
       {/* DÒNG TIÊU ĐỀ THỨ (THÊM MỚI) */}
-      <div className="grid grid-cols-[30%_repeat(7,1fr)] md:grid-cols-[200px_repeat(7,1fr)] gap-1 mb-3 pb-2 border-b border-slate-100">
+      <div className="grid grid-cols-[40%_repeat(7,1fr)] md:grid-cols-[200px_repeat(7,1fr)] gap-1 mb-3 pb-2 border-b border-slate-100">
          <div className="text-xs font-bold text-gray-400 uppercase tracking-wider pl-1">Thói quen</div>
          {weekDays.map((d, i) => {
             const isToday = new Date().toDateString() === d.toDateString();
@@ -326,7 +326,7 @@ const WeeklyView = ({ habits, currentDate, navigateDate }) => {
       {/* Danh sách thói quen */}
       <div className="space-y-2">
           {habits.map(habit => (
-            <div key={habit.id} className="grid grid-cols-[30%_repeat(7,1fr)] md:grid-cols-[200px_repeat(7,1fr)] gap-1 items-center border-b border-slate-50 pb-2 last:border-0">
+            <div key={habit.id} className="grid grid-cols-[40%_repeat(7,1fr)] md:grid-cols-[200px_repeat(7,1fr)] gap-1 items-center border-b border-slate-50 pb-2 last:border-0">
                <div className="flex items-center gap-1.5 pr-1 overflow-hidden">
                  <span className="text-sm">{habit.icon}</span> 
                  <span className="text-xs font-semibold text-gray-700 truncate">{habit.name}</span>
@@ -984,8 +984,10 @@ export default function HabitApp({ user }) {
   };
 
   const deleteGoal = async (id) => {
-    const base = getBasePath(user);
-    if(confirm("Xóa mục tiêu này?")) await deleteDoc(doc(db, `${base}/goals`, id));
+    if (window.confirm("Bạn có chắc chắn muốn xóa mục tiêu này không?\nHành động này không thể hoàn tác.")) {
+      const base = getBasePath(user);
+      await deleteDoc(doc(db, `${base}/goals`, id));
+    }
   };
 
   const updateGoalProgress = async (goal, amount) => {
@@ -1011,9 +1013,30 @@ export default function HabitApp({ user }) {
     setShowEmojiPicker(false);
   };
 
+  // --- HÀM MỞ MODAL CHỈNH SỬA THÓI QUEN ---
+  const openEditModal = (habit) => {
+    setEditingHabitId(habit.id);
+    setFormData({
+      name: habit.name,
+      icon: habit.icon || '🎯',
+      description: habit.description || '',
+      color: habit.color || getRandomColor(),
+      time: habit.time || '',
+      goalAmount: habit.goalAmount || '1',
+      goalUnit: habit.goalUnit || 'lần',
+      freqType: habit.freqType || 'daily',
+      freqValue: habit.freqValue || []
+    });
+    setModalType('habit'); // Quan trọng: báo cho Modal biết đây là sửa Thói quen (không phải Goal)
+    setShowModal(true);
+  };
+
+
+
   const deleteHabit = async (id) => {
-    const base = getBasePath(user);
-    await deleteDoc(doc(db, `${base}/habits`, id));
+    if (window.confirm("Bạn có chắc chắn muốn xóa thói quen này không?\nDữ liệu lịch sử cũng sẽ bị xóa và không thể khôi phục.")) {
+      await deleteDoc(doc(db, getHabitPath(user), id));
+    }
   };
 
   // Toggle Check: Chỉ update history
@@ -1273,33 +1296,65 @@ export default function HabitApp({ user }) {
             />
           )}
 
-          {/* TAB: CÀI ĐẶT */}
+          {/* TAB: CÀI ĐẶT - QUẢN LÝ THÓI QUEN (ĐÃ FIX LAYOUT CỨNG) */}
           {activeTab === 'settings' && (
-             <div className="animate-fade-in space-y-6">
-                <div><h2 className="text-2xl font-bold text-gray-800">Quản lý thói quen</h2></div>
-                <div className="grid gap-4">
-                  {habits.map(habit => (
-                     <div key={habit.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                           <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{backgroundColor: `${habit.color}20`}}>{habit.icon}</div>
-                           <div>
-                             <h4 className="font-bold text-gray-800">{habit.name}</h4>
-                             <p className="text-sm text-gray-500">
-                               <span className="font-bold text-gray-700 bg-slate-100 px-1.5 rounded mr-2">{habit.goalAmount} {habit.goalUnit}</span>
-                               <span className="text-xs text-blue-500 bg-blue-50 px-1.5 rounded uppercase font-bold">
-                                 {FREQUENCY_TYPES.find(f => f.value === habit.freqType)?.label || 'Hàng ngày'}
-                               </span>
-                             </p>
-                           </div>
-                        </div>
-                        <div className="flex gap-2">
-                           <button onClick={() => { setEditingHabitId(habit.id); setFormData(habit); setModalType('habit'); setShowModal(true); }} className="p-3 bg-slate-50 text-slate-500 rounded-xl hover:bg-blue-50 hover:text-blue-600"><Edit size={20}/></button>
-                           <button onClick={() => deleteHabit(habit.id)} className="p-3 bg-slate-50 text-slate-500 rounded-xl hover:bg-red-50 hover:text-red-600"><Trash2 size={20}/></button>
-                        </div>
-                     </div>
-                  ))}
-                </div>
-             </div>
+              <div className="animate-fade-in space-y-6">
+                  <div><h2 className="text-2xl font-bold text-gray-800">Quản lý thói quen</h2></div>
+                  <div className="grid gap-3">
+                      {habits.map(habit => (
+                          <div key={habit.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 h-[88px] overflow-hidden w-full max-w-full">
+                              
+                              {/* 1. ICON (Cố định cứng - shrink-0) */}
+                              <div 
+                                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0" 
+                                  style={{backgroundColor: `${habit.color}15`}}
+                              >
+                                  {habit.icon}
+                              </div>
+
+                              {/* 2. TEXT CONTAINER (Scroll ngang tại đây) */}
+                              {/* w-0 flex-1: Ép container co lại vừa khít khoảng trống, ngăn tràn viền cha */}
+                              <div className="flex-1 w-0 flex flex-col justify-center">
+                                  <div 
+                                      className="overflow-x-auto whitespace-nowrap pr-4" 
+                                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} // Ẩn thanh cuộn cho đẹp
+                                  >
+                                      {/* Tên Thói Quen */}
+                                      <h4 className="font-bold text-gray-800 text-base leading-tight mb-1 inline-block">
+                                          {habit.name}
+                                      </h4>
+                                      
+                                      {/* Tags Info */}
+                                      <div className="flex items-center gap-2 text-xs mt-0.5">
+                                          <span className="font-bold text-gray-600 bg-slate-100 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">
+                                              {habit.goalAmount} {habit.goalUnit}
+                                          </span>
+                                          <span className="font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded uppercase whitespace-nowrap shrink-0">
+                                              {FREQUENCY_TYPES.find(f => f.value === habit.freqType)?.label || 'Hàng ngày'}
+                                          </span>
+                                      </div>
+                                  </div>
+                              </div>
+
+                              {/* 3. BUTTONS (Cố định cứng bên phải - shrink-0) */}
+                              <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-slate-50 h-10 bg-white">
+                                  <button 
+                                      onClick={() => openEditModal(habit)} 
+                                      className="w-9 h-9 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                  >
+                                      <Edit size={16} />
+                                  </button>
+                                  <button 
+                                      onClick={() => deleteHabit(habit.id)} 
+                                      className="w-9 h-9 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors"
+                                  >
+                                      <Trash2 size={16} />
+                                  </button>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
           )}
         </div>
       </main>
