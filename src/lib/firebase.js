@@ -4,12 +4,13 @@ import { getFirestore, collection, doc } from 'firebase/firestore';
 
 // Centralized Firebase config and initialization
 const firebaseConfig = {
-  apiKey: 'AIzaSyAc3uMaQ-1oQJW-J2U6I4qqfpf-XUKgRp0',
-  authDomain: 'quan-ly-chi-tieu-1ce0f.firebaseapp.com',
-  projectId: 'quan-ly-chi-tieu-1ce0f',
-  storageBucket: 'quan-ly-chi-tieu-1ce0f.firebasestorage.app',
-  messagingSenderId: '31622801510',
-  appId: '1:31622801510:web:2d6eeb5ab18f7e3a06a5a7',
+  // Cách viết cho Vite (phổ biến nhất hiện nay)
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
