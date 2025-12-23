@@ -23,10 +23,11 @@ const GOAL_UNITS = [
   { value: 'm', label: 'Mét' },
   { value: 'bước', label: 'Bước' },
   { value: 'trang', label: 'Trang sách' },
-  { value: 'ly', label: 'Ly/Cốc' },
+  { value: 'lit', label: 'Lit' },
+  { value: 'ml', label: 'ml' },
   { value: 'cal', label: 'Calories' },
   { value: 'kg', label: 'Kg' },
-  { value: 'đ', label: 'VND' }
+  { value: 'người', label: 'Người' }
 ];
 
 const FREQUENCY_TYPES = [
@@ -411,19 +412,38 @@ const MonthlyView = ({ habits, currentDate, navigateDate }) => {
   );
 };
 
-// 3. Yearly View
+// 3. Yearly View (Đã cập nhật Dropdown chuẩn iOS)
 const YearlyView = ({ habits, year, setYear }) => {
   const availableYears = [2025, 2026, 2027, 2028];
+
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 w-full overflow-hidden">
        <div className="flex justify-between items-center mb-6">
           <h3 className="text-lg font-bold text-gray-800">Tiến độ năm</h3>
-          <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
-            {availableYears.map(y => (
-              <button key={y} onClick={() => setYear(y)} className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${year === y ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>{y}</button>
-            ))}
+          
+          {/* --- DROPDOWN CHỌN NĂM (FIX UI IOS) --- */}
+          <div className="relative">
+              <select
+                value={year}
+                onChange={(e) => setYear(Number(e.target.value))}
+                // appearance-none: Tắt style mặc định của iOS
+                // pr-9: Chừa chỗ cho icon mũi tên bên phải
+                className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-gray-700 font-bold text-xs md:text-sm py-2 pl-3 pr-9 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer"
+              >
+                {availableYears.map(y => (
+                  <option key={y} value={y}>Năm {y}</option>
+                ))}
+              </select>
+              
+              {/* Icon mũi tên giả (Absolute) */}
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                <ChevronDown size={14} strokeWidth={2.5} />
+              </div>
           </div>
+          {/* -------------------------------------- */}
        </div>
+
+       {/* Phần Grid hiển thị chấm tròn (Giữ nguyên) */}
        <div className="space-y-6 w-full">
           {habits.map(habit => (
              <div key={habit.id} className="w-full">
@@ -1690,7 +1710,7 @@ export default function HabitApp({ user }) {
                               - max-w-[150px]: Giới hạn độ rộng để khớp với input ngày ở trên 
                           */}
                           <div className="flex-1 min-w-0">
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Giờ nhắc</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Giờ bắt đầu</label>
                             <input 
                               type="time" 
                               className="h-[52px] w-full max-w-[150px] px-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-white text-gray-800 shadow-sm appearance-none" 
