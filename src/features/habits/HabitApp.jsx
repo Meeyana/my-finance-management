@@ -4,7 +4,7 @@ import {
   PlusCircle, CheckCircle2, Trash2, X, Activity, ArrowLeft, 
   LayoutDashboard, Menu, LogOut, Calendar as CalendarIcon, 
   Settings, BarChart2, ChevronLeft, ChevronRight, Check, Edit, 
-  RotateCcw, Filter, MousePointer2, Target, Flag, CalendarDays 
+  RotateCcw, Filter, MousePointer2, Target, Flag, CalendarDays , ChevronDown
 } from 'lucide-react';
 import { 
   collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp 
@@ -102,8 +102,28 @@ const getMonday = (d) => {
   return new Date(date.setDate(diff));
 };
 
-// Check if habit should appear on a specific date based on frequency
+// Check if habit should appear on a specific date based on frequency AND date range
 const isHabitDueOnDate = (habit, date) => {
+  // 1. CHECK DATE RANGE (MỚI THÊM)
+  // Chuyển date đang xét về đầu ngày để so sánh chính xác
+  const checkDate = new Date(date);
+  checkDate.setHours(0, 0, 0, 0);
+
+  // Nếu có ngày bắt đầu
+  if (habit.startDate) {
+    const start = new Date(habit.startDate);
+    start.setHours(0, 0, 0, 0);
+    if (checkDate < start) return false; // Chưa đến ngày bắt đầu
+  }
+
+  // Nếu có ngày kết thúc
+  if (habit.endDate) {
+    const end = new Date(habit.endDate);
+    end.setHours(0, 0, 0, 0);
+    if (checkDate > end) return false; // Đã quá ngày kết thúc
+  }
+
+  // 2. CHECK FREQUENCY (LOGIC CŨ)
   const type = habit.freqType || 'daily';
   const val = habit.freqValue; 
 
@@ -608,7 +628,10 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, 
   };
 
   // Helper Logic
+  // 1. Helper Label: Hiển thị tiêu đề ngày tháng
   const getDateLabel = () => {
+    if (filter === 'all') return 'Tất cả danh sách'; // Label cho chế độ xem hết
+    
     const y = viewDate.getFullYear();
     const m = viewDate.getMonth() + 1;
     if (filter === 'year') return `Năm ${y}`;
@@ -619,16 +642,12 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, 
     }
   };
 
-  const navigateTime = (direction) => {
-    const newDate = new Date(viewDate);
-    if (filter === 'year') newDate.setFullYear(newDate.getFullYear() + direction);
-    else if (filter === 'month') newDate.setMonth(newDate.getMonth() + direction);
-    else if (filter === 'quarter') newDate.setMonth(newDate.getMonth() + (direction * 3));
-    setViewDate(newDate);
-  };
-
+  // 2. Logic Filter: Đã cập nhật để chấp nhận 'all'
   const filteredGoals = goals.filter(g => {
-    if (g.type !== filter) return false;
+    if (filter === 'all') return true; // <-- QUAN TRỌNG: Nếu là 'all' thì lấy hết
+
+    if (g.type !== filter) return false; // Lọc theo loại (tháng/quý/năm)
+    
     const d = new Date(g.deadline);
     const viewYear = viewDate.getFullYear();
     const viewMonth = viewDate.getMonth();
@@ -643,6 +662,14 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, 
     return true;
   });
 
+  const navigateTime = (direction) => {
+    const newDate = new Date(viewDate);
+    if (filter === 'year') newDate.setFullYear(newDate.getFullYear() + direction);
+    else if (filter === 'month') newDate.setMonth(newDate.getMonth() + direction);
+    else if (filter === 'quarter') newDate.setMonth(newDate.getMonth() + (direction * 3));
+    setViewDate(newDate);
+  };
+
   const calculateProgress = (current, target) => Math.min(100, Math.round((current / target) * 100));
 
   return (
@@ -654,97 +681,154 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, 
            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">Mục tiêu dài hạn</h2>
            <p className="text-gray-500 mt-1 text-sm">Quản lý các cột mốc quan trọng</p>
         </div>
+        
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full md:w-auto">
-           <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-100 w-full sm:w-auto">
-             {[{id: 'month', label: 'Tháng'}, {id: 'quarter', label: 'Quý'}, {id: 'year', label: 'Năm'}].map(f => (
-               <button key={f.id} onClick={() => { setFilter(f.id); setViewDate(new Date()); }} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === f.id ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>{f.label}</button>
+           {/* MENU FILTER: Thêm nút 'Tất cả' */}
+           <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-100 w-full sm:w-auto overflow-x-auto">
+             {[
+               {id: 'all', label: 'Tất cả'}, // <-- Thêm nút này
+               {id: 'month', label: 'Tháng'}, 
+               {id: 'quarter', label: 'Quý'}, 
+               {id: 'year', label: 'Năm'}
+             ].map(f => (
+               <button 
+                  key={f.id} 
+                  onClick={() => { setFilter(f.id); setViewDate(new Date()); }} 
+                  className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${filter === f.id ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+               >
+                 {f.label}
+               </button>
              ))}
            </div>
-           <div className="flex items-center justify-between w-full sm:w-auto gap-2 bg-slate-100 p-1 rounded-lg">
-              <button onClick={() => navigateTime(-1)} className="p-1 hover:bg-white rounded-md shadow-sm transition-all"><ChevronLeft size={16}/></button>
-              <span className="text-xs font-bold text-gray-700 min-w-[80px] text-center">{getDateLabel()}</span>
-              <button onClick={() => navigateTime(1)} className="p-1 hover:bg-white rounded-md shadow-sm transition-all"><ChevronRight size={16}/></button>
-           </div>
+
+           {/* NAVIGATE TIME: Chỉ hiện khi KHÔNG PHẢI là 'all' */}
+           {filter !== 'all' && (
+             <div className="flex items-center justify-between w-full sm:w-auto gap-2 bg-slate-100 p-1 rounded-lg">
+                <button onClick={() => navigateTime(-1)} className="p-1 hover:bg-white rounded-md shadow-sm transition-all"><ChevronLeft size={16}/></button>
+                <span className="text-xs font-bold text-gray-700 min-w-[80px] text-center">{getDateLabel()}</span>
+                <button onClick={() => navigateTime(1)} className="p-1 hover:bg-white rounded-md shadow-sm transition-all"><ChevronRight size={16}/></button>
+             </div>
+           )}
         </div>
       </div>
 
-      {/* DANH SÁCH THẺ GOAL */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {filteredGoals.map(goal => {
-          const percent = calculateProgress(goal.currentAmount, goal.targetAmount);
-          const isCompleted = percent >= 100;
-          const themeColor = goal.color || '#6366F1'; 
-          
-          return (
-            <div key={goal.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
-               <div className="absolute bottom-0 left-0 h-1 w-full bg-slate-50">
-                  <div className="h-full transition-all duration-1000" style={{width: `${percent}%`, backgroundColor: themeColor}}></div>
-               </div>
+      {/* DANH SÁCH MỤC TIÊU (ĐÃ SỬA LỖI GIAO DIỆN MOBILE) */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        {filteredGoals.length > 0 ? (
+          filteredGoals.map((goal) => {
+            const percent = calculateProgress(goal.currentAmount, goal.targetAmount);
+            const isCompleted = percent >= 100;
+            const themeColor = goal.color || '#6366F1'; 
+            
+            return (
+              <div 
+                key={goal.id} 
+                // Thêm 'group/item' để scope hover chính xác hơn
+                className="group/item relative p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+              >
+                 {/* 1. ICON & INFO (Bên trái) */}
+                 <div className="flex items-center gap-4 flex-1 w-full sm:w-auto">
+                    {/* Icon Box */}
+                    <div 
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm" 
+                      style={{ backgroundColor: `${themeColor}15`, color: themeColor }}
+                    >
+                          {goal.icon || '🎯'}
+                    </div>
 
-               <div className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
-                  {/* ICON */}
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xl sm:text-2xl shrink-0" style={{ backgroundColor: `${themeColor}15`, color: themeColor }}>
-                        {goal.icon || '🎯'}
-                  </div>
+                    {/* Text Info & Progress Bar */}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-center mb-1">
+                           <h3 className="font-bold text-gray-800 text-base truncate pr-2">{goal.name}</h3>
+                        </div>
+                        
+                        {/* Thanh tiến độ */}
+                        <div className="w-full max-w-[200px] h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1.5">
+                           <div 
+                              className="h-full rounded-full transition-all duration-1000" 
+                              style={{ width: `${percent}%`, backgroundColor: themeColor }}
+                           />
+                        </div>
 
-                  {/* INFO */}
-                  <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-gray-500 bg-gray-100/80">
-                          {goal.type === 'year' ? `Năm` : goal.type === 'quarter' ? 'Quý' : 'Tháng'}
-                        </span>
-                      </div>
-                      <h3 className="font-bold leading-tight truncate text-base text-gray-800">{goal.name}</h3>
-                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5 truncate">
-                         <span className="flex items-center gap-1"><CalendarDays size={10}/> {new Date(goal.deadline).toLocaleDateString('vi-VN')}</span>
-                      </div>
-                  </div>
+                        <div className="flex items-center gap-3 text-xs text-gray-400">
+                           <span className="flex items-center gap-1">
+                              <CalendarDays size={10}/> {new Date(goal.deadline).toLocaleDateString('vi-VN')}
+                           </span>
+                           {goal.description && (
+                             <span className="truncate max-w-[150px] border-l border-slate-200 pl-2 font-medium">
+                               {goal.description}
+                             </span>
+                           )}
+                        </div>
+                    </div>
+                 </div>
 
-                  {/* STATS & ACTION */}
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <div className="text-right">
-                         <div className="text-sm sm:text-base font-black leading-none" style={{color: isCompleted ? '#22c55e' : themeColor}}>
-                            {goal.currentAmount.toLocaleString()}
-                         </div>
-                         <div className="text-[10px] sm:text-xs font-bold text-gray-400 mt-0.5">
-                            / {goal.targetAmount.toLocaleString()} {goal.unit}
-                         </div>
-                      </div>
-
-                      {/* --- LOGIC HIỂN THỊ NÚT BẤM --- */}
-                      {!isCompleted ? (
-                        // Chưa xong: Hiện nút Cập nhật
-                        <button 
-                          onClick={() => openUpdateModal(goal)}
-                          className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-colors"
+                 {/* 2. STATS & ACTIONS (Bên phải - Chứa tất cả nút bấm) */}
+                 <div className="flex items-center justify-between w-full sm:w-auto gap-4 pl-0 sm:pl-4 sm:border-l sm:border-slate-50 mt-2 sm:mt-0">
+                    {/* Con số thống kê */}
+                    <div className="text-right shrink-0">
+                        {/* SỬA LẠI: Luôn dùng themeColor cho con số, bất kể đã xong hay chưa */}
+                        <div 
+                          className="text-base font-black leading-none" 
+                          style={{ color: themeColor }} 
                         >
-                          Cập nhật
-                        </button>
-                      ) : (
-                        // Đã xong: Hiện Badge (Bấm vào để mở Modal sửa lại)
-                        <button 
-                            onClick={() => openUpdateModal(goal)} // <-- Logic mở lại modal ở đây
-                            className="flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-lg border border-green-200 shadow-sm hover:bg-green-200 transition-colors cursor-pointer"
-                        >
-                            <CheckCircle2 size={12} strokeWidth={3} />
-                            <span className="text-[10px] font-extrabold uppercase tracking-wide">Hoàn thành</span>
-                        </button>
-                      )}
-                      
-                      {/* Edit/Delete Buttons */}
-                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm p-1 rounded-lg shadow-sm z-10">
-                         <button onClick={() => onEdit(goal)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400"><Edit size={14}/></button>
-                         <button onClick={() => onDelete(goal.id)} className="p-1.5 hover:bg-red-50 rounded text-red-400 hover:text-red-500"><Trash2 size={14}/></button>
-                      </div>
-                  </div>
-               </div>
-            </div>
-          )
-        })}
-        {filteredGoals.length === 0 && (
-           <div className="col-span-full py-8 text-center border-2 border-dashed border-slate-100 rounded-3xl">
-              <p className="text-gray-400 text-sm font-medium">Không có mục tiêu trong {getDateLabel()}.</p>
-              <button onClick={onAddClick} className="mt-1 text-indigo-600 font-bold text-xs hover:underline">Thêm mới +</button>
+                          {goal.currentAmount.toLocaleString()}
+                        </div>
+                        
+                        <div className="text-[10px] font-bold text-gray-400 mt-1">
+                          / {goal.targetAmount.toLocaleString()} {goal.unit}
+                        </div>
+                    </div>
+
+                    {/* CỤM NÚT HÀNH ĐỘNG (Đặt chung vào một khối flex) */}
+                    <div className="flex items-center gap-3">
+                        
+                        {/* Nút Sửa/Xóa: Mobile hiện mờ, Desktop hover mới hiện */}
+                        <div className="flex items-center gap-1 opacity-60 sm:opacity-0 group-hover/item:sm:opacity-100 transition-all">
+                             <button onClick={() => onEdit(goal)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+                                <Edit size={16}/>
+                             </button>
+                             <button onClick={() => onDelete(goal.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                                <Trash2 size={16}/>
+                             </button>
+                        </div>
+
+                        {/* Nút hành động chính (Cập nhật/Xong) */}
+                        {!isCompleted ? (
+                          <button 
+                            onClick={() => openUpdateModal(goal)}
+                            className="px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-100 text-xs font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-200 shadow-sm transition-all active:scale-95 shrink-0"
+                          >
+                            Cập nhật
+                          </button>
+                        ) : (
+                          <button 
+                              onClick={() => openUpdateModal(goal)} 
+                              className="flex items-center gap-1 bg-green-50 text-green-700 px-3 py-1.5 rounded-lg border border-green-200 shadow-sm hover:bg-green-100 transition-colors shrink-0"
+                          >
+                              <CheckCircle2 size={14} strokeWidth={3} />
+                              <span className="text-[10px] font-extrabold uppercase">Xong</span>
+                          </button>
+                        )}
+                    </div>
+                 </div>
+
+                 {/* (Đã xóa phần div absolute cũ ở đây) */}
+              </div>
+            )
+          })
+        ) : (
+           /* EMPTY STATE (Giữ nguyên) */
+           <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
+              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+                <Target size={32} />
+              </div>
+              <div>
+                <p className="text-gray-500 text-sm font-medium">Chưa có mục tiêu nào phù hợp.</p>
+                <button onClick={onAddClick} className="mt-2 text-indigo-600 font-bold text-sm hover:underline">
+                  + Thêm mục tiêu mới ngay
+                </button>
+              </div>
            </div>
         )}
       </div>
@@ -824,7 +908,7 @@ export default function HabitApp({ user }) {
   
   // State cho Goals
   const [goals, setGoals] = useState([]);
-  const [goalFilter, setGoalFilter] = useState('year'); // year | quarter | month
+  const [goalFilter, setGoalFilter] = useState('all'); // year | quarter | month
   const [goalViewDate, setGoalViewDate] = useState(new Date());
 
   // Modal State
@@ -839,7 +923,8 @@ export default function HabitApp({ user }) {
   
   const [formData, setFormData] = useState({ 
     name: '', icon: '🎯', description: '', color: '', time: '',
-    goalAmount: '1', goalUnit: 'lần', freqType: 'daily', freqValue: []
+    goalAmount: '1', goalUnit: 'lần', freqType: 'daily', freqValue: [],
+    startDate: '', endDate: ''
   });
 
   const [goalFormData, setGoalFormData] = useState({
@@ -921,7 +1006,10 @@ export default function HabitApp({ user }) {
       goalAmount: parseInt(formData.goalAmount) || 1,
       goalUnit: formData.goalUnit || 'lần',
       freqType: formData.freqType,
-      freqValue: finalFreqValue
+      freqValue: finalFreqValue,
+      // --- THÊM MỚI ---
+      startDate: formData.startDate || null, // Lưu null nếu rỗng
+      endDate: formData.endDate || null      // Lưu null nếu rỗng
     };
 
     const base = getBasePath(user);
@@ -1006,7 +1094,12 @@ export default function HabitApp({ user }) {
 
   // --- COMMON HANDLERS ---
   const closeModal = () => {
-    setFormData({ name: '', icon: '🎯', description: '', color: '', time: '', goalAmount: '1', goalUnit: 'lần', freqType: 'daily', freqValue: [] });
+    // Reset thêm startDate và endDate về rỗng
+    setFormData({ 
+        name: '', icon: '🎯', description: '', color: '', time: '', 
+        goalAmount: '1', goalUnit: 'lần', freqType: 'daily', freqValue: [],
+        startDate: '', endDate: '' 
+    });
     setGoalFormData({ name: '', description: '', targetAmount: '', currentAmount: '0', unit: '', deadline: '', type: 'year' });
     setEditingHabitId(null);
     setShowModal(false);
@@ -1025,9 +1118,12 @@ export default function HabitApp({ user }) {
       goalAmount: habit.goalAmount || '1',
       goalUnit: habit.goalUnit || 'lần',
       freqType: habit.freqType || 'daily',
-      freqValue: habit.freqValue || []
+      freqValue: habit.freqValue || [],
+      // --- THÊM MỚI ---
+      startDate: habit.startDate || '',
+      endDate: habit.endDate || ''
     });
-    setModalType('habit'); // Quan trọng: báo cho Modal biết đây là sửa Thói quen (không phải Goal)
+    setModalType('habit'); 
     setShowModal(true);
   };
 
@@ -1404,7 +1500,9 @@ export default function HabitApp({ user }) {
                             value={formData.name} 
                             onChange={e => setFormData({...formData, name: e.target.value})} 
                           />
+                          
                       </div>
+                      
 
                       {/* 2. MỤC TIÊU */}
                       <div>
@@ -1417,26 +1515,38 @@ export default function HabitApp({ user }) {
                               value={formData.goalAmount} 
                               onChange={e => setFormData({...formData, goalAmount: e.target.value})} 
                             />
-                            <select 
-                              className="w-2/3 p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-white" 
-                              value={formData.goalUnit} 
-                              onChange={e => setFormData({...formData, goalUnit: e.target.value})}
-                            >
-                              {GOAL_UNITS.map(u => <option key={u.value} value={u.value}>{u.label} ({u.value})</option>)}
-                            </select>
+                            {/* --- SỬA DROPDOWN CHO IOS --- */}
+                            <div className="relative w-2/3">
+                                <select 
+                                  className="w-full h-full p-3 pr-10 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-white appearance-none" 
+                                  value={formData.goalUnit} 
+                                  onChange={e => setFormData({...formData, goalUnit: e.target.value})}
+                                >
+                                  {GOAL_UNITS.map(u => <option key={u.value} value={u.value}>{u.label} ({u.value})</option>)}
+                                </select>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                                    <ChevronDown size={16} />
+                                </div>
+                            </div>
+                            {/* --------------------------- */}
                           </div>
                       </div>
 
                       {/* 3. TẦN SUẤT */}
                       <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                           <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><Filter size={12}/> Tần suất lặp lại</label>
-                          <select 
-                            className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-white mb-3"
-                            value={formData.freqType}
-                            onChange={e => setFormData({...formData, freqType: e.target.value, freqValue: []})}
-                          >
-                            {FREQUENCY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                          </select>
+                          <div className="relative mb-3">
+                              <select 
+                                className="w-full p-3 pr-10 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-white appearance-none"
+                                value={formData.freqType}
+                                onChange={e => setFormData({...formData, freqType: e.target.value, freqValue: []})}
+                              >
+                                {FREQUENCY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                              </select>
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                                  <ChevronDown size={16} />
+                              </div>
+                          </div>
 
                           {formData.freqType === 'specific_days' && (
                               <div className="flex flex-wrap gap-2">
@@ -1492,6 +1602,36 @@ export default function HabitApp({ user }) {
                             )}
                       </div>
 
+                      {/* --- THÊM MỚI: INPUT NGÀY BẮT ĐẦU / KẾT THÚC --- */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mt-4">
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
+                            <CalendarDays size={12}/> Thời gian áp dụng (Tùy chọn)
+                          </label>
+                          <div className="flex gap-3">
+                              <div className="flex-1">
+                                <span className="text-[10px] text-gray-400 font-bold uppercase mb-1 block">Ngày bắt đầu</span>
+                                <input 
+                                  type="date" 
+                                  className="w-full p-2.5 border border-slate-200 rounded-lg font-bold bg-white text-sm outline-none focus:border-blue-500"
+                                  value={formData.startDate} 
+                                  onChange={e => setFormData({...formData, startDate: e.target.value})} 
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <span className="text-[10px] text-gray-400 font-bold uppercase mb-1 block">Ngày kết thúc</span>
+                                <input 
+                                  type="date" 
+                                  className="w-full p-2.5 border border-slate-200 rounded-lg font-bold bg-white text-sm outline-none focus:border-blue-500"
+                                  value={formData.endDate} 
+                                  onChange={e => setFormData({...formData, endDate: e.target.value})} 
+                                />
+                              </div>
+                          </div>
+                          <p className="text-[10px] text-gray-400 mt-2 font-medium italic">
+                            * Để trống nếu muốn áp dụng thói quen này vô thời hạn.
+                          </p>
+                      </div>
+
                       {/* 4. CHỌN MÀU SẮC (NEW) */}
                       <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Màu đại diện</label>
@@ -1541,7 +1681,7 @@ export default function HabitApp({ user }) {
                           </div>
 
                           <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Giờ nhắc</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Giờ bắt đầu</label>
                             <input 
                               type="time" 
                               className="h-[52px] w-full px-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-white" 
@@ -1594,21 +1734,25 @@ export default function HabitApp({ user }) {
                             {/* 1. CHỌN LOẠI MỤC TIÊU */}
                             <div>
                               <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Loại mục tiêu</label>
-                              <select 
-                                className="w-full p-2.5 border border-slate-200 rounded-lg font-bold bg-white outline-none focus:border-indigo-500 text-sm"
-                                value={goalFormData.type} 
-                                onChange={e => {
-                                  // Khi đổi loại, tự động tính lại deadline mặc định cho loại đó
-                                  const newType = e.target.value;
-                                  const curDate = new Date();
-                                  const newDeadline = getDeadlineDate(newType, curDate.getFullYear(), newType === 'quarter' ? Math.ceil((curDate.getMonth()+1)/3) : curDate.getMonth() + 1);
-                                  setGoalFormData({...goalFormData, type: newType, deadline: newDeadline});
-                                }}
-                              >
-                                  <option value="month">Theo Tháng</option>
-                                  <option value="quarter">Theo Quý</option>
-                                  <option value="year">Theo Năm</option>
-                              </select>
+                              <div className="relative">
+                                  <select 
+                                    className="w-full p-2.5 pr-8 border border-slate-200 rounded-lg font-bold bg-white outline-none focus:border-indigo-500 text-sm appearance-none"
+                                    value={goalFormData.type} 
+                                    onChange={e => {
+                                      const newType = e.target.value;
+                                      const curDate = new Date();
+                                      const newDeadline = getDeadlineDate(newType, curDate.getFullYear(), newType === 'quarter' ? Math.ceil((curDate.getMonth()+1)/3) : curDate.getMonth() + 1);
+                                      setGoalFormData({...goalFormData, type: newType, deadline: newDeadline});
+                                    }}
+                                  >
+                                      <option value="month">Theo Tháng</option>
+                                      <option value="quarter">Theo Quý</option>
+                                      <option value="year">Theo Năm</option>
+                                  </select>
+                                  <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                      <ChevronDown size={14} />
+                                  </div>
+                              </div>
                             </div>
 
                             {/* 2. CHỌN THỜI GIAN (DYNAMIC INPUT) */}
@@ -1626,18 +1770,22 @@ export default function HabitApp({ user }) {
 
                                     // Render YEAR Select (Luôn hiển thị)
                                     const YearSelect = (
-                                      <select 
-                                        className="w-full p-2.5 border border-slate-200 rounded-lg font-bold bg-white outline-none focus:border-indigo-500 text-sm"
-                                        value={curYear}
-                                        onChange={(e) => {
-                                            const y = parseInt(e.target.value);
-                                            // Giữ nguyên tháng/quý, chỉ đổi năm
-                                            const val = goalFormData.type === 'quarter' ? curQuarter : curMonth;
-                                            setGoalFormData({...goalFormData, deadline: getDeadlineDate(goalFormData.type, y, val)});
-                                        }}
-                                      >
-                                        {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => <option key={y} value={y}>{y}</option>)}
-                                      </select>
+                                      <div className="relative w-full">
+                                          <select 
+                                            className="w-full p-2.5 pr-8 border border-slate-200 rounded-lg font-bold bg-white outline-none focus:border-indigo-500 text-sm appearance-none"
+                                            value={curYear}
+                                            onChange={(e) => {
+                                                const y = parseInt(e.target.value);
+                                                const val = goalFormData.type === 'quarter' ? curQuarter : curMonth;
+                                                setGoalFormData({...goalFormData, deadline: getDeadlineDate(goalFormData.type, y, val)});
+                                            }}
+                                          >
+                                            {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => <option key={y} value={y}>{y}</option>)}
+                                          </select>
+                                          <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                              <ChevronDown size={14} />
+                                          </div>
+                                      </div>
                                     );
 
                                     if (goalFormData.type === 'year') {
@@ -1647,16 +1795,21 @@ export default function HabitApp({ user }) {
                                     if (goalFormData.type === 'quarter') {
                                       return (
                                         <>
-                                          <select 
-                                              className="w-full p-2.5 border border-slate-200 rounded-lg font-bold bg-white outline-none focus:border-indigo-500 text-sm"
-                                              value={curQuarter}
-                                              onChange={(e) => {
-                                                const q = parseInt(e.target.value);
-                                                setGoalFormData({...goalFormData, deadline: getDeadlineDate('quarter', curYear, q)});
-                                              }}
-                                          >
-                                              {[1, 2, 3, 4].map(q => <option key={q} value={q}>Quý {q}</option>)}
-                                          </select>
+                                          <div className="relative w-full">
+                                              <select 
+                                                  className="w-full p-2.5 pr-8 border border-slate-200 rounded-lg font-bold bg-white outline-none focus:border-indigo-500 text-sm appearance-none"
+                                                  value={curQuarter}
+                                                  onChange={(e) => {
+                                                    const q = parseInt(e.target.value);
+                                                    setGoalFormData({...goalFormData, deadline: getDeadlineDate('quarter', curYear, q)});
+                                                  }}
+                                              >
+                                                  {[1, 2, 3, 4].map(q => <option key={q} value={q}>Quý {q}</option>)}
+                                              </select>
+                                              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                                  <ChevronDown size={14} />
+                                              </div>
+                                          </div>
                                           {YearSelect}
                                         </>
                                       );
@@ -1665,16 +1818,21 @@ export default function HabitApp({ user }) {
                                     if (goalFormData.type === 'month') {
                                       return (
                                         <>
-                                          <select 
-                                              className="w-full p-2.5 border border-slate-200 rounded-lg font-bold bg-white outline-none focus:border-indigo-500 text-sm"
-                                              value={curMonth}
-                                              onChange={(e) => {
-                                                const m = parseInt(e.target.value);
-                                                setGoalFormData({...goalFormData, deadline: getDeadlineDate('month', curYear, m)});
-                                              }}
-                                          >
-                                              {Array.from({length: 12}, (_, i) => i + 1).map(m => <option key={m} value={m}>Tháng {m}</option>)}
-                                          </select>
+                                          <div className="relative w-full">
+                                              <select 
+                                                  className="w-full p-2.5 pr-8 border border-slate-200 rounded-lg font-bold bg-white outline-none focus:border-indigo-500 text-sm appearance-none"
+                                                  value={curMonth}
+                                                  onChange={(e) => {
+                                                    const m = parseInt(e.target.value);
+                                                    setGoalFormData({...goalFormData, deadline: getDeadlineDate('month', curYear, m)});
+                                                  }}
+                                              >
+                                                  {Array.from({length: 12}, (_, i) => i + 1).map(m => <option key={m} value={m}>Tháng {m}</option>)}
+                                              </select>
+                                              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                                  <ChevronDown size={14} />
+                                              </div>
+                                          </div>
                                           {YearSelect}
                                         </>
                                       );
@@ -1705,15 +1863,20 @@ export default function HabitApp({ user }) {
                             </div>
                             <div className="w-24">
                                 <span className="text-[10px] text-gray-400 font-bold uppercase mb-1 block">Đơn vị</span>
-                                <select 
-                                  className="w-full p-2 border border-slate-200 rounded-lg font-bold text-center bg-white outline-none focus:border-indigo-500"
-                                  value={goalFormData.unit} 
-                                  onChange={e => setGoalFormData({...goalFormData, unit: e.target.value})}
-                                >
-                                  {GOAL_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-                                  <option value="đ">VND</option>
-                                  <option value="$">USD</option>
-                                </select>
+                                <div className="relative">
+                                    <select 
+                                      className="w-full p-2 pr-6 border border-slate-200 rounded-lg font-bold text-center bg-white outline-none focus:border-indigo-500 appearance-none text-sm"
+                                      value={goalFormData.unit} 
+                                      onChange={e => setGoalFormData({...goalFormData, unit: e.target.value})}
+                                    >
+                                      {GOAL_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                                      <option value="đ">VND</option>
+                                      <option value="$">USD</option>
+                                    </select>
+                                    <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                        <ChevronDown size={12} />
+                                    </div>
+                                </div>
                             </div>
                           </div>
                       </div>
