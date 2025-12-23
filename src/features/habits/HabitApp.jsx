@@ -1602,26 +1602,28 @@ export default function HabitApp({ user }) {
                             )}
                       </div>
 
-                      {/* --- THÊM MỚI: INPUT NGÀY BẮT ĐẦU / KẾT THÚC --- */}
+                      {/* --- 1. KHỐI NGÀY BẮT ĐẦU / KẾT THÚC (TĂNG GAP ĐỂ THOÁNG HƠN) --- */}
                       <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mt-4">
                           <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
                             <CalendarDays size={12}/> Thời gian áp dụng (Tùy chọn)
                           </label>
-                          <div className="flex gap-3">
-                              <div className="flex-1">
+                          
+                          {/* SỬA LẠI: Tăng gap-3 lên gap-5 để 2 ô input cách xa nhau hơn, nhìn ngắn gọn hơn */}
+                          <div className="grid grid-cols-2 gap-5">
+                              <div>
                                 <span className="text-[10px] text-gray-400 font-bold uppercase mb-1 block">Ngày bắt đầu</span>
                                 <input 
                                   type="date" 
-                                  className="w-full p-2.5 border border-slate-200 rounded-lg font-bold bg-white text-sm outline-none focus:border-blue-500"
+                                  className="w-full p-2.5 border border-slate-200 rounded-lg font-bold bg-white text-sm outline-none focus:border-blue-500 shadow-sm"
                                   value={formData.startDate} 
                                   onChange={e => setFormData({...formData, startDate: e.target.value})} 
                                 />
                               </div>
-                              <div className="flex-1">
+                              <div>
                                 <span className="text-[10px] text-gray-400 font-bold uppercase mb-1 block">Ngày kết thúc</span>
                                 <input 
                                   type="date" 
-                                  className="w-full p-2.5 border border-slate-200 rounded-lg font-bold bg-white text-sm outline-none focus:border-blue-500"
+                                  className="w-full p-2.5 border border-slate-200 rounded-lg font-bold bg-white text-sm outline-none focus:border-blue-500 shadow-sm"
                                   value={formData.endDate} 
                                   onChange={e => setFormData({...formData, endDate: e.target.value})} 
                                 />
@@ -1632,8 +1634,8 @@ export default function HabitApp({ user }) {
                           </p>
                       </div>
 
-                      {/* 4. CHỌN MÀU SẮC (NEW) */}
-                      <div>
+                      {/* 2. CHỌN MÀU SẮC (Giữ nguyên) */}
+                      <div className="mt-5">
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Màu đại diện</label>
                         <div className="flex flex-wrap gap-3">
                           {PRESET_COLORS.map((color) => (
@@ -1648,20 +1650,20 @@ export default function HabitApp({ user }) {
                         </div>
                       </div>
 
-                      {/* 5. ICON & GIỜ NHẮC (NEW LAYOUT) */}
-                      <div className="grid grid-cols-2 gap-4">
-                          <div className="relative">
+                      {/* --- 3. KHỐI ICON & GIỜ NHẮC (TĂNG GAP ĐỂ CÂN ĐỐI) --- */}
+                      {/* SỬA LẠI: gap-5 để tách biệt Icon và Input giờ, giúp Input giờ không bị quá dài */}
+                      <div className="mt-5 flex items-end gap-5">
+                          {/* Nút Icon: Vuông vức, gọn gàng */}
+                          <div className="shrink-0 relative">
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Icon</label>
                             <button
                               type="button"
                               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                              className="h-[52px] w-full px-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold text-left flex items-center gap-2 hover:bg-slate-50 transition-colors bg-white overflow-hidden"
+                              className="h-[52px] w-[52px] border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold flex items-center justify-center hover:bg-slate-50 transition-colors bg-white shadow-sm"
                             >
-                              <span className="text-2xl flex-shrink-0">{formData.icon || '🎯'}</span>
-                              <span className="text-gray-400 text-sm font-normal truncate">
-                                {formData.icon ? 'Đổi Icon' : 'Chọn Icon'}
-                              </span>
+                              <span className="text-2xl">{formData.icon || '🎯'}</span>
                             </button>
+                            
                             {showEmojiPicker && (
                               <div className="absolute z-50 mt-2 bottom-full left-0 mb-2 shadow-2xl rounded-2xl">
                                 <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)}></div>
@@ -1680,11 +1682,12 @@ export default function HabitApp({ user }) {
                             )}
                           </div>
 
-                          <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Giờ bắt đầu</label>
+                          {/* Input Giờ: Tự co giãn (flex-1) nhưng bị giới hạn bởi gap lớn hơn */}
+                          <div className="flex-1">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Giờ nhắc</label>
                             <input 
                               type="time" 
-                              className="h-[52px] w-full px-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-white" 
+                              className="h-[52px] w-full px-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold bg-white text-gray-800 shadow-sm" 
                               value={formData.time} 
                               onChange={e => setFormData({...formData, time: e.target.value})} 
                             />
