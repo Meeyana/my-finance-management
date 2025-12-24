@@ -2563,12 +2563,20 @@ export default function FinanceApp({ user }) {
       </aside>
 
       <main className="flex-1 overflow-y-auto relative scroll-smooth bg-slate-50 w-full">
-        <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-30 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
-          <div className="flex items-center gap-4 w-full sm:w-auto">{(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}</div>
-          {activeTab !== 'debt' && activeTab !== 'loans' &&(
-            <button onClick={() => { setEditingTransaction(null); setShowAddModal(true); }} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
-          )}
-        </header>
+          {activeTab !== 'debt' && activeTab !== 'loans' && (
+          <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-30 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
+            <div className="flex items-center gap-4 w-full sm:w-auto">
+              {(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}
+            </div>
+            
+            <button 
+              onClick={() => { setEditingTransaction(null); setShowAddModal(true); }} 
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"
+            >
+              <PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span>
+            </button>
+          </header>
+        )}
 
         <div className="p-4 sm:p-8 max-w-[1600px] mx-auto pb-32">
           {isLoading ? (
