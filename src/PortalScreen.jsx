@@ -61,7 +61,7 @@ export default function PortalScreen({ user }) {
              </div>
              <div className="relative z-10">
                <h2 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-orange-600 transition-colors">Habit Tracker</h2>
-               <p className="text-gray-500 leading-relaxed">Xây dựng thói quen tích cực, theo dõi chuỗi (streak) và kỷ luật bản thân.</p>
+               <p className="text-gray-500 leading-relaxed">Xây dựng thói quen tích cực và kỷ luật bản thân.</p>
              </div>
              <div className="absolute top-0 right-0 w-64 h-64 bg-orange-50 rounded-full blur-3xl -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
              <div className="absolute bottom-8 right-8 text-gray-300 group-hover:text-orange-500 group-hover:translate-x-1 transition-all">

@@ -11,7 +11,7 @@ import {
   Heart, Star, Gift, Music, Briefcase, Plane, Gamepad2, GraduationCap,
   Baby, Dog, Car, Zap, Wifi, Phone, Dumbbell,
   Eye, EyeOff, Bell, BellOff, LogOut, Lock, User, Globe, Plus, DollarSign, Calculator,
-  ClipboardList, ArrowLeft, Filter
+  ClipboardList, ArrowLeft, Filter, HandCoins, CalendarDays, CheckCircle
 } from 'lucide-react';
 
 // FIREBASE IMPORTS
@@ -555,8 +555,9 @@ const BudgetContent = ({
 
   return (
     <div className="space-y-8 animate-fade-in pb-24">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div><h3 className="text-2xl font-bold text-gray-800">Cài đặt hạn mức chi tiêu</h3><p className="text-gray-500">Đặt giới hạn cho từng danh mục để nhận cảnh báo khi vượt quá</p></div>
+      <div className="flex flex-col md:flex-row items-center justify-between gap-2">
+          <div><h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Settings size={24} className="text-gray-400"/> Cài đặt hạn mức chi tiêu</h3>
+          <p className="text-gray-500">Đặt giới hạn cho từng danh mục để nhận cảnh báo khi vượt quá</p></div>
           <button 
             onClick={() => saveBudgetsToDb(budgets)} 
             className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl sm:hover:bg-black font-bold shadow-lg transition-all active:scale-95 active:bg-black w-full md:w-auto justify-center"
@@ -776,7 +777,7 @@ const RecurringContent = ({
     <div className="space-y-6 animate-fade-in pb-24">
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2">Chi tiêu cố định <Repeat size={24} className="text-blue-500"/></h3>
+          <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Repeat size={24} className="text-gray-500"/>Chi tiêu cố định</h3>
           <p className="text-gray-500">Tự động tạo giao dịch cho các khoản chi hàng tháng</p>
         </div>
         <button 
@@ -1302,6 +1303,318 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
   );
 };
 
+// --- COMPONENT: LOAN CONTENT (NEW FEATURE) ---
+// --- COMPONENT: LOAN CONTENT (UPDATED UI & ALERTS) ---
+const LoanContent = ({ 
+  loans, addLoan, updateLoan, deleteLoan, formatCurrency 
+}) => {
+  const [showModal, setShowModal] = useState(false);
+  const [filterType, setFilterType] = useState('all'); // all, lent, borrowed
+  const [editingLoan, setEditingLoan] = useState(null);
+  const [formData, setFormData] = useState({
+    type: 'lent', // lent (cho vay), borrowed (đi vay)
+    person: '',
+    amount: '',
+    startDate: new Date().toISOString().split('T')[0],
+    dueDate: '',
+    note: '',
+    status: 'pending' // pending, completed
+  });
+
+  const resetForm = () => {
+    setFormData({
+      type: 'lent', person: '', amount: '',
+      startDate: new Date().toISOString().split('T')[0],
+      dueDate: '', note: '', status: 'pending'
+    });
+    setEditingLoan(null);
+  };
+
+  const handleEdit = (loan) => {
+    setEditingLoan(loan);
+    setFormData({
+      type: loan.type, person: loan.person, amount: loan.amount,
+      startDate: loan.startDate, dueDate: loan.dueDate || '',
+      note: loan.note || '', status: loan.status
+    });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.person || !formData.amount) return;
+
+    const payload = { ...formData, amount: Number(formData.amount) };
+    
+    if (editingLoan) {
+      await updateLoan(editingLoan.id, payload);
+    } else {
+      await addLoan(payload);
+    }
+    setShowModal(false);
+    resetForm();
+  };
+
+  // --- LOGIC TÍNH TOÁN & CẢNH BÁO ---
+  const { stats, sortedLoans, alerts } = useMemo(() => {
+    const pendingLoans = loans.filter(l => l.status === 'pending');
+    const totalLent = pendingLoans.filter(l => l.type === 'lent').reduce((sum, l) => sum + l.amount, 0);
+    const totalBorrowed = pendingLoans.filter(l => l.type === 'borrowed').reduce((sum, l) => sum + l.amount, 0);
+    
+    // Xử lý danh sách hiển thị
+    const filtered = loans.filter(l => {
+      if (filterType === 'all') return true;
+      return l.type === filterType;
+    }).sort((a, b) => {
+       if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
+       return new Date(b.startDate) - new Date(a.startDate);
+    });
+
+    // Xử lý cảnh báo (Alerts)
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const generatedAlerts = [];
+
+    pendingLoans.forEach(loan => {
+      if (!loan.dueDate) return;
+      const due = new Date(loan.dueDate);
+      due.setHours(0,0,0,0);
+      
+      const diffTime = due - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Số ngày còn lại
+
+      // Logic màu sắc: <= 3 ngày hoặc quá hạn là ĐỎ, <= 7 ngày là VÀNG
+      if (diffDays <= 3) {
+        generatedAlerts.push({
+          id: loan.id,
+          type: 'danger', // Đỏ
+          loanType: loan.type,
+          person: loan.person,
+          days: diffDays,
+          amount: loan.amount
+        });
+      } else if (diffDays <= 7) {
+        generatedAlerts.push({
+          id: loan.id,
+          type: 'warning', // Vàng
+          loanType: loan.type,
+          person: loan.person,
+          days: diffDays,
+          amount: loan.amount
+        });
+      }
+    });
+
+    return { 
+      stats: { totalLent, totalBorrowed }, 
+      sortedLoans: filtered,
+      alerts: generatedAlerts
+    };
+  }, [loans, filterType]);
+
+  const isOverdue = (dueDate) => {
+    if (!dueDate) return false;
+    return new Date(dueDate) < new Date().setHours(0,0,0,0);
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in pb-24">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+          <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <HandCoins size={24} className="text-gray-400"/>Sổ Nợ & Cho Vay
+          </h3>        
+          <p className="text-gray-500">Quản lý các khoản vay mượn và nhắc hạn trả nợ</p>
+        </div>
+        <button 
+          onClick={() => { resetForm(); setShowModal(true); }} 
+          className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl sm:hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-200 transition-all active:scale-95 w-full md:w-auto justify-center"
+        >
+          <PlusCircle size={18} /> Thêm khoản mới
+        </button>
+      </div>
+
+      {/* --- PHẦN THÔNG BÁO (ALERTS) MỚI --- */}
+      {alerts.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 animate-fade-in">
+          {alerts.map((alert) => {
+            const isDanger = alert.type === 'danger';
+            const actionText = alert.loanType === 'lent' ? 'thu hồi từ' : 'trả cho';
+            let timeText = '';
+            
+            if (alert.days < 0) timeText = `Đã quá hạn ${Math.abs(alert.days)} ngày`;
+            else if (alert.days === 0) timeText = `Hạn chót là hôm nay`;
+            else timeText = `Còn ${alert.days} ngày nữa đến hạn`;
+
+            return (
+              <div key={alert.id} className={`p-4 rounded-xl border-l-4 shadow-sm flex items-start gap-3 ${isDanger ? 'bg-red-50 border-red-500 text-red-800' : 'bg-yellow-50 border-yellow-500 text-yellow-800'}`}>
+                {isDanger ? <AlertCircle size={20} className="shrink-0 mt-0.5" /> : <AlertTriangle size={20} className="shrink-0 mt-0.5" />}
+                <div className="flex-1">
+                  <p className="font-bold text-sm">
+                    {isDanger ? 'Cảnh báo hạn nợ!' : 'Sắp đến hạn'}
+                  </p>
+                  <p className="text-xs mt-1">
+                    Bạn cần {actionText} <strong>{alert.person}</strong> số tiền <strong>{formatCurrency(alert.amount)}</strong>.
+                  </p>
+                  <p className={`text-xs font-bold mt-1 ${isDanger ? 'text-red-600' : 'text-yellow-700'}`}>
+                    {timeText}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+         <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg border-none">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-green-100 text-sm font-medium uppercase tracking-wider">Bạn đang cho vay</p>
+                <h3 className="text-3xl font-bold mt-2">{formatCurrency(stats.totalLent)}</h3>
+              </div>
+              <div className="p-2 bg-white/20 rounded-lg"><ArrowUpRight size={24}/></div>
+            </div>
+         </Card>
+         <Card className="bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg border-none">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-orange-100 text-sm font-medium uppercase tracking-wider">Bạn đang nợ</p>
+                <h3 className="text-3xl font-bold mt-2">{formatCurrency(stats.totalBorrowed)}</h3>
+              </div>
+              <div className="p-2 bg-white/20 rounded-lg"><ArrowDownRight size={24}/></div>
+            </div>
+         </Card>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-2 bg-white p-1.5 rounded-xl border border-slate-100 w-fit">
+         {['all', 'lent', 'borrowed'].map(type => (
+           <button
+             key={type}
+             onClick={() => setFilterType(type)}
+             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === type ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-slate-50'}`}
+           >
+             {type === 'all' ? 'Tất cả' : type === 'lent' ? 'Cho vay' : 'Đi vay'}
+           </button>
+         ))}
+      </div>
+
+      {/* List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {sortedLoans.map(item => {
+           const overdue = item.status === 'pending' && isOverdue(item.dueDate);
+           return (
+             <div key={item.id} className={`bg-white rounded-2xl p-5 border shadow-sm transition-all relative group overflow-hidden ${item.status === 'completed' ? 'border-slate-100 opacity-60 grayscale-[0.5]' : overdue ? 'border-red-200 ring-1 ring-red-100' : 'border-slate-100 hover:border-indigo-100 hover:shadow-md'}`}>
+                {item.status === 'completed' && <div className="absolute inset-0 bg-slate-50/10 z-10 pointer-events-none flex items-center justify-center"><div className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold text-sm transform -rotate-12 border border-green-200 shadow-sm">Đã hoàn thành</div></div>}
+                
+                <div className="flex justify-between items-start mb-3 relative z-20">
+                   <div className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase ${item.type === 'lent' ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>
+                     {item.type === 'lent' ? 'Cho vay' : 'Đi vay'}
+                   </div>
+                   <div className="flex gap-1">
+                      {item.status === 'pending' && (
+                        <button onClick={() => updateLoan(item.id, { status: 'completed' })} className="p-2 rounded-full text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors" title="Đánh dấu đã xong"><CheckCircle2 size={18}/></button>
+                      )}
+                      <button onClick={() => handleEdit(item)} className="p-2 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={18}/></button>
+                      <button onClick={() => deleteLoan(item.id)} className="p-2 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={18}/></button>
+                   </div>
+                </div>
+
+                <div className="mb-4 relative z-20">
+                  <h4 className="text-lg font-bold text-gray-800">{item.person}</h4>
+                  <p className={`text-2xl font-bold mt-1 ${item.type === 'lent' ? 'text-green-600' : 'text-orange-600'}`}>{formatCurrency(item.amount)}</p>
+                  {item.note && <p className="text-sm text-gray-500 mt-2 line-clamp-2">{item.note}</p>}
+                </div>
+
+                <div className="pt-3 border-t border-slate-50 flex flex-col gap-2 relative z-20">
+                   <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                     <Calendar size={14} className="text-gray-400" /> Ngày tạo: {new Date(item.startDate).toLocaleDateString('vi-VN')}
+                   </div>
+                   {item.dueDate && (
+                     <div className={`flex items-center gap-2 text-xs font-bold ${overdue ? 'text-red-600' : 'text-indigo-600'}`}>
+                       <CalendarClock size={14} /> Hạn trả: {new Date(item.dueDate).toLocaleDateString('vi-VN')}
+                       {overdue && <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[10px]">Quá hạn</span>}
+                     </div>
+                   )}
+                </div>
+             </div>
+           );
+        })}
+        {sortedLoans.length === 0 && (
+          <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+             <HandCoins size={48} className="mb-4 opacity-20" />
+             <p>Chưa có khoản vay/mượn nào.</p>
+          </div>
+        )}
+      </div>
+
+      {/* MODAL */}
+      {showModal && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
+             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="text-lg font-bold text-gray-800">{editingLoan ? 'Cập nhật khoản vay' : 'Thêm khoản vay/mượn mới'}</h3>
+                <button onClick={() => setShowModal(false)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18}/></button>
+             </div>
+             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                  <button type="button" onClick={() => setFormData({...formData, type: 'lent'})} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${formData.type === 'lent' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Cho vay (Phải thu)</button>
+                  <button type="button" onClick={() => setFormData({...formData, type: 'borrowed'})} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${formData.type === 'borrowed' ? 'bg-white text-orange-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Đi vay (Phải trả)</button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="col-span-2">
+                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{formData.type === 'lent' ? 'Người vay' : 'Chủ nợ'}</label>
+                     <input required autoFocus type="text" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 font-medium" placeholder="Nhập tên..." value={formData.person} onChange={e => setFormData({...formData, person: e.target.value})} />
+                   </div>
+                   <div className="col-span-2">
+                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số tiền</label>
+                     <input required type="number" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-lg font-bold" placeholder="0" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+                   </div>
+                   <div>
+                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày bắt đầu</label>
+                     <input required type="date" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm font-medium" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+                   </div>
+                   <div>
+                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hạn trả (Tuỳ chọn)</label>
+                     <input type="date" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm font-medium" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} />
+                   </div>
+                   <div className="col-span-2">
+                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ghi chú</label>
+                     <textarea className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm" rows="2" placeholder="Nội dung chi tiết..." value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})}></textarea>
+                   </div>
+                </div>
+
+                {/* --- UI TRẠNG THÁI MỚI: RÕ RÀNG HƠN --- */}
+                {editingLoan && (
+                   <div 
+                     onClick={() => setFormData({...formData, status: formData.status === 'completed' ? 'pending' : 'completed'})}
+                     className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex items-center gap-3 select-none ${formData.status === 'completed' ? 'bg-green-50 border-green-500 text-green-700' : 'bg-slate-50 border-slate-200 text-gray-500 hover:bg-slate-100'}`}
+                   >
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${formData.status === 'completed' ? 'border-green-600 bg-green-600 text-white' : 'border-gray-400 bg-white'}`}>
+                        {formData.status === 'completed' && <CheckCircle2 size={16} />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-bold text-sm">{formData.status === 'completed' ? 'Đã thanh toán xong' : 'Đánh dấu đã xong'}</p>
+                        <p className="text-xs opacity-80">{formData.status === 'completed' ? 'Khoản này đã được quyết toán' : 'Khoản này vẫn đang hiệu lực'}</p>
+                      </div>
+                   </div>
+                )}
+
+                <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 mt-2">
+                  {editingLoan ? 'Cập nhật' : 'Lưu khoản nợ'}
+                </button>
+             </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- MAIN APP ---
 export default function FinanceApp({ user }) {
   const navigate = useNavigate();
@@ -1318,7 +1631,8 @@ export default function FinanceApp({ user }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState(null); 
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [loans, setLoans] = useState([]);
   //const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // --- FILTER STATE ---
@@ -1353,6 +1667,19 @@ export default function FinanceApp({ user }) {
 
     const paths = getFirestorePaths(user);
     if (!paths) { setIsLoading(false); return; }
+
+    try {
+      const parentPath = paths.transactions.parent;
+      if (parentPath) {
+        const loansRef = collection(parentPath, 'loans');
+        onSnapshot(loansRef, (snapshot) => {
+           const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+           setLoans(data);
+        });
+      }
+    } catch (err) {
+      console.warn("Error fetching loans:", err);
+    }
 
     // --- SAFETY TIMEOUT (Phòng hờ treo mạng) ---
     const safetyTimer = setTimeout(() => {
@@ -1643,6 +1970,30 @@ export default function FinanceApp({ user }) {
     const paths = getFirestorePaths(user);
     await setDoc(paths.budgetConfig, newBudgets);
     showSuccess("Đã cập nhật hạn mức danh mục thành công!");
+  };
+
+  const addLoan = async (loanData) => {
+    if (!user) return;
+    const paths = getFirestorePaths(user);
+    // Tự dựng path loans tương tự bước listener
+    const loansRef = collection(paths.transactions.parent, 'loans');
+    await addDoc(loansRef, { ...loanData, createdAt: serverTimestamp() });
+    showSuccess("Đã thêm khoản nợ mới!");
+  };
+
+  const updateLoan = async (id, updatedData) => {
+    if (!user) return;
+    const paths = getFirestorePaths(user);
+    const loansRef = collection(paths.transactions.parent, 'loans');
+    await updateDoc(doc(loansRef, id), updatedData);
+    showSuccess("Đã cập nhật!");
+  };
+
+  const deleteLoan = async (id) => {
+    if (!user || !confirm('Xóa khoản này?')) return;
+    const paths = getFirestorePaths(user);
+    const loansRef = collection(paths.transactions.parent, 'loans');
+    await deleteDoc(doc(loansRef, id));
   };
 
   const updateMonthlyIncome = async (amount) => {
@@ -2185,6 +2536,7 @@ export default function FinanceApp({ user }) {
           <SidebarItem id="budget" label="Cài đặt hạn mức" icon={Settings} active={activeTab === 'budget'} />
           <div className="pt-4 border-t border-slate-50 mt-4">
              <SidebarItem id="debt" label="Dư nợ" icon={ClipboardList} active={activeTab === 'debt'} />
+             <SidebarItem id="loans" label="Sổ nợ" icon={HandCoins} active={activeTab === 'loans'} />
           </div>
         </nav>
 
@@ -2213,7 +2565,7 @@ export default function FinanceApp({ user }) {
       <main className="flex-1 overflow-y-auto relative scroll-smooth bg-slate-50 w-full">
         <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-30 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
           <div className="flex items-center gap-4 w-full sm:w-auto">{(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}</div>
-          {activeTab !== 'debt' && (
+          {activeTab !== 'debt' && activeTab !== 'loans' &&(
             <button onClick={() => { setEditingTransaction(null); setShowAddModal(true); }} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"><PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span></button>
           )}
         </header>
@@ -2270,6 +2622,15 @@ export default function FinanceApp({ user }) {
                   updateRecurringItem={updateRecurringItem}
                   deleteRecurringItem={deleteRecurringItem}
                   allCategories={allCategories}
+                />
+              )}
+              {activeTab === 'loans' && (
+                <LoanContent 
+                  loans={loans}
+                  addLoan={addLoan}
+                  updateLoan={updateLoan}
+                  deleteLoan={deleteLoan}
+                  formatCurrency={formatCurrency}
                 />
               )}
               {activeTab === 'debt' && (
