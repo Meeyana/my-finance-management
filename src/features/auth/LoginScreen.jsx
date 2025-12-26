@@ -2,19 +2,16 @@ import { useState } from 'react';
 import { Wallet, AlertCircle, User, Lock, Eye, EyeOff, ArrowUpRight } from 'lucide-react';
 import { 
   signInWithEmailAndPassword, 
-  // signInAnonymously, // Không dùng nữa
-  // signInWithCustomToken // Không dùng nữa
+  createUserWithEmailAndPassword // Import thêm để tự tạo demo user
 } from 'firebase/auth';
 
-// 1. IMPORT QUAN TRỌNG
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'; 
 import { auth, db } from '../../lib/firebase'; 
 
-// --- CẤU HÌNH TÀI KHOẢN DEMO CỐ ĐỊNH ---
-// Bạn có thể đưa vào .env nếu muốn bảo mật hơn, nhưng với demo public thì để đây cũng được
+// CẤU HÌNH TÀI KHOẢN DEMO
 const DEMO_CREDENTIALS = {
-  email: 'demo@quanlychitieu.com', // Thay bằng email bạn đã tạo ở Bước 1
-  password: 'demo@quanlychitieu.com'            // Thay bằng password bạn đã tạo ở Bước 1
+  email: 'demo@quanlychitieu.com', 
+  password: 'demo@quanlychitieu.com'            
 };
 
 const LoginScreen = () => {
@@ -24,28 +21,30 @@ const LoginScreen = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // --- HÀM TẠO PROFILE (GIỮ NGUYÊN) ---
+  // --- HÀM TẠO PROFILE (Đã bỏ isDemoAccount) ---
   const createUserProfile = async (user) => {
-    console.log(">>> [DEBUG] 1. Bắt đầu kiểm tra profile cho UID:", user.uid);
+    console.log(">>> [DEBUG] Kiểm tra profile cho UID:", user.uid);
+    
     try {
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
-      
+
+      // Chỉ ghi nếu chưa có hoặc thiếu thông tin
       if (!userSnap.exists() || !userSnap.data().createdAt) {
-          console.log(">>> [DEBUG] 3. Document chưa có. Đang ghi...");
+          console.log(">>> [DEBUG] Đang khởi tạo dữ liệu user mới...");
+          
           await setDoc(userRef, {
             uid: user.uid,
-            email: user.email || 'demo_user',
+            email: user.email || 'unknown',
             createdAt: serverTimestamp(),
-            isPremium: false,
-            isDemoAccount: true // Đánh dấu đây là tk demo nếu cần logic riêng sau này
+            isPremium: false 
+            // ĐÃ BỎ: isDemoAccount
           }, { merge: true });
-          console.log(">>> [DEBUG] 4. Đã ghi thành công!");
-      } else {
-          console.log(">>> [DEBUG] 3. Document đã có. Bỏ qua.");
+
+          console.log(">>> [DEBUG] Đã ghi profile thành công!");
       }
     } catch (error) {
-      console.error(">>> [DEBUG] LỖI GHI DB:", error);
+      console.error(">>> [DEBUG] Lỗi ghi DB:", error);
     }
   };
 
@@ -53,10 +52,9 @@ const LoginScreen = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log(">>> [DEBUG] Auth thành công:", userCredential.user.email);
       await createUserProfile(userCredential.user);
     } catch (err) {
       console.error(err);
@@ -65,34 +63,45 @@ const LoginScreen = () => {
     }
   };
 
-  // --- SỬA LẠI: DEMO LOGIN VÀO USER CỐ ĐỊNH ---
+  // --- HÀM DEMO THÔNG MINH (Tự đăng ký nếu chưa có) ---
   const handleDemoLogin = async () => {
     setLoading(true);
     setError('');
-    console.log(">>> [DEBUG] Bắt đầu đăng nhập Demo User cố định");
+    console.log(">>> [DEBUG] Bắt đầu Demo Login");
 
     try {
-      // Đăng nhập thẳng vào tài khoản Demo đã định nghĩa
-      const userCredential = await signInWithEmailAndPassword(
-        auth, 
-        DEMO_CREDENTIALS.email, 
-        DEMO_CREDENTIALS.password
-      );
+      let userCredential;
 
-      console.log(">>> [DEBUG] Demo Auth thành công. UID:", userCredential.user.uid);
+      try {
+        // 1. Thử đăng nhập trước
+        userCredential = await signInWithEmailAndPassword(
+          auth, 
+          DEMO_CREDENTIALS.email, 
+          DEMO_CREDENTIALS.password
+        );
+      } catch (authError) {
+        // 2. Nếu lỗi do chưa có tài khoản hoặc sai pass -> Tự động tạo mới
+        if (authError.code === 'auth/invalid-credential' || authError.code === 'auth/user-not-found') {
+          console.log(">>> [DEBUG] Tài khoản Demo chưa có, đang tạo mới...");
+          userCredential = await createUserWithEmailAndPassword(
+            auth,
+            DEMO_CREDENTIALS.email,
+            DEMO_CREDENTIALS.password
+          );
+        } else {
+          throw authError; // Lỗi khác thì ném ra ngoài
+        }
+      }
       
-      // QUAN TRỌNG: Gọi hàm tạo profile để đảm bảo Demo User có dữ liệu trong Firestore
-      // Vì giờ nó là user thật, nó cần document trong collection 'users'
-      await createUserProfile(userCredential.user);
+      // 3. Đảm bảo có profile trong DB
+      if (userCredential && userCredential.user) {
+         await createUserProfile(userCredential.user);
+      }
 
     } catch (err) {
-      console.error('Lỗi demo:', err);
-      // Xử lý lỗi sai pass hoặc chưa tạo user trên console
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        setError('Lỗi: Chưa tạo tài khoản Demo trên Firebase Console!');
-      } else {
-        setError(err.message);
-      }
+      console.error('Lỗi Demo:', err);
+      setError('Lỗi Demo: ' + err.message);
+    } finally {
       setLoading(false);
     }
   };
