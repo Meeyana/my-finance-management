@@ -13,6 +13,7 @@ import { signOut } from "firebase/auth";
 import { db, auth } from '../../lib/firebase';
 import { useNavigate } from 'react-router-dom';
 import EmojiPicker from 'emoji-picker-react';
+import { useTrial } from '../../hooks/useTrial';
 
 // --- CONSTANTS ---
 const GOAL_UNITS = [

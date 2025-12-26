@@ -30,8 +30,9 @@ import { auth, db, appId, getFirestorePaths } from '../../lib/firebase';
 import { formatCurrency, formatShortCurrency, getRandomColor } from '../../utils/format';
 import { Card, Badge } from '../../components/common/Card';
 import LoginScreen from '../auth/LoginScreen';
-import HabitTracker from '../habits/HabitTracker';
 import { useNavigate } from 'react-router-dom';
+import { useTrial } from '../../hooks/useTrial';
+import TrialLimitModal from '../../components/common/TrialLimitModal';
 
 // --- ICON LIBRARY ---
 const ICON_LIBRARY = {
@@ -62,7 +63,7 @@ const DashboardContent = React.memo(({
   totalSpent, monthlyIncome, updateMonthlyIncome, spendingDiff, totalIncurred, alerts, 
   spendingByCategory, currentChartData, chartMode, setChartMode, 
   chartCategoryFilter, setChartCategoryFilter, allCategories, categoryVisibility,
-  userName, isPublic
+  userName, isPublic, checkPermission
 }) => {
   const [showCharts, setShowCharts] = useState(false);
   const [showIncomeModal, setShowIncomeModal] = useState(false); 
@@ -208,7 +209,11 @@ const DashboardContent = React.memo(({
         </Card>
         
         {/* SCORECARD THU NHẬP */}
-        <Card className="cursor-pointer hover:shadow-md transition-all relative group" onClick={() => setShowIncomeModal(true)}>
+        <Card className="cursor-pointer hover:shadow-md transition-all relative group"
+            onClick={() => {
+              if (!checkPermission()) return;
+              setShowIncomeModal(true);
+            }}>
            <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium uppercase tracking-wider mb-1">Thu nhập tháng</p>
@@ -432,13 +437,14 @@ const DashboardContent = React.memo(({
           )}
         </div>
       </Card>
+  
     </div>
   );
 });
 
 // --- COMPONENT: TRANSACTION CONTENT ---
 const TransactionContent = ({ 
-  filtered, viewMonth, viewYear, search, setSearch, filterCategory, setFilterCategory, deleteTransaction, onEdit, allCategories
+  filtered, viewMonth, viewYear, search, setSearch, filterCategory, setFilterCategory, deleteTransaction, onEdit, allCategories, checkPermission
 }) => {
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -490,14 +496,20 @@ const TransactionContent = ({
                   <td className="px-2 py-3 sm:px-6 sm:py-4 text-center">
                     <div className="flex items-center justify-center gap-1">
                       <button 
-                        onClick={() => onEdit(tx)} 
+                        onClick={() => {
+                          if (!checkPermission()) return;
+                          onEdit(tx);
+                        }}
                         className="text-gray-300 sm:hover:text-blue-500 p-2 rounded-full sm:hover:bg-blue-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 active:scale-125 active:bg-blue-100 active:text-blue-600"
                         title="Chỉnh sửa"
                       >
                         <Edit size={16} />
                       </button>
                       <button 
-                        onClick={() => deleteTransaction(tx.id)} 
+                        onClick= {() => {
+                          if (!checkPermission()) return;
+                          deleteTransaction(tx.id);
+                        }}
                         className="text-gray-300 sm:hover:text-red-500 p-2 rounded-full sm:hover:bg-red-50 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 active:scale-125 active:bg-red-100 active:text-red-600"
                         title="Xóa"
                       >
@@ -522,7 +534,7 @@ const TransactionContent = ({
 const BudgetContent = ({ 
   budgets, setBudgets, saveBudgetsToDb, allCategories, onAddCategory, 
   categoryVisibility, toggleVisibility, 
-  categoryAlerts, toggleAlert, deleteCustomCategory, updateCategoryName
+  categoryAlerts, toggleAlert, deleteCustomCategory, updateCategoryName, checkPermission
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCat, setNewCat] = useState({ name: '', budget: '' });
@@ -559,7 +571,10 @@ const BudgetContent = ({
           <div><h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Settings size={24} className="text-gray-400"/> Cài đặt hạn mức chi tiêu</h3>
           <p className="text-gray-500">Đặt giới hạn cho từng danh mục để nhận cảnh báo khi vượt quá</p></div>
           <button 
-            onClick={() => saveBudgetsToDb(budgets)} 
+            onClick={() => {
+              if (!checkPermission()) return;
+              saveBudgetsToDb(budgets);
+            }}
             className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl sm:hover:bg-black font-bold shadow-lg transition-all active:scale-95 active:bg-black w-full md:w-auto justify-center"
           >
             <Save size={18} /> Lưu thay đổi
@@ -580,7 +595,10 @@ const BudgetContent = ({
   
         {/* Nút Edit */}
         <button 
-          onClick={() => handleEditClick(cat)}
+          onClick={() => {
+            if (!checkPermission()) return; // <--- BỌC LẠI
+            handleEditClick(cat);
+          }}
           className="w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-600 active:scale-90"
           title="Chỉnh sửa tên"
         >
@@ -590,7 +608,10 @@ const BudgetContent = ({
         {/* Nút Xóa (cho Custom Category) */}
         {isCustom && (
           <button 
-            onClick={() => deleteCustomCategory(cat.id)}
+            onClick={() => {
+              if (!checkPermission()) return; // <--- BỌC LẠI
+              deleteCustomCategory(cat.id);
+            }}
             className="w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 active:scale-90"
             title="Xóa danh mục"
           >
@@ -600,7 +621,10 @@ const BudgetContent = ({
 
         {/* Nút Alert */}
         <button 
-          onClick={() => toggleAlert(cat.id)}
+          onClick={() => {
+            if (!checkPermission()) return; // <--- BỌC LẠI
+            toggleAlert(cat.id);
+          }}
           className={`w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all active:scale-90 ${isAlertOn ? 'bg-white text-yellow-500 hover:bg-yellow-50 border border-yellow-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
           title={isAlertOn ? "Đang bật cảnh báo" : "Đã tắt cảnh báo"}
         >
@@ -609,7 +633,10 @@ const BudgetContent = ({
 
         {/* Nút Visibility */}
         <button 
-          onClick={() => toggleVisibility(cat.id)}
+          onClick={() => {
+            if (!checkPermission()) return; // <--- BỌC LẠI
+            toggleVisibility(cat.id);
+          }}
           className={`w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all active:scale-90 ${isVisible ? 'bg-white text-blue-600 hover:bg-blue-50 border border-blue-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
           title={isVisible ? "Đang hiển thị" : "Đã ẩn"}
         >
@@ -633,7 +660,11 @@ const BudgetContent = ({
         })}
         
         <button 
-          onClick={() => setShowAddModal(true)}
+          onClick={() => {
+            if (!checkPermission()) return;
+            setShowAddModal(true)
+            }
+          }
           className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-gray-400 sm:hover:text-blue-600 sm:hover:border-blue-300 sm:hover:bg-blue-50/50 transition-all min-h-[240px] group active:scale-[0.98]"
         >
           <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
@@ -709,7 +740,7 @@ const BudgetContent = ({
 
 // --- COMPONENT: RECURRING EXPENSES ---
 const RecurringContent = ({ 
-  recurringItems, addRecurringItem, updateRecurringItem, deleteRecurringItem, allCategories 
+  recurringItems, addRecurringItem, updateRecurringItem, deleteRecurringItem, allCategories, checkPermission
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null); 
@@ -781,7 +812,7 @@ const RecurringContent = ({
           <p className="text-gray-500">Tự động tạo giao dịch cho các khoản chi hàng tháng</p>
         </div>
         <button 
-          onClick={() => { resetForm(); setShowModal(true); }} 
+          onClick={() => { if (!checkPermission()) return; resetForm(); setShowModal(true); }} 
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl sm:hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 w-full md:w-auto justify-center"
         >
           <PlusCircle size={18} /> Thêm lịch chi tiêu
@@ -807,13 +838,19 @@ const RecurringContent = ({
                      <div className="w-16 h-1.5 rounded-full" style={{ backgroundColor: category?.color || '#999' }}></div>
                      <div className="flex gap-1 -mr-2 -mt-2">
                         <button 
-                          onClick={() => handleEdit(item)}
+                          onClick={() => {
+                            if (!checkPermission()) return; // <--- BỌC LẠI
+                            handleEdit(item);
+                          }}
                           className="text-gray-300 hover:text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
                         >
                           <Edit size={16} />
                         </button>
                         <button 
-                          onClick={() => deleteRecurringItem(item.id)}
+                          onClick={() => {
+                            if (!checkPermission()) return; // <--- BỌC LẠI
+                            deleteRecurringItem(item.id);
+                          }}
                           className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
                         >
                           <Trash2 size={16} />
@@ -848,7 +885,7 @@ const RecurringContent = ({
           <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
              <Repeat size={48} className="mb-4 opacity-20" />
              <p>Chưa có khoản chi cố định nào.</p>
-             <button onClick={() => { resetForm(); setShowModal(true); }} className="text-blue-600 font-bold hover:underline mt-2">Tạo ngay</button>
+             <button onClick={() => { if (!checkPermission()) return; resetForm(); setShowModal(true); }} className="text-blue-600 font-bold hover:underline mt-2">Tạo ngay</button>
           </div>
         )}
       </div>
@@ -956,7 +993,7 @@ const RecurringContent = ({
 };
 
 // --- NEW COMPONENT: DEBT AUDIT CONTENT ---
-const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
+const DebtAuditContent = ({ transactions, allMonthlyIncome}) => {
   const [startMonth, setStartMonth] = useState('');
   const [startYear, setStartYear] = useState('');
   const [endMonth, setEndMonth] = useState('');
@@ -1304,9 +1341,9 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
 };
 
 // --- COMPONENT: LOAN CONTENT (NEW FEATURE) ---
-// --- COMPONENT: LOAN CONTENT (UPDATED UI & ALERTS) ---
+// --- COMPONENT: LOAN CONTENT (UPDATED UI & ALERTS) ---  
 const LoanContent = ({ 
-  loans, addLoan, updateLoan, deleteLoan, formatCurrency 
+  loans, addLoan, updateLoan, deleteLoan, formatCurrency, checkPermission
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [filterType, setFilterType] = useState('all'); // all, lent, borrowed
@@ -1428,7 +1465,7 @@ const LoanContent = ({
           <p className="text-gray-500">Quản lý các khoản vay mượn và nhắc hạn trả nợ</p>
         </div>
         <button 
-          onClick={() => { resetForm(); setShowModal(true); }} 
+          onClick={() => { if (!checkPermission()) return; resetForm(); setShowModal(true); }} 
           className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl sm:hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-200 transition-all active:scale-95 w-full md:w-auto justify-center"
         >
           <PlusCircle size={18} /> Thêm khoản mới
@@ -1516,10 +1553,20 @@ const LoanContent = ({
                    </div>
                    <div className="flex gap-1">
                       {item.status === 'pending' && (
-                        <button onClick={() => updateLoan(item.id, { status: 'completed' })} className="p-2 rounded-full text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors" title="Đánh dấu đã xong"><CheckCircle2 size={18}/></button>
+                        <button onClick={() => {
+                          if (!checkPermission()) return; // <--- BỌC LẠI
+                          updateLoan(item.id, { status: 'completed' });
+                        }} 
+                        className="p-2 rounded-full text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors" title="Đánh dấu đã xong"><CheckCircle2 size={18}/></button>
                       )}
-                      <button onClick={() => handleEdit(item)} className="p-2 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={18}/></button>
-                      <button onClick={() => deleteLoan(item.id)} className="p-2 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={18}/></button>
+                      <button onClick={() => {
+                          if (!checkPermission()) return; // <--- BỌC LẠI
+                          handleEdit(item);
+                        }} className="p-2 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={18}/></button>
+                      <button onClick={() => {
+                        if (!checkPermission()) return; // <--- BỌC LẠI
+                        deleteLoan(item.id);
+                      }} className="p-2 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={18}/></button>
                    </div>
                 </div>
 
@@ -1634,6 +1681,29 @@ export default function FinanceApp({ user }) {
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [loans, setLoans] = useState([]);
   //const [isAuthChecking, setIsAuthChecking] = useState(true);
+
+  // 1. GỌI HOOK TRIAL
+  const { isReadOnly, daysLeft } = useTrial(user);
+  
+  // 2. STATE ĐIỀU KHIỂN MODAL
+  const [showTrialModal, setShowTrialModal] = useState(false);
+
+  // 3. HÀM CHECK QUYỀN (Dùng để bọc các hành động)
+  // Hàm này trả về TRUE nếu được phép, FALSE nếu bị chặn
+  const checkPermission = () => {
+    if (isReadOnly) {
+      setShowTrialModal(true); // Hiện popup đẹp thay vì alert
+      return false;
+    }
+    return true;
+  };
+
+  // Hàm xử lý khi bấm nút Nâng cấp trong Modal
+  const handleUpgrade = () => {
+    alert("Chuyển hướng đến cổng thanh toán...");
+    // Logic thanh toán của bạn ở đây
+    setShowTrialModal(false);
+  };
 
   // --- FILTER STATE ---
   const [viewMonth, setViewMonth] = useState(new Date().getMonth());
@@ -2563,6 +2633,22 @@ export default function FinanceApp({ user }) {
       </aside>
 
       <main className="flex-1 overflow-y-auto relative scroll-smooth bg-slate-50 w-full">
+
+          {/* --- BANNER DÙNG THỬ --- */}
+          {isReadOnly ? (
+            <div className="bg-red-600 text-white px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md z-50 sticky top-0">
+              <Lock size={16} />
+              HẾT HẠN DÙNG THỬ: Bạn đang ở chế độ CHỈ XEM. Dữ liệu vẫn an toàn.
+            </div>
+          ) : (
+            daysLeft !== null && daysLeft <= 3 && (
+              <div className="bg-orange-100 text-orange-800 px-4 py-1 text-xs font-bold text-center border-b border-orange-200">
+                Bạn còn {daysLeft} ngày dùng thử miễn phí.
+              </div>
+            )
+          )}
+          {/* ----------------------- */}
+
           {activeTab !== 'debt' && activeTab !== 'loans' && (
           <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-30 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
             <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -2570,7 +2656,11 @@ export default function FinanceApp({ user }) {
             </div>
             
             <button 
-              onClick={() => { setEditingTransaction(null); setShowAddModal(true); }} 
+              onClick={() => {
+                  if (!checkPermission()) return;
+                  setEditingTransaction(null); 
+                  setShowAddModal(true); 
+              }} 
               className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"
             >
               <PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span>
@@ -2598,6 +2688,7 @@ export default function FinanceApp({ user }) {
                   categoryVisibility={categoryVisibility} 
                   userName={userName}
                   isPublic={user.isAnonymous}
+                  checkPermission={checkPermission}
                 />
               )}
               {activeTab === 'transactions' && (
@@ -2607,6 +2698,7 @@ export default function FinanceApp({ user }) {
                   deleteTransaction={deleteTransaction}
                   onEdit={(tx) => { setEditingTransaction(tx); setShowAddModal(true); }}
                   allCategories={allCategories}
+                  checkPermission={checkPermission}
                 />
               )}
               {activeTab === 'budget' && (
@@ -2621,6 +2713,7 @@ export default function FinanceApp({ user }) {
                   toggleAlert={toggleAlert} 
                   deleteCustomCategory={deleteCustomCategory}
                   updateCategoryName={updateCategoryName}
+                  checkPermission={checkPermission}
                 />
               )}
               {activeTab === 'recurring' && (
@@ -2630,6 +2723,7 @@ export default function FinanceApp({ user }) {
                   updateRecurringItem={updateRecurringItem}
                   deleteRecurringItem={deleteRecurringItem}
                   allCategories={allCategories}
+                  checkPermission={checkPermission}
                 />
               )}
               {activeTab === 'loans' && (
@@ -2639,12 +2733,14 @@ export default function FinanceApp({ user }) {
                   updateLoan={updateLoan}
                   deleteLoan={deleteLoan}
                   formatCurrency={formatCurrency}
+                  checkPermission={checkPermission}
                 />
               )}
               {activeTab === 'debt' && (
                 <DebtAuditContent 
                   transactions={transactions}
                   allMonthlyIncome={allMonthlyIncome}
+                  checkPermission={checkPermission}
                 />
               )}
               {activeTab === 'habits' && (
@@ -2675,6 +2771,12 @@ export default function FinanceApp({ user }) {
           </div>
         </div>
       )}
+
+      <TrialLimitModal 
+        isOpen={showTrialModal} 
+        onClose={() => setShowTrialModal(false)}
+        onUpgrade={handleUpgrade}
+      />
 
       {showAddModal && <AddTransactionModal onClose={() => { setShowAddModal(false); setEditingTransaction(null); }} transactionToEdit={editingTransaction} />}
     </div>
