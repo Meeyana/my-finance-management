@@ -2609,7 +2609,12 @@ export default function FinanceApp({ user }) {
                 </div>
               )}
             </div>
-            <div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">{user.isAnonymous ? 'Public Shared Dashboard' : 'Personal Finance'}</p></div>
+            <div>
+              <h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1>
+              <p className="text-xs text-gray-400 font-medium mt-1">
+                {user.isAnonymous ? 'Public Dashboard' : (isPremium ? 'Premium Finance Manager' : 'Finance Manager')}
+              </p>
+            </div>
           </div>
         </div>
 

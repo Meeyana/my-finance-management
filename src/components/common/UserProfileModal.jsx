@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Calendar, Mail, Crown, LogOut, User } from 'lucide-react';
 import { signOut } from "firebase/auth";
 import { auth } from '../../lib/firebase';
 
 const UserProfileModal = ({ isOpen, onClose, user, isPremium, createdAt, expirationDate }) => {
     if (!isOpen) return null;
+
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
     const userName = user?.displayName || user?.email?.split('@')[0] || 'User';
     const userInitial = userName.charAt(0).toUpperCase();
@@ -102,12 +104,32 @@ const UserProfileModal = ({ isOpen, onClose, user, isPremium, createdAt, expirat
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleLogout}
-                        className="w-full mt-2 bg-red-50 hover:bg-red-100 text-red-600 p-4 rounded-xl flex items-center justify-center gap-2 transition-colors font-bold active:scale-[0.98]"
-                    >
-                        <LogOut size={20} /> Đăng xuất
-                    </button>
+                    {showLogoutConfirm ? (
+                        <div className="mt-2 p-4 bg-red-50 rounded-xl border border-red-100 animate-fade-in">
+                            <p className="text-sm font-bold text-red-800 mb-3 text-center">Bạn có chắc chắn muốn đăng xuất?</p>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setShowLogoutConfirm(false)}
+                                    className="flex-1 py-2 bg-white text-gray-600 font-bold rounded-lg text-sm border border-gray-200 hover:bg-gray-50 transition-colors"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    onClick={handleLogout}
+                                    className="flex-1 py-2 bg-red-600 text-white font-bold rounded-lg text-sm hover:bg-red-700 transition-colors shadow-sm"
+                                >
+                                    Đăng xuất
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setShowLogoutConfirm(true)}
+                            className="w-full mt-2 bg-red-50 hover:bg-red-100 text-red-600 p-4 rounded-xl flex items-center justify-center gap-2 transition-colors font-bold active:scale-[0.98]"
+                        >
+                            <LogOut size={20} /> Đăng xuất
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
