@@ -944,7 +944,7 @@ export default function HabitApp({ user }) {
   };
 
   const handleUpgrade = () => {
-    alert("Chuyển hướng đến cổng thanh toán...");
+    navigate('/pricing');
     setShowTrialModal(false);
   };
 

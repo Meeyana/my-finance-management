@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { Wallet, AlertCircle, User, Lock, Eye, EyeOff, ArrowUpRight } from 'lucide-react';
-import { 
-  signInWithEmailAndPassword, 
+import {
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword // Import thêm để tự tạo demo user
 } from 'firebase/auth';
 
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'; 
-import { auth, db } from '../../lib/firebase'; 
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../../lib/firebase';
 
 // CẤU HÌNH TÀI KHOẢN DEMO
 const DEMO_CREDENTIALS = {
-  email: 'demo@quanlychitieu.com', 
-  password: 'demo@quanlychitieu.com'            
+  email: 'demo@quanlychitieu.com',
+  password: 'demo@quanlychitieu.com'
 };
 
 const LoginScreen = () => {
@@ -24,24 +24,24 @@ const LoginScreen = () => {
   // --- HÀM TẠO PROFILE (Đã bỏ isDemoAccount) ---
   const createUserProfile = async (user) => {
     console.log(">>> [DEBUG] Kiểm tra profile cho UID:", user.uid);
-    
+
     try {
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
 
       // Chỉ ghi nếu chưa có hoặc thiếu thông tin
       if (!userSnap.exists() || !userSnap.data().createdAt) {
-          console.log(">>> [DEBUG] Đang khởi tạo dữ liệu user mới...");
-          
-          await setDoc(userRef, {
-            uid: user.uid,
-            email: user.email || 'unknown',
-            createdAt: serverTimestamp(),
-            isPremium: false 
-            // ĐÃ BỎ: isDemoAccount
-          }, { merge: true });
+        console.log(">>> [DEBUG] Đang khởi tạo dữ liệu user mới...");
 
-          console.log(">>> [DEBUG] Đã ghi profile thành công!");
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email || 'unknown',
+          createdAt: serverTimestamp(),
+          isPremium: false
+          // ĐÃ BỎ: isDemoAccount
+        }, { merge: true });
+
+        console.log(">>> [DEBUG] Đã ghi profile thành công!");
       }
     } catch (error) {
       console.error(">>> [DEBUG] Lỗi ghi DB:", error);
@@ -75,8 +75,8 @@ const LoginScreen = () => {
       try {
         // 1. Thử đăng nhập trước
         userCredential = await signInWithEmailAndPassword(
-          auth, 
-          DEMO_CREDENTIALS.email, 
+          auth,
+          DEMO_CREDENTIALS.email,
           DEMO_CREDENTIALS.password
         );
       } catch (authError) {
@@ -92,10 +92,10 @@ const LoginScreen = () => {
           throw authError; // Lỗi khác thì ném ra ngoài
         }
       }
-      
+
       // 3. Đảm bảo có profile trong DB
       if (userCredential && userCredential.user) {
-         await createUserProfile(userCredential.user);
+        await createUserProfile(userCredential.user);
       }
 
     } catch (err) {
@@ -127,8 +127,8 @@ const LoginScreen = () => {
             <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Email</label>
             <div className="relative">
               <User className="absolute left-4 top-3.5 text-gray-400" size={20} />
-              <input 
-                type="email" required 
+              <input
+                type="email" required
                 className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
                 placeholder="email@example.com"
                 value={email} onChange={(e) => setEmail(e.target.value)}
@@ -139,8 +139,8 @@ const LoginScreen = () => {
             <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Mật khẩu</label>
             <div className="relative">
               <Lock className="absolute left-4 top-3.5 text-gray-400" size={20} />
-              <input 
-                type={showPassword ? 'text' : 'password'} required 
+              <input
+                type={showPassword ? 'text' : 'password'} required
                 className="w-full pl-12 pr-12 py-3 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
                 placeholder="••••••••"
                 value={password} onChange={(e) => setPassword(e.target.value)}
@@ -155,10 +155,13 @@ const LoginScreen = () => {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <button onClick={handleDemoLogin} disabled={loading} className="text-xs text-gray-400 hover:text-blue-600 font-medium transition-colors inline-flex items-center gap-1 group">
-            Xem Demo (Dữ liệu mẫu) <ArrowUpRight size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"/>
+        <div className="mt-6 text-center space-y-3">
+          <button onClick={handleDemoLogin} disabled={loading} className="block w-full text-xs text-center text-gray-400 hover:text-blue-600 font-medium transition-colors group">
+            Xem Demo (Dữ liệu mẫu) <ArrowUpRight size={14} className="inline-block group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
           </button>
+          <a href="/pricing" className="block w-full text-xs text-center text-indigo-400 hover:text-indigo-600 font-bold transition-colors">
+            Xem Bảng Giá & Quyền Lợi Premium
+          </a>
         </div>
       </div>
     </div>

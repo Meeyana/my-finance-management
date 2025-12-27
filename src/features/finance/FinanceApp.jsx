@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
+import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LabelList, LineChart, Line
 } from 'recharts';
-import { 
-  LayoutDashboard, Wallet, Receipt, PlusCircle, Settings, 
+import {
+  LayoutDashboard, Wallet, Receipt, PlusCircle, Settings,
   TrendingUp, TrendingDown, Search, Trash2, Save,
   Menu, X, Database, Calendar, AlertCircle, BarChart2, ArrowUpRight, ArrowDownRight,
   List, AlertTriangle, Repeat, CalendarClock, CheckCircle2, Edit,
@@ -15,15 +15,15 @@ import {
 } from 'lucide-react';
 
 // FIREBASE IMPORTS
-import { 
-  signInWithEmailAndPassword, 
+import {
+  signInWithEmailAndPassword,
   signInAnonymously,
-  signOut,                   
+  signOut,
   onAuthStateChanged,
   signInWithCustomToken
 } from "firebase/auth";
-import { 
-  collection, addDoc, onSnapshot, query, 
+import {
+  collection, addDoc, onSnapshot, query,
   deleteDoc, doc, setDoc, updateDoc, deleteField, serverTimestamp, increment
 } from "firebase/firestore";
 import { auth, db, appId, getFirestorePaths } from '../../lib/firebase';
@@ -54,24 +54,24 @@ const DEFAULT_CATEGORY_CONFIG = {
 };
 
 const INITIAL_BUDGETS = {
-  eating: 0, investment: 0, entertainment: 0, learning: 0, 
+  eating: 0, investment: 0, entertainment: 0, learning: 0,
   living: 0, fuel: 0, shopping: 0, other: 0
 };
 
 // --- DASHBOARD CONTENT (UPDATED V3 - SYNC REMAINING) ---
-const DashboardContent = React.memo(({ 
-  totalSpent, monthlyIncome, updateMonthlyIncome, spendingDiff, totalIncurred, alerts, 
-  spendingByCategory, currentChartData, chartMode, setChartMode, 
+const DashboardContent = React.memo(({
+  totalSpent, monthlyIncome, updateMonthlyIncome, spendingDiff, totalIncurred, alerts,
+  spendingByCategory, currentChartData, chartMode, setChartMode,
   chartCategoryFilter, setChartCategoryFilter, allCategories, categoryVisibility,
   userName, isPublic, checkPermission
 }) => {
   const [showCharts, setShowCharts] = useState(false);
-  const [showIncomeModal, setShowIncomeModal] = useState(false); 
+  const [showIncomeModal, setShowIncomeModal] = useState(false);
   const [tempIncome, setTempIncome] = useState(monthlyIncome);
 
   // --- STATE: Filter ---
-  const [excludedCats, setExcludedCats] = useState([]); 
-  const [showFilterMenu, setShowFilterMenu] = useState(false); 
+  const [excludedCats, setExcludedCats] = useState([]);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowCharts(true), 200);
@@ -97,7 +97,7 @@ const DashboardContent = React.memo(({
   }, [totalSpent, spendingByCategory, excludedCats]);
 
   const toggleExclude = (catId) => {
-    setExcludedCats(prev => 
+    setExcludedCats(prev =>
       prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]
     );
   };
@@ -114,14 +114,14 @@ const DashboardContent = React.memo(({
 
   // --- CẬP NHẬT LOGIC: TÍNH CÒN LẠI THEO SỐ ĐÃ LỌC ---
   // Trước đây: const remaining = monthlyIncome - totalSpent;
-  const remaining = monthlyIncome - filteredTotalSpent; 
+  const remaining = monthlyIncome - filteredTotalSpent;
   // ----------------------------------------------------
 
   const chartColor = chartMode === 'daily' ? '#3B82F6' : '#8B5CF6';
 
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     const RADIAN = Math.PI / 180;
-    const radius = outerRadius * 1.1; 
+    const radius = outerRadius * 1.1;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
     if (percent === 0) return null;
@@ -131,90 +131,90 @@ const DashboardContent = React.memo(({
   return (
     <div className="space-y-6 animate-fade-in pb-12" onClick={() => setShowFilterMenu(false)}>
       <div className="mb-4 flex justify-between items-start">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              Xin chào, {userName}
-              {isPublic && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">Public Mode</span>}
-            </h2>
-            <p className="text-gray-500">Đây là tình hình tài chính tháng này của bạn.</p>
-          </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            Xin chào, {userName}
+            {isPublic && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">Public Mode</span>}
+          </h2>
+          <p className="text-gray-500">Đây là tình hình tài chính tháng này của bạn.</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        
+
         {/* --- CARD ĐÃ CHI TIÊU --- */}
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-200 shadow-lg border-none relative overflow-visible">
           <div className="relative z-10">
-              <div className="flex justify-between items-start">
-                <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">
-                  {excludedCats.length > 0 ? 'Chi tiêu (Tùy chỉnh)' : 'Đã chi tiêu'}
-                </p>
-                
-                {/* Nút Filter */}
-                <div className="relative" onClick={e => e.stopPropagation()}>
-                  <button 
-                    onClick={() => setShowFilterMenu(!showFilterMenu)}
-                    className={`p-1.5 rounded-lg transition-colors ${showFilterMenu ? 'bg-white text-blue-600' : 'bg-white/20 text-white hover:bg-white/30'}`}
-                  >
-                    <Filter size={16} />
-                  </button>
+            <div className="flex justify-between items-start">
+              <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">
+                {excludedCats.length > 0 ? 'Chi tiêu (Tùy chỉnh)' : 'Đã chi tiêu'}
+              </p>
 
-                  {/* Dropdown Menu Filter */}
-                  {showFilterMenu && (
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50 animate-scale-in">
-                      
-                      <div className="flex gap-2 mb-2 pb-2 border-b border-gray-100 px-1">
-                        <button 
-                          onClick={handleSelectAll}
-                          className="flex-1 py-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                        >
-                          Chọn tất cả
-                        </button>
-                        <button 
-                          onClick={handleDeselectAll}
-                          className="flex-1 py-1.5 text-[11px] font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                          Bỏ chọn hết
-                        </button>
-                      </div>
+              {/* Nút Filter */}
+              <div className="relative" onClick={e => e.stopPropagation()}>
+                <button
+                  onClick={() => setShowFilterMenu(!showFilterMenu)}
+                  className={`p-1.5 rounded-lg transition-colors ${showFilterMenu ? 'bg-white text-blue-600' : 'bg-white/20 text-white hover:bg-white/30'}`}
+                >
+                  <Filter size={16} />
+                </button>
 
-                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-1 px-2">Danh mục hiển thị</p>
-                      <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
-                        {allCategories.filter(c => categoryVisibility[c.id] !== false).map(cat => (
-                          <div 
-                            key={cat.id} 
-                            onClick={() => toggleExclude(cat.id)}
-                            className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-gray-700 text-sm select-none"
-                          >
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${excludedCats.includes(cat.id) ? 'border-gray-300 bg-white' : 'border-blue-500 bg-blue-500'}`}>
-                              {!excludedCats.includes(cat.id) && <CheckCircle2 size={12} className="text-white" />}
-                            </div>
-                            <span className={`transition-opacity ${excludedCats.includes(cat.id) ? 'opacity-50' : 'font-medium'}`}>{cat.name}</span>
-                          </div>
-                        ))}
-                      </div>
+                {/* Dropdown Menu Filter */}
+                {showFilterMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50 animate-scale-in">
+
+                    <div className="flex gap-2 mb-2 pb-2 border-b border-gray-100 px-1">
+                      <button
+                        onClick={handleSelectAll}
+                        className="flex-1 py-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                      >
+                        Chọn tất cả
+                      </button>
+                      <button
+                        onClick={handleDeselectAll}
+                        className="flex-1 py-1.5 text-[11px] font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        Bỏ chọn hết
+                      </button>
                     </div>
-                  )}
-                </div>
-              </div>
 
-              <h3 className="text-3xl font-bold mt-2 tracking-tight">{formatCurrency(filteredTotalSpent)}</h3>
-              
-              <div className="mt-3 inline-flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm">
-                {spendingDiff > 0 ? <ArrowUpRight size={12}/> : <ArrowDownRight size={12}/>}
-                {spendingDiff > 0 ? '+' : ''}{formatShortCurrency(spendingDiff)} so với tháng trước
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1 px-2">Danh mục hiển thị</p>
+                    <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
+                      {allCategories.filter(c => categoryVisibility[c.id] !== false).map(cat => (
+                        <div
+                          key={cat.id}
+                          onClick={() => toggleExclude(cat.id)}
+                          className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-gray-700 text-sm select-none"
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${excludedCats.includes(cat.id) ? 'border-gray-300 bg-white' : 'border-blue-500 bg-blue-500'}`}>
+                            {!excludedCats.includes(cat.id) && <CheckCircle2 size={12} className="text-white" />}
+                          </div>
+                          <span className={`transition-opacity ${excludedCats.includes(cat.id) ? 'opacity-50' : 'font-medium'}`}>{cat.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
+            </div>
+
+            <h3 className="text-3xl font-bold mt-2 tracking-tight">{formatCurrency(filteredTotalSpent)}</h3>
+
+            <div className="mt-3 inline-flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm">
+              {spendingDiff > 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+              {spendingDiff > 0 ? '+' : ''}{formatShortCurrency(spendingDiff)} so với tháng trước
+            </div>
           </div>
           <TrendingDown className="absolute right-[-10px] bottom-[-10px] text-white opacity-20" size={100} />
         </Card>
-        
+
         {/* SCORECARD THU NHẬP */}
         <Card className="cursor-pointer hover:shadow-md transition-all relative group"
-            onClick={() => {
-              if (!checkPermission()) return;
-              setShowIncomeModal(true);
-            }}>
-           <div className="flex justify-between items-start">
+          onClick={() => {
+            if (!checkPermission()) return;
+            setShowIncomeModal(true);
+          }}>
+          <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium uppercase tracking-wider mb-1">Thu nhập tháng</p>
               <h3 className="text-2xl font-bold text-gray-800 mt-1 flex items-center gap-2">
@@ -225,29 +225,29 @@ const DashboardContent = React.memo(({
             <div className="p-2.5 bg-green-50 rounded-xl text-green-600"><DollarSign size={24} /></div>
           </div>
         </Card>
-        
+
         {/* --- SCORECARD CÒN LẠI (Sẽ tự động cập nhật theo 'remaining' mới) --- */}
         <Card>
-           <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">
-                 {excludedCats.length > 0 ? 'Còn lại (Theo lọc)' : 'Còn lại'}
+                {excludedCats.length > 0 ? 'Còn lại (Theo lọc)' : 'Còn lại'}
               </p>
               <h3 className={`text-2xl font-bold mt-1 ${remaining < 0 ? 'text-red-600' : 'text-indigo-600'}`}>
                 {formatCurrency(remaining)}
               </h3>
             </div>
-             <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600"><TrendingUp size={24} /></div>
+            <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600"><TrendingUp size={24} /></div>
           </div>
         </Card>
 
         <Card>
-           <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Phát sinh</p>
               <h3 className="text-2xl font-bold text-orange-600 mt-1">{formatCurrency(totalIncurred)}</h3>
             </div>
-             <div className="p-2.5 bg-orange-50 rounded-xl text-orange-600"><AlertCircle size={24} /></div>
+            <div className="p-2.5 bg-orange-50 rounded-xl text-orange-600"><AlertCircle size={24} /></div>
           </div>
         </Card>
       </div>
@@ -258,15 +258,15 @@ const DashboardContent = React.memo(({
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-scale-in p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-gray-800">Cập nhật thu nhập</h3>
-              <button onClick={(e) => { e.stopPropagation(); setShowIncomeModal(false); }} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18}/></button>
+              <button onClick={(e) => { e.stopPropagation(); setShowIncomeModal(false); }} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18} /></button>
             </div>
             <form onSubmit={handleSaveIncome}>
               <div className="mb-4">
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Tổng thu nhập tháng này</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   autoFocus
-                  className="w-full p-3 border-2 border-slate-200 rounded-xl outline-none focus:border-blue-500 text-xl font-bold text-gray-800" 
+                  className="w-full p-3 border-2 border-slate-200 rounded-xl outline-none focus:border-blue-500 text-xl font-bold text-gray-800"
                   placeholder="0"
                   value={tempIncome === 0 ? '' : tempIncome}
                   onChange={(e) => setTempIncome(e.target.value)}
@@ -300,56 +300,56 @@ const DashboardContent = React.memo(({
             <PieChart size={20} className="text-gray-400" /> Phân bổ chi tiêu
           </h4>
           <div className="h-80 w-full">
-             {!showCharts ? (
-                <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
-             ) : (
-               /* LOGIC MỚI: Tạo biến tạm chartData để check độ dài */
-               (() => {
-                 // Lọc data: Phải > 0 VÀ không nằm trong danh sách loại trừ (filter dashboard)
-                 // Lưu ý: spendingByCategory đã tự động loại bỏ các mục ẩn từ "Cài đặt hạn mức" rồi
-                 const chartData = spendingByCategory.filter(i => i.value > 0 && !excludedCats.includes(i.id));
+            {!showCharts ? (
+              <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
+            ) : (
+              /* LOGIC MỚI: Tạo biến tạm chartData để check độ dài */
+              (() => {
+                // Lọc data: Phải > 0 VÀ không nằm trong danh sách loại trừ (filter dashboard)
+                // Lưu ý: spendingByCategory đã tự động loại bỏ các mục ẩn từ "Cài đặt hạn mức" rồi
+                const chartData = spendingByCategory.filter(i => i.value > 0 && !excludedCats.includes(i.id));
 
-                 // Kiểm tra nếu có data thì vẽ, không thì hiện "Chưa có dữ liệu"
-                 if (chartData.length > 0) {
-                   return (
+                // Kiểm tra nếu có data thì vẽ, không thì hiện "Chưa có dữ liệu"
+                if (chartData.length > 0) {
+                  return (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={chartData} // Dùng data đã lọc
                           cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={4} dataKey="value" label={renderCustomizedLabel}
-                          activeShape={null} 
+                          activeShape={null}
                         >
                           {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={2} stroke="#fff" />)}
                         </Pie>
-                        <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
-                        <Legend verticalAlign="bottom" height={36} iconType="circle"/>
+                        <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }} />
+                        <Legend verticalAlign="bottom" height={36} iconType="circle" />
                       </PieChart>
                     </ResponsiveContainer>
-                   );
-                 } else {
-                   // Giao diện khi không có dữ liệu (hoặc đã bị ẩn hết)
-                   return (
-                     <div className="h-full flex flex-col items-center justify-center text-gray-400"><Database size={48} className="mb-2 opacity-10" /><p className="text-sm">Chưa có dữ liệu</p></div>
-                   );
-                 }
-               })()
-             )}
+                  );
+                } else {
+                  // Giao diện khi không có dữ liệu (hoặc đã bị ẩn hết)
+                  return (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400"><Database size={48} className="mb-2 opacity-10" /><p className="text-sm">Chưa có dữ liệu</p></div>
+                  );
+                }
+              })()
+            )}
           </div>
         </Card>
 
         <Card className="min-h-[420px]">
           <div className="flex flex-col gap-3 mb-4">
-             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <h4 className="font-bold text-gray-800 flex items-center gap-2"><BarChart2 size={20} className="text-gray-400" /> Xu hướng chi tiêu</h4>
               <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold w-full sm:w-auto">
-                <button 
-                  onClick={() => setChartMode('daily')} 
+                <button
+                  onClick={() => setChartMode('daily')}
                   className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all active:scale-95 ${chartMode === 'daily' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 sm:hover:text-gray-700 active:bg-gray-200'}`}
                 >
                   Ngày
                 </button>
-                <button 
-                  onClick={() => setChartMode('monthly')} 
+                <button
+                  onClick={() => setChartMode('monthly')}
                   className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all active:scale-95 ${chartMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 sm:hover:text-gray-700 active:bg-gray-200'}`}
                 >
                   Tháng
@@ -357,29 +357,29 @@ const DashboardContent = React.memo(({
               </div>
             </div>
             <div className="self-end w-full sm:w-auto">
-               <select 
-                 className="custom-select w-full sm:w-auto pl-3 py-2 pr-10 text-base sm:text-xs border border-slate-200 rounded-lg bg-white outline-none text-gray-600 font-medium active:bg-gray-50" 
-                 value={chartCategoryFilter} 
-                 onChange={(e) => setChartCategoryFilter(e.target.value)}
-               >
-                 <option value="all">Tất cả mục</option>
-                 {allCategories.filter(c => categoryVisibility[c.id] !== false).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-               </select>
+              <select
+                className="custom-select w-full sm:w-auto pl-3 py-2 pr-10 text-base sm:text-xs border border-slate-200 rounded-lg bg-white outline-none text-gray-600 font-medium active:bg-gray-50"
+                value={chartCategoryFilter}
+                onChange={(e) => setChartCategoryFilter(e.target.value)}
+              >
+                <option value="all">Tất cả mục</option>
+                {allCategories.filter(c => categoryVisibility[c.id] !== false).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
             </div>
           </div>
           <div className="h-80 w-full">
             {!showCharts ? (
-               <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
+              <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
             ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={currentChartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="name" tick={{fontSize: 10, fill: '#94A3B8'}} axisLine={false} tickLine={false} interval={chartMode === 'daily' ? 2 : 0} />
-                <YAxis hide />
-                <RechartsTooltip formatter={(value) => formatCurrency(value)} labelFormatter={(label, payload) => payload[0]?.payload.fullLabel || label} cursor={{fill: '#F8FAFC'}} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
-                <Bar dataKey="amount" fill={chartColor} radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={false} activeBar={false} />
-              </BarChart>
-            </ResponsiveContainer>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={currentChartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} interval={chartMode === 'daily' ? 2 : 0} />
+                  <YAxis hide />
+                  <RechartsTooltip formatter={(value) => formatCurrency(value)} labelFormatter={(label, payload) => payload[0]?.payload.fullLabel || label} cursor={{ fill: '#F8FAFC' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }} />
+                  <Bar dataKey="amount" fill={chartColor} radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={false} activeBar={false} />
+                </BarChart>
+              </ResponsiveContainer>
             )}
           </div>
         </Card>
@@ -406,19 +406,19 @@ const DashboardContent = React.memo(({
             </div>
           </div>
         </div>
-        
+
         <div className="h-[500px] w-full">
           {!showCharts ? (
-             <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
+            <div className="h-full flex items-center justify-center bg-slate-50 rounded-xl animate-pulse"><p className="text-gray-400 text-sm">Đang tải biểu đồ...</p></div>
           ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={spendingByCategory.filter(item => item.value > 0 || item.budget > 0)} layout="vertical" margin={{left: 40, right: 60}} barCategoryGap={24}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
-              <XAxis type="number" hide />
-              <YAxis dataKey="name" type="category" tick={{fontSize: 12, fill: '#4B5563', fontWeight: 600}} width={80} axisLine={false} tickLine={false} />
-              <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}} />
-              <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false} activeBar={false}>
-                 {spendingByCategory.map((entry, index) => {
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={spendingByCategory.filter(item => item.value > 0 || item.budget > 0)} layout="vertical" margin={{ left: 40, right: 60 }} barCategoryGap={24}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
+                <XAxis type="number" hide />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: '#4B5563', fontWeight: 600 }} width={80} axisLine={false} tickLine={false} />
+                <RechartsTooltip formatter={(value) => formatCurrency(value)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }} />
+                <Bar dataKey="value" name="Thực tế" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false} activeBar={false}>
+                  {spendingByCategory.map((entry, index) => {
                     let barColor = '#3B82F6';
                     if (entry.budget > 0) {
                       const ratio = entry.value / entry.budget;
@@ -426,34 +426,34 @@ const DashboardContent = React.memo(({
                       else if (ratio >= 0.8) barColor = '#F59E0B';
                     }
                     return <Cell key={`cell-${index}`} fill={barColor} />;
-                 })}
-                 <LabelList dataKey="value" position="right" formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} style={{fontSize: '11px', fontWeight: 'bold', fill: '#6B7280'}} />
-              </Bar>
-              <Bar dataKey="budget" name="Định mức" fill="#F3F4F6" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false} activeBar={false}>
-                 <LabelList dataKey="budget" position="right" formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} style={{fontSize: '11px', fill: '#9CA3AF'}} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+                  })}
+                  <LabelList dataKey="value" position="right" formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} style={{ fontSize: '11px', fontWeight: 'bold', fill: '#6B7280' }} />
+                </Bar>
+                <Bar dataKey="budget" name="Định mức" fill="#F3F4F6" barSize={20} radius={[0, 6, 6, 0]} isAnimationActive={false} activeBar={false}>
+                  <LabelList dataKey="budget" position="right" formatter={(val) => val > 0 ? formatShortCurrency(val) : ''} style={{ fontSize: '11px', fill: '#9CA3AF' }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </div>
       </Card>
-  
+
     </div>
   );
 });
 
 // --- COMPONENT: TRANSACTION CONTENT ---
-const TransactionContent = ({ 
+const TransactionContent = ({
   filtered, viewMonth, viewYear, search, setSearch, filterCategory, setFilterCategory, deleteTransaction, onEdit, allCategories, checkPermission
 }) => {
   return (
     <div className="space-y-6 animate-fade-in pb-12">
       <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm flex items-center justify-between">
-         <div className="flex items-center gap-3">
-           <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><Receipt size={20} /></div>
-           <div><h3 className="font-bold text-gray-800">Sổ giao dịch</h3><p className="text-xs text-gray-500">Tháng {parseInt(viewMonth) + 1}/{viewYear}</p></div>
-         </div>
-         <span className="text-xs bg-slate-100 px-3 py-1.5 rounded-full font-bold text-gray-600 whitespace-nowrap">{filtered.length} giao dịch</span>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><Receipt size={20} /></div>
+          <div><h3 className="font-bold text-gray-800">Sổ giao dịch</h3><p className="text-xs text-gray-500">Tháng {parseInt(viewMonth) + 1}/{viewYear}</p></div>
+        </div>
+        <span className="text-xs bg-slate-100 px-3 py-1.5 rounded-full font-bold text-gray-600 whitespace-nowrap">{filtered.length} giao dịch</span>
       </div>
 
       <Card className="p-0 overflow-hidden border-0 shadow-sm">
@@ -462,9 +462,9 @@ const TransactionContent = ({
             <Search className="absolute left-3 top-3 text-gray-400" size={18} />
             <input type="text" placeholder="Tìm kiếm..." className="w-full pl-10 p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <select 
-            className="custom-select p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-full md:min-w-[180px] text-base sm:text-sm font-medium text-gray-600" 
-            value={filterCategory} 
+          <select
+            className="custom-select p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-full md:min-w-[180px] text-base sm:text-sm font-medium text-gray-600"
+            value={filterCategory}
             onChange={e => setFilterCategory(e.target.value)}
           >
             <option value="all">Tất cả danh mục</option>
@@ -488,14 +488,14 @@ const TransactionContent = ({
                   <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-gray-500 font-medium">
                     {new Date(tx.date).getDate()}/{new Date(tx.date).getMonth() + 1}
                     {tx.isIncurred && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-400" title="Chi phí phát sinh"></span>}
-                    {tx.isRecurring && <span className="ml-2 text-blue-500" title="Tự động"><Repeat size={12} className="inline"/></span>}
+                    {tx.isRecurring && <span className="ml-2 text-blue-500" title="Tự động"><Repeat size={12} className="inline" /></span>}
                   </td>
                   <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap"><Badge color={allCategories.find(c => c.id === tx.category)?.color || '#999'}>{allCategories.find(c => c.id === tx.category)?.name}</Badge></td>
                   <td className="px-2 py-3 sm:px-6 sm:py-4 text-gray-800 font-medium break-words max-w-[200px]">{tx.note}</td>
                   <td className="px-2 py-3 sm:px-6 sm:py-4 text-right font-bold text-gray-800 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
                   <td className="px-2 py-3 sm:px-6 sm:py-4 text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <button 
+                      <button
                         onClick={() => {
                           if (!checkPermission()) return;
                           onEdit(tx);
@@ -505,8 +505,8 @@ const TransactionContent = ({
                       >
                         <Edit size={16} />
                       </button>
-                      <button 
-                        onClick= {() => {
+                      <button
+                        onClick={() => {
                           if (!checkPermission()) return;
                           deleteTransaction(tx.id);
                         }}
@@ -531,9 +531,9 @@ const TransactionContent = ({
 };
 
 // --- COMPONENT: BUDGET CONTENT ---
-const BudgetContent = ({ 
-  budgets, setBudgets, saveBudgetsToDb, allCategories, onAddCategory, 
-  categoryVisibility, toggleVisibility, 
+const BudgetContent = ({
+  budgets, setBudgets, saveBudgetsToDb, allCategories, onAddCategory,
+  categoryVisibility, toggleVisibility,
   categoryAlerts, toggleAlert, deleteCustomCategory, updateCategoryName, checkPermission
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -568,102 +568,102 @@ const BudgetContent = ({
   return (
     <div className="space-y-8 animate-fade-in pb-24">
       <div className="flex flex-col md:flex-row items-center justify-between gap-2">
-          <div><h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Settings size={24} className="text-gray-400"/> Cài đặt hạn mức chi tiêu</h3>
+        <div><h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Settings size={24} className="text-gray-400" /> Cài đặt hạn mức chi tiêu</h3>
           <p className="text-gray-500">Đặt giới hạn cho từng danh mục để nhận cảnh báo khi vượt quá</p></div>
-          <button 
-            onClick={() => {
-              if (!checkPermission()) return;
-              saveBudgetsToDb(budgets);
-            }}
-            className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl sm:hover:bg-black font-bold shadow-lg transition-all active:scale-95 active:bg-black w-full md:w-auto justify-center"
-          >
-            <Save size={18} /> Lưu thay đổi
-          </button>
+        <button
+          onClick={() => {
+            if (!checkPermission()) return;
+            saveBudgetsToDb(budgets);
+          }}
+          className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl sm:hover:bg-black font-bold shadow-lg transition-all active:scale-95 active:bg-black w-full md:w-auto justify-center"
+        >
+          <Save size={18} /> Lưu thay đổi
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {allCategories.map(cat => {
           const currentVal = budgets[cat.id] || 0;
-          const isVisible = categoryVisibility[cat.id] !== false; 
-          const isAlertOn = categoryAlerts[cat.id] !== false; 
-          const isCustom = cat.id.startsWith('custom_'); 
+          const isVisible = categoryVisibility[cat.id] !== false;
+          const isAlertOn = categoryAlerts[cat.id] !== false;
+          const isCustom = cat.id.startsWith('custom_');
 
           return (
             <div key={cat.id} className={`bg-white rounded-2xl p-6 border border-slate-100 shadow-sm sm:hover:shadow-md transition-all group relative overflow-hidden ${!isVisible ? 'opacity-60 grayscale-[0.5]' : ''}`}>
-              
+
               <div className="absolute top-3 right-3 z-20 flex gap-1.5">
-  
-        {/* Nút Edit */}
-        <button 
-          onClick={() => {
-            if (!checkPermission()) return; // <--- BỌC LẠI
-            handleEditClick(cat);
-          }}
-          className="w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-600 active:scale-90"
-          title="Chỉnh sửa tên"
-        >
-          <Edit size={16} strokeWidth={2.5} /> {/* Tăng độ dày icon cho dễ nhìn */}
-        </button>
 
-        {/* Nút Xóa (cho Custom Category) */}
-        {isCustom && (
-          <button 
-            onClick={() => {
-              if (!checkPermission()) return; // <--- BỌC LẠI
-              deleteCustomCategory(cat.id);
-            }}
-            className="w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 active:scale-90"
-            title="Xóa danh mục"
-          >
-            <Trash2 size={16} strokeWidth={2.5} />
-          </button>
-        )}
+                {/* Nút Edit */}
+                <button
+                  onClick={() => {
+                    if (!checkPermission()) return; // <--- BỌC LẠI
+                    handleEditClick(cat);
+                  }}
+                  className="w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-600 active:scale-90"
+                  title="Chỉnh sửa tên"
+                >
+                  <Edit size={16} strokeWidth={2.5} /> {/* Tăng độ dày icon cho dễ nhìn */}
+                </button>
 
-        {/* Nút Alert */}
-        <button 
-          onClick={() => {
-            if (!checkPermission()) return; // <--- BỌC LẠI
-            toggleAlert(cat.id);
-          }}
-          className={`w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all active:scale-90 ${isAlertOn ? 'bg-white text-yellow-500 hover:bg-yellow-50 border border-yellow-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-          title={isAlertOn ? "Đang bật cảnh báo" : "Đã tắt cảnh báo"}
-        >
-          {isAlertOn ? <Bell size={16} strokeWidth={2.5} /> : <BellOff size={16} />}
-        </button>
+                {/* Nút Xóa (cho Custom Category) */}
+                {isCustom && (
+                  <button
+                    onClick={() => {
+                      if (!checkPermission()) return; // <--- BỌC LẠI
+                      deleteCustomCategory(cat.id);
+                    }}
+                    className="w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 active:scale-90"
+                    title="Xóa danh mục"
+                  >
+                    <Trash2 size={16} strokeWidth={2.5} />
+                  </button>
+                )}
 
-        {/* Nút Visibility */}
-        <button 
-          onClick={() => {
-            if (!checkPermission()) return; // <--- BỌC LẠI
-            toggleVisibility(cat.id);
-          }}
-          className={`w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all active:scale-90 ${isVisible ? 'bg-white text-blue-600 hover:bg-blue-50 border border-blue-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-          title={isVisible ? "Đang hiển thị" : "Đã ẩn"}
-        >
-          {isVisible ? <Eye size={16} strokeWidth={2.5} /> : <EyeOff size={16} />}
-        </button>
-      </div>
+                {/* Nút Alert */}
+                <button
+                  onClick={() => {
+                    if (!checkPermission()) return; // <--- BỌC LẠI
+                    toggleAlert(cat.id);
+                  }}
+                  className={`w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all active:scale-90 ${isAlertOn ? 'bg-white text-yellow-500 hover:bg-yellow-50 border border-yellow-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                  title={isAlertOn ? "Đang bật cảnh báo" : "Đã tắt cảnh báo"}
+                >
+                  {isAlertOn ? <Bell size={16} strokeWidth={2.5} /> : <BellOff size={16} />}
+                </button>
+
+                {/* Nút Visibility */}
+                <button
+                  onClick={() => {
+                    if (!checkPermission()) return; // <--- BỌC LẠI
+                    toggleVisibility(cat.id);
+                  }}
+                  className={`w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-all active:scale-90 ${isVisible ? 'bg-white text-blue-600 hover:bg-blue-50 border border-blue-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                  title={isVisible ? "Đang hiển thị" : "Đã ẩn"}
+                >
+                  {isVisible ? <Eye size={16} strokeWidth={2.5} /> : <EyeOff size={16} />}
+                </button>
+              </div>
 
               <div className="relative z-10 flex flex-col h-full justify-between mt-2">
-                  <div className="mb-4">
-                    <div className="w-10 h-2 rounded-full mb-3" style={{backgroundColor: cat.color}}></div>
-                    <h4 className="font-bold text-lg text-gray-800">{cat.name}</h4>
-                  </div>
-                  <div className="relative mt-auto">
-                      <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Hạn mức tháng</label>
-                      <input type="number" className="w-full text-xl font-bold border-b-2 border-slate-100 focus:border-gray-800 outline-none py-2 transition-colors bg-transparent text-gray-800" value={currentVal === 0 ? '' : currentVal} onChange={(e) => setBudgets({...budgets, [cat.id]: Number(e.target.value)})} placeholder="0" />
-                      <span className="absolute right-0 bottom-3 text-xs text-gray-400 font-bold">đ</span>
-                  </div>
+                <div className="mb-4">
+                  <div className="w-10 h-2 rounded-full mb-3" style={{ backgroundColor: cat.color }}></div>
+                  <h4 className="font-bold text-lg text-gray-800">{cat.name}</h4>
+                </div>
+                <div className="relative mt-auto">
+                  <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Hạn mức tháng</label>
+                  <input type="number" className="w-full text-xl font-bold border-b-2 border-slate-100 focus:border-gray-800 outline-none py-2 transition-colors bg-transparent text-gray-800" value={currentVal === 0 ? '' : currentVal} onChange={(e) => setBudgets({ ...budgets, [cat.id]: Number(e.target.value) })} placeholder="0" />
+                  <span className="absolute right-0 bottom-3 text-xs text-gray-400 font-bold">đ</span>
+                </div>
               </div>
             </div>
           )
         })}
-        
-        <button 
+
+        <button
           onClick={() => {
             if (!checkPermission()) return;
             setShowAddModal(true)
-            }
+          }
           }
           className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-gray-400 sm:hover:text-blue-600 sm:hover:border-blue-300 sm:hover:bg-blue-50/50 transition-all min-h-[240px] group active:scale-[0.98]"
         >
@@ -677,23 +677,23 @@ const BudgetContent = ({
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
-             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h3 className="text-lg font-bold text-gray-800">Tạo danh mục mới</h3>
-                <button onClick={() => setShowAddModal(false)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18}/></button>
-             </div>
-             <form onSubmit={handleAdd} className="p-6 space-y-4">
-                <div>
-                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên danh mục</label>
-                   <input required type="text" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="Ví dụ: Du lịch, Thú cưng..." value={newCat.name} onChange={e => setNewCat({...newCat, name: e.target.value})} />
-                </div>
-                <div>
-                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hạn mức dự kiến</label>
-                   <input required type="number" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="0" value={newCat.budget} onChange={e => setNewCat({...newCat, budget: e.target.value})} />
-                </div>
-                <div className="pt-2">
-                  <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200">Tạo danh mục</button>
-                </div>
-             </form>
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-800">Tạo danh mục mới</h3>
+              <button onClick={() => setShowAddModal(false)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleAdd} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên danh mục</label>
+                <input required type="text" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="Ví dụ: Du lịch, Thú cưng..." value={newCat.name} onChange={e => setNewCat({ ...newCat, name: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hạn mức dự kiến</label>
+                <input required type="number" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="0" value={newCat.budget} onChange={e => setNewCat({ ...newCat, budget: e.target.value })} />
+              </div>
+              <div className="pt-2">
+                <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200">Tạo danh mục</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -701,36 +701,36 @@ const BudgetContent = ({
       {showEditModal && editingCategory && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
-             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h3 className="text-lg font-bold text-gray-800">Chỉnh sửa tên danh mục</h3>
-                <button onClick={() => { setShowEditModal(false); setEditingCategory(null); setEditName(''); }} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18}/></button>
-             </div>
-             <form onSubmit={handleUpdateName} className="p-6 space-y-4">
-                <div>
-                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên danh mục</label>
-                   <input 
-                     required 
-                     type="text" 
-                     autoFocus
-                     className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" 
-                     placeholder="Nhập tên mới..." 
-                     value={editName} 
-                     onChange={e => setEditName(e.target.value)} 
-                   />
-                </div>
-                <div className="pt-2 flex gap-3">
-                  <button 
-                    type="button"
-                    onClick={() => { setShowEditModal(false); setEditingCategory(null); setEditName(''); }} 
-                    className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors"
-                  >
-                    Hủy
-                  </button>
-                  <button type="submit" className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200">
-                    Lưu thay đổi
-                  </button>
-                </div>
-             </form>
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-800">Chỉnh sửa tên danh mục</h3>
+              <button onClick={() => { setShowEditModal(false); setEditingCategory(null); setEditName(''); }} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleUpdateName} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên danh mục</label>
+                <input
+                  required
+                  type="text"
+                  autoFocus
+                  className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
+                  placeholder="Nhập tên mới..."
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                />
+              </div>
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditModal(false); setEditingCategory(null); setEditName(''); }}
+                  className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button type="submit" className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200">
+                  Lưu thay đổi
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -739,22 +739,22 @@ const BudgetContent = ({
 };
 
 // --- COMPONENT: RECURRING EXPENSES ---
-const RecurringContent = ({ 
+const RecurringContent = ({
   recurringItems, addRecurringItem, updateRecurringItem, deleteRecurringItem, allCategories, checkPermission
 }) => {
   const [showModal, setShowModal] = useState(false);
-  const [editingItem, setEditingItem] = useState(null); 
-  const [formData, setFormData] = useState({ 
-    name: '', amount: '', category: 'living', day: '1', 
-    durationMonths: '', 
+  const [editingItem, setEditingItem] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '', amount: '', category: 'living', day: '1',
+    durationMonths: '',
     isLifetime: true,
     durationType: 'months'
   });
 
   const resetForm = () => {
-    setFormData({ 
-      name: '', amount: '', category: 'living', day: '1', 
-      durationMonths: '', 
+    setFormData({
+      name: '', amount: '', category: 'living', day: '1',
+      durationMonths: '',
       isLifetime: true,
       durationType: 'months'
     });
@@ -770,7 +770,7 @@ const RecurringContent = ({
       day: item.day,
       durationMonths: item.durationMonths || '',
       isLifetime: !item.durationMonths,
-      durationType: 'months' 
+      durationType: 'months'
     });
     setShowModal(true);
   };
@@ -808,11 +808,11 @@ const RecurringContent = ({
     <div className="space-y-6 animate-fade-in pb-24">
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Repeat size={24} className="text-gray-500"/>Chi tiêu cố định</h3>
+          <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Repeat size={24} className="text-gray-500" />Chi tiêu cố định</h3>
           <p className="text-gray-500">Tự động tạo giao dịch cho các khoản chi hàng tháng</p>
         </div>
-        <button 
-          onClick={() => { if (!checkPermission()) return; resetForm(); setShowModal(true); }} 
+        <button
+          onClick={() => { if (!checkPermission()) return; resetForm(); setShowModal(true); }}
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl sm:hover:bg-blue-700 font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 w-full md:w-auto justify-center"
         >
           <PlusCircle size={18} /> Thêm lịch chi tiêu
@@ -829,63 +829,63 @@ const RecurringContent = ({
 
           return (
             <div key={item.id} className={`bg-white rounded-2xl p-6 border border-slate-100 shadow-sm relative group overflow-hidden hover:shadow-md transition-all ${isExpired ? 'opacity-60 grayscale-[0.8]' : ''}`}>
-               <div className="absolute top-0 right-0 p-4 opacity-10">
-                 <Repeat size={100} />
-               </div>
-               
-               <div className="relative z-10 flex flex-col h-full">
-                  <div className="flex justify-between items-start mb-2">
-                     <div className="w-16 h-1.5 rounded-full" style={{ backgroundColor: category?.color || '#999' }}></div>
-                     <div className="flex gap-1 -mr-2 -mt-2">
-                        <button 
-                          onClick={() => {
-                            if (!checkPermission()) return; // <--- BỌC LẠI
-                            handleEdit(item);
-                          }}
-                          className="text-gray-300 hover:text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button 
-                          onClick={() => {
-                            if (!checkPermission()) return; // <--- BỌC LẠI
-                            deleteRecurringItem(item.id);
-                          }}
-                          className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                     </div>
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <Repeat size={100} />
+              </div>
+
+              <div className="relative z-10 flex flex-col h-full">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="w-16 h-1.5 rounded-full" style={{ backgroundColor: category?.color || '#999' }}></div>
+                  <div className="flex gap-1 -mr-2 -mt-2">
+                    <button
+                      onClick={() => {
+                        if (!checkPermission()) return; // <--- BỌC LẠI
+                        handleEdit(item);
+                      }}
+                      className="text-gray-300 hover:text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!checkPermission()) return; // <--- BỌC LẠI
+                        deleteRecurringItem(item.id);
+                      }}
+                      className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
-                  
-                  <h4 className="font-bold text-lg text-gray-800 mb-1 line-clamp-1 mt-2">
-                    {item.name} {isExpired && <span className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full ml-1">(Đã hết hạn)</span>}
-                  </h4>
-                  <p className="text-sm text-gray-500 mb-4">{category?.name}</p>
-                  
-                  <div className="mt-auto pt-4 border-t border-slate-50 space-y-2">
-                    <p className="text-2xl font-bold text-blue-600">{formatCurrency(item.amount)}</p>
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 bg-slate-50 py-1.5 px-3 rounded-lg w-fit">
-                        <CalendarClock size={14} /> 
-                        Ngày {item.day} hàng tháng
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 bg-slate-50 py-1.5 px-3 rounded-lg w-fit">
-                        <CheckCircle2 size={14} className={item.durationMonths ? "text-orange-500" : "text-green-500"} /> 
-                        {item.durationMonths ? `Kéo dài ${item.durationMonths} tháng` : 'Trọn đời'}
-                      </div>
+                </div>
+
+                <h4 className="font-bold text-lg text-gray-800 mb-1 line-clamp-1 mt-2">
+                  {item.name} {isExpired && <span className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full ml-1">(Đã hết hạn)</span>}
+                </h4>
+                <p className="text-sm text-gray-500 mb-4">{category?.name}</p>
+
+                <div className="mt-auto pt-4 border-t border-slate-50 space-y-2">
+                  <p className="text-2xl font-bold text-blue-600">{formatCurrency(item.amount)}</p>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 bg-slate-50 py-1.5 px-3 rounded-lg w-fit">
+                      <CalendarClock size={14} />
+                      Ngày {item.day} hàng tháng
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 bg-slate-50 py-1.5 px-3 rounded-lg w-fit">
+                      <CheckCircle2 size={14} className={item.durationMonths ? "text-orange-500" : "text-green-500"} />
+                      {item.durationMonths ? `Kéo dài ${item.durationMonths} tháng` : 'Trọn đời'}
                     </div>
                   </div>
-               </div>
+                </div>
+              </div>
             </div>
           );
         })}
-        
+
         {recurringItems.length === 0 && (
           <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
-             <Repeat size={48} className="mb-4 opacity-20" />
-             <p>Chưa có khoản chi cố định nào.</p>
-             <button onClick={() => { if (!checkPermission()) return; resetForm(); setShowModal(true); }} className="text-blue-600 font-bold hover:underline mt-2">Tạo ngay</button>
+            <Repeat size={48} className="mb-4 opacity-20" />
+            <p>Chưa có khoản chi cố định nào.</p>
+            <button onClick={() => { if (!checkPermission()) return; resetForm(); setShowModal(true); }} className="text-blue-600 font-bold hover:underline mt-2">Tạo ngay</button>
           </div>
         )}
       </div>
@@ -893,98 +893,98 @@ const RecurringContent = ({
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in max-h-[90vh] overflow-y-auto">
-             <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
-                <h3 className="text-lg font-bold text-gray-800">{editingItem ? 'Chỉnh sửa khoản chi' : 'Thêm khoản chi cố định'}</h3>
-                <button onClick={() => setShowModal(false)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18}/></button>
-             </div>
-             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                <div>
-                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên khoản chi</label>
-                   <input required type="text" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="Ví dụ: Tiền nhà, Internet..." value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                </div>
-                <div>
-                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số tiền hàng tháng</label>
-                   <input required type="number" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="0" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Danh mục</label>
-                    <select className="custom-select w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
-                      {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày lên sổ</label>
-                    <select className="custom-select w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white" value={formData.day} onChange={e => setFormData({...formData, day: e.target.value})}>
-                      {Array.from({length: 31}, (_, i) => i + 1).map(d => (
-                        <option key={d} value={d}>Ngày {d}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="text-lg font-bold text-gray-800">{editingItem ? 'Chỉnh sửa khoản chi' : 'Thêm khoản chi cố định'}</h3>
+              <button onClick={() => setShowModal(false)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên khoản chi</label>
+                <input required type="text" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="Ví dụ: Tiền nhà, Internet..." value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số tiền hàng tháng</label>
+                <input required type="number" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500" placeholder="0" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} />
+              </div>
 
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-4">
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">Thời gian áp dụng</label>
-                  
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({...formData, isLifetime: true})}
-                      className={`flex-1 py-3 px-4 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${formData.isLifetime ? 'bg-white border-blue-500 text-blue-600 shadow-sm ring-1 ring-blue-500' : 'bg-transparent border-slate-200 text-gray-500 hover:bg-white hover:border-slate-300'}`}
-                    >
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${formData.isLifetime ? 'border-blue-500' : 'border-gray-400'}`}>
-                        {formData.isLifetime && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
-                      </div>
-                      Trọn đời
-                    </button>
-                    
-                    <button
-                      type="button"
-                      onClick={() => setFormData({...formData, isLifetime: false})}
-                      className={`flex-1 py-3 px-4 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${!formData.isLifetime ? 'bg-white border-blue-500 text-blue-600 shadow-sm ring-1 ring-blue-500' : 'bg-transparent border-slate-200 text-gray-500 hover:bg-white hover:border-slate-300'}`}
-                    >
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${!formData.isLifetime ? 'border-blue-500' : 'border-gray-400'}`}>
-                        {!formData.isLifetime && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
-                      </div>
-                      Có thời hạn
-                    </button>
-                  </div>
-                  
-                  {!formData.isLifetime && (
-                    <div className="flex gap-3 animate-fade-in pt-1">
-                       <div className="relative flex-1">
-                         <input 
-                           type="number" 
-                           required 
-                           min="1"
-                           className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 text-sm font-bold text-gray-700"
-                           placeholder="Nhập số lượng..."
-                           value={formData.durationMonths}
-                           onChange={e => setFormData({...formData, durationMonths: e.target.value})}
-                         />
-                       </div>
-                       <div className="w-1/3">
-                         <select 
-                           className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white text-sm font-bold text-gray-700 h-full"
-                           value={formData.durationType}
-                           onChange={e => setFormData({...formData, durationType: e.target.value})}
-                         >
-                           <option value="months">Tháng</option>
-                           <option value="years">Năm</option>
-                         </select>
-                       </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Danh mục</label>
+                  <select className="custom-select w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
+                    {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày lên sổ</label>
+                  <select className="custom-select w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white" value={formData.day} onChange={e => setFormData({ ...formData, day: e.target.value })}>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                      <option key={d} value={d}>Ngày {d}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-4">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">Thời gian áp dụng</label>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, isLifetime: true })}
+                    className={`flex-1 py-3 px-4 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${formData.isLifetime ? 'bg-white border-blue-500 text-blue-600 shadow-sm ring-1 ring-blue-500' : 'bg-transparent border-slate-200 text-gray-500 hover:bg-white hover:border-slate-300'}`}
+                  >
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${formData.isLifetime ? 'border-blue-500' : 'border-gray-400'}`}>
+                      {formData.isLifetime && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
                     </div>
-                  )}
+                    Trọn đời
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, isLifetime: false })}
+                    className={`flex-1 py-3 px-4 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${!formData.isLifetime ? 'bg-white border-blue-500 text-blue-600 shadow-sm ring-1 ring-blue-500' : 'bg-transparent border-slate-200 text-gray-500 hover:bg-white hover:border-slate-300'}`}
+                  >
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${!formData.isLifetime ? 'border-blue-500' : 'border-gray-400'}`}>
+                      {!formData.isLifetime && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
+                    </div>
+                    Có thời hạn
+                  </button>
                 </div>
 
-                <div className="pt-2">
-                  <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200">
-                    {editingItem ? 'Cập nhật' : 'Lưu thiết lập'}
-                  </button>
-                  <p className="text-xs text-center text-gray-400 mt-3">Hệ thống sẽ tự động tạo giao dịch khi đến ngày này hàng tháng.</p>
-                </div>
-             </form>
+                {!formData.isLifetime && (
+                  <div className="flex gap-3 animate-fade-in pt-1">
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 text-sm font-bold text-gray-700"
+                        placeholder="Nhập số lượng..."
+                        value={formData.durationMonths}
+                        onChange={e => setFormData({ ...formData, durationMonths: e.target.value })}
+                      />
+                    </div>
+                    <div className="w-1/3">
+                      <select
+                        className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 bg-white text-sm font-bold text-gray-700 h-full"
+                        value={formData.durationType}
+                        onChange={e => setFormData({ ...formData, durationType: e.target.value })}
+                      >
+                        <option value="months">Tháng</option>
+                        <option value="years">Năm</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200">
+                  {editingItem ? 'Cập nhật' : 'Lưu thiết lập'}
+                </button>
+                <p className="text-xs text-center text-gray-400 mt-3">Hệ thống sẽ tự động tạo giao dịch khi đến ngày này hàng tháng.</p>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -993,7 +993,7 @@ const RecurringContent = ({
 };
 
 // --- NEW COMPONENT: DEBT AUDIT CONTENT ---
-const DebtAuditContent = ({ transactions, allMonthlyIncome}) => {
+const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
   const [startMonth, setStartMonth] = useState('');
   const [startYear, setStartYear] = useState('');
   const [endMonth, setEndMonth] = useState('');
@@ -1005,7 +1005,7 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome}) => {
     if (transactions.length === 0 && Object.keys(allMonthlyIncome).length === 0) {
       return { minMonth: null, minYear: null, maxMonth: null, maxYear: null };
     }
-    
+
     let minMonth = null;
     let minYear = null;
     let maxMonth = null;
@@ -1016,7 +1016,7 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome}) => {
       const d = new Date(tx.date);
       const year = d.getFullYear();
       const month = d.getMonth();
-      
+
       if (minYear === null || year < minYear || (year === minYear && month < minMonth)) {
         minYear = year;
         minMonth = month;
@@ -1032,7 +1032,7 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome}) => {
       const [year, month] = key.split('-');
       const y = parseInt(year);
       const m = parseInt(month);
-      
+
       if (minYear === null || y < minYear || (y === minYear && m < minMonth)) {
         minYear = y;
         minMonth = m;
@@ -1055,7 +1055,7 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome}) => {
       const txDate = new Date(tx.date);
       const txYear = txDate.getFullYear();
       const txMonth = txDate.getMonth();
-      
+
       if (startYear && startMonth !== '') {
         const startM = parseInt(startMonth);
         const startY = parseInt(startYear);
@@ -1081,7 +1081,7 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome}) => {
       const [year, month] = key.split('-');
       const y = parseInt(year);
       const m = parseInt(month);
-      
+
       if (startYear && startMonth !== '') {
         const startM = parseInt(startMonth);
         const startY = parseInt(startYear);
@@ -1103,8 +1103,8 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome}) => {
       ...item,
       balance: item.income - item.spent
     })).sort((a, b) => {
-       if (b.year !== a.year) return b.year - a.year;
-       return b.month - a.month;
+      if (b.year !== a.year) return b.year - a.year;
+      return b.month - a.month;
     });
 
     const totalBalance = list.reduce((sum, item) => sum + item.balance, 0);
@@ -1176,14 +1176,14 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome}) => {
       </div>
 
       <Card className={`${stats.totalBalance >= 0 ? 'bg-gradient-to-br from-green-500 to-green-600' : 'bg-gradient-to-br from-red-500 to-red-600'} text-white border-none shadow-lg`}>
-         <div className="flex flex-col items-center justify-center py-6">
-            <h3 className="text-blue-100 text-sm font-medium uppercase tracking-wider mb-2">Tổng tích lũy (Dư/Nợ)</h3>
-            <div className="text-4xl font-bold flex items-center gap-2">
-              {stats.totalBalance >= 0 ? <TrendingUp size={36} /> : <TrendingDown size={36} />}
-              {formatCurrency(stats.totalBalance)}
-            </div>
-            <p className="mt-2 opacity-80 text-sm">{getFilterDescription()}</p>
-         </div>
+        <div className="flex flex-col items-center justify-center py-6">
+          <h3 className="text-blue-100 text-sm font-medium uppercase tracking-wider mb-2">Tổng tích lũy (Dư/Nợ)</h3>
+          <div className="text-4xl font-bold flex items-center gap-2">
+            {stats.totalBalance >= 0 ? <TrendingUp size={36} /> : <TrendingDown size={36} />}
+            {formatCurrency(stats.totalBalance)}
+          </div>
+          <p className="mt-2 opacity-80 text-sm">{getFilterDescription()}</p>
+        </div>
       </Card>
 
       <Card>
@@ -1218,32 +1218,32 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome}) => {
 
       <Card className="p-0 overflow-hidden border-0 shadow-sm">
         <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-           <div className="flex items-center gap-2">
-             <div className="p-2 bg-blue-100 rounded-lg text-blue-600"><ClipboardList size={20}/></div>
-             <h3 className="font-bold text-gray-800">Bảng kê chi tiết theo tháng</h3>
-           </div>
-           <div className="flex items-center gap-2 w-full sm:w-auto">
-             <button
-               onClick={() => setShowFilter(!showFilter)}
-               className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-             >
-               <Calendar size={16} />
-               {(startMonth || startYear || endMonth || endYear) ? 'Đang lọc' : 'Lọc theo tháng/năm'}
-               {(startMonth || startYear || endMonth || endYear) && (
-                 <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">1</span>
-               )}
-             </button>
-             {(startMonth || startYear || endMonth || endYear) && (
-               <button
-                 onClick={handleResetFilter}
-                 className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-200 transition-colors"
-               >
-                 Xóa bộ lọc
-               </button>
-             )}
-           </div>
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-blue-100 rounded-lg text-blue-600"><ClipboardList size={20} /></div>
+            <h3 className="font-bold text-gray-800">Bảng kê chi tiết theo tháng</h3>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => setShowFilter(!showFilter)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <Calendar size={16} />
+              {(startMonth || startYear || endMonth || endYear) ? 'Đang lọc' : 'Lọc theo tháng/năm'}
+              {(startMonth || startYear || endMonth || endYear) && (
+                <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">1</span>
+              )}
+            </button>
+            {(startMonth || startYear || endMonth || endYear) && (
+              <button
+                onClick={handleResetFilter}
+                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-200 transition-colors"
+              >
+                Xóa bộ lọc
+              </button>
+            )}
+          </div>
         </div>
-        
+
         {showFilter && (
           <div className="p-4 bg-blue-50/50 border-b border-gray-100">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1342,7 +1342,7 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome}) => {
 
 // --- COMPONENT: LOAN CONTENT (NEW FEATURE) ---
 // --- COMPONENT: LOAN CONTENT (UPDATED UI & ALERTS) ---  
-const LoanContent = ({ 
+const LoanContent = ({
   loans, addLoan, updateLoan, deleteLoan, formatCurrency, checkPermission
 }) => {
   const [showModal, setShowModal] = useState(false);
@@ -1382,7 +1382,7 @@ const LoanContent = ({
     if (!formData.person || !formData.amount) return;
 
     const payload = { ...formData, amount: Number(formData.amount) };
-    
+
     if (editingLoan) {
       await updateLoan(editingLoan.id, payload);
     } else {
@@ -1397,26 +1397,26 @@ const LoanContent = ({
     const pendingLoans = loans.filter(l => l.status === 'pending');
     const totalLent = pendingLoans.filter(l => l.type === 'lent').reduce((sum, l) => sum + l.amount, 0);
     const totalBorrowed = pendingLoans.filter(l => l.type === 'borrowed').reduce((sum, l) => sum + l.amount, 0);
-    
+
     // Xử lý danh sách hiển thị
     const filtered = loans.filter(l => {
       if (filterType === 'all') return true;
       return l.type === filterType;
     }).sort((a, b) => {
-       if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
-       return new Date(b.startDate) - new Date(a.startDate);
+      if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
+      return new Date(b.startDate) - new Date(a.startDate);
     });
 
     // Xử lý cảnh báo (Alerts)
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
     const generatedAlerts = [];
 
     pendingLoans.forEach(loan => {
       if (!loan.dueDate) return;
       const due = new Date(loan.dueDate);
-      due.setHours(0,0,0,0);
-      
+      due.setHours(0, 0, 0, 0);
+
       const diffTime = due - today;
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Số ngày còn lại
 
@@ -1442,8 +1442,8 @@ const LoanContent = ({
       }
     });
 
-    return { 
-      stats: { totalLent, totalBorrowed }, 
+    return {
+      stats: { totalLent, totalBorrowed },
       sortedLoans: filtered,
       alerts: generatedAlerts
     };
@@ -1451,7 +1451,7 @@ const LoanContent = ({
 
   const isOverdue = (dueDate) => {
     if (!dueDate) return false;
-    return new Date(dueDate) < new Date().setHours(0,0,0,0);
+    return new Date(dueDate) < new Date().setHours(0, 0, 0, 0);
   };
 
   return (
@@ -1460,12 +1460,12 @@ const LoanContent = ({
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
           <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <HandCoins size={24} className="text-gray-400"/>Sổ Nợ & Cho Vay
-          </h3>        
+            <HandCoins size={24} className="text-gray-400" />Sổ Nợ & Cho Vay
+          </h3>
           <p className="text-gray-500">Quản lý các khoản vay mượn và nhắc hạn trả nợ</p>
         </div>
-        <button 
-          onClick={() => { if (!checkPermission()) return; resetForm(); setShowModal(true); }} 
+        <button
+          onClick={() => { if (!checkPermission()) return; resetForm(); setShowModal(true); }}
           className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl sm:hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-200 transition-all active:scale-95 w-full md:w-auto justify-center"
         >
           <PlusCircle size={18} /> Thêm khoản mới
@@ -1479,7 +1479,7 @@ const LoanContent = ({
             const isDanger = alert.type === 'danger';
             const actionText = alert.loanType === 'lent' ? 'thu hồi từ' : 'trả cho';
             let timeText = '';
-            
+
             if (alert.days < 0) timeText = `Đã quá hạn ${Math.abs(alert.days)} ngày`;
             else if (alert.days === 0) timeText = `Hạn chót là hôm nay`;
             else timeText = `Còn ${alert.days} ngày nữa đến hạn`;
@@ -1506,94 +1506,94 @@ const LoanContent = ({
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-         <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg border-none">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-green-100 text-sm font-medium uppercase tracking-wider">Bạn đang cho vay</p>
-                <h3 className="text-3xl font-bold mt-2">{formatCurrency(stats.totalLent)}</h3>
-              </div>
-              <div className="p-2 bg-white/20 rounded-lg"><ArrowUpRight size={24}/></div>
+        <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg border-none">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-green-100 text-sm font-medium uppercase tracking-wider">Bạn đang cho vay</p>
+              <h3 className="text-3xl font-bold mt-2">{formatCurrency(stats.totalLent)}</h3>
             </div>
-         </Card>
-         <Card className="bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg border-none">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-orange-100 text-sm font-medium uppercase tracking-wider">Bạn đang nợ</p>
-                <h3 className="text-3xl font-bold mt-2">{formatCurrency(stats.totalBorrowed)}</h3>
-              </div>
-              <div className="p-2 bg-white/20 rounded-lg"><ArrowDownRight size={24}/></div>
+            <div className="p-2 bg-white/20 rounded-lg"><ArrowUpRight size={24} /></div>
+          </div>
+        </Card>
+        <Card className="bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg border-none">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-orange-100 text-sm font-medium uppercase tracking-wider">Bạn đang nợ</p>
+              <h3 className="text-3xl font-bold mt-2">{formatCurrency(stats.totalBorrowed)}</h3>
             </div>
-         </Card>
+            <div className="p-2 bg-white/20 rounded-lg"><ArrowDownRight size={24} /></div>
+          </div>
+        </Card>
       </div>
 
       {/* Filters */}
       <div className="flex gap-2 bg-white p-1.5 rounded-xl border border-slate-100 w-fit">
-         {['all', 'lent', 'borrowed'].map(type => (
-           <button
-             key={type}
-             onClick={() => setFilterType(type)}
-             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === type ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-slate-50'}`}
-           >
-             {type === 'all' ? 'Tất cả' : type === 'lent' ? 'Cho vay' : 'Đi vay'}
-           </button>
-         ))}
+        {['all', 'lent', 'borrowed'].map(type => (
+          <button
+            key={type}
+            onClick={() => setFilterType(type)}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === type ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-slate-50'}`}
+          >
+            {type === 'all' ? 'Tất cả' : type === 'lent' ? 'Cho vay' : 'Đi vay'}
+          </button>
+        ))}
       </div>
 
       {/* List */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {sortedLoans.map(item => {
-           const overdue = item.status === 'pending' && isOverdue(item.dueDate);
-           return (
-             <div key={item.id} className={`bg-white rounded-2xl p-5 border shadow-sm transition-all relative group overflow-hidden ${item.status === 'completed' ? 'border-slate-100 opacity-60 grayscale-[0.5]' : overdue ? 'border-red-200 ring-1 ring-red-100' : 'border-slate-100 hover:border-indigo-100 hover:shadow-md'}`}>
-                {item.status === 'completed' && <div className="absolute inset-0 bg-slate-50/10 z-10 pointer-events-none flex items-center justify-center"><div className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold text-sm transform -rotate-12 border border-green-200 shadow-sm">Đã hoàn thành</div></div>}
-                
-                <div className="flex justify-between items-start mb-3 relative z-20">
-                   <div className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase ${item.type === 'lent' ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>
-                     {item.type === 'lent' ? 'Cho vay' : 'Đi vay'}
-                   </div>
-                   <div className="flex gap-1">
-                      {item.status === 'pending' && (
-                        <button onClick={() => {
-                          if (!checkPermission()) return; // <--- BỌC LẠI
-                          updateLoan(item.id, { status: 'completed' });
-                        }} 
-                        className="p-2 rounded-full text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors" title="Đánh dấu đã xong"><CheckCircle2 size={18}/></button>
-                      )}
-                      <button onClick={() => {
-                          if (!checkPermission()) return; // <--- BỌC LẠI
-                          handleEdit(item);
-                        }} className="p-2 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={18}/></button>
-                      <button onClick={() => {
-                        if (!checkPermission()) return; // <--- BỌC LẠI
-                        deleteLoan(item.id);
-                      }} className="p-2 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={18}/></button>
-                   </div>
-                </div>
+          const overdue = item.status === 'pending' && isOverdue(item.dueDate);
+          return (
+            <div key={item.id} className={`bg-white rounded-2xl p-5 border shadow-sm transition-all relative group overflow-hidden ${item.status === 'completed' ? 'border-slate-100 opacity-60 grayscale-[0.5]' : overdue ? 'border-red-200 ring-1 ring-red-100' : 'border-slate-100 hover:border-indigo-100 hover:shadow-md'}`}>
+              {item.status === 'completed' && <div className="absolute inset-0 bg-slate-50/10 z-10 pointer-events-none flex items-center justify-center"><div className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold text-sm transform -rotate-12 border border-green-200 shadow-sm">Đã hoàn thành</div></div>}
 
-                <div className="mb-4 relative z-20">
-                  <h4 className="text-lg font-bold text-gray-800">{item.person}</h4>
-                  <p className={`text-2xl font-bold mt-1 ${item.type === 'lent' ? 'text-green-600' : 'text-orange-600'}`}>{formatCurrency(item.amount)}</p>
-                  {item.note && <p className="text-sm text-gray-500 mt-2 line-clamp-2">{item.note}</p>}
+              <div className="flex justify-between items-start mb-3 relative z-20">
+                <div className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase ${item.type === 'lent' ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>
+                  {item.type === 'lent' ? 'Cho vay' : 'Đi vay'}
                 </div>
+                <div className="flex gap-1">
+                  {item.status === 'pending' && (
+                    <button onClick={() => {
+                      if (!checkPermission()) return; // <--- BỌC LẠI
+                      updateLoan(item.id, { status: 'completed' });
+                    }}
+                      className="p-2 rounded-full text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors" title="Đánh dấu đã xong"><CheckCircle2 size={18} /></button>
+                  )}
+                  <button onClick={() => {
+                    if (!checkPermission()) return; // <--- BỌC LẠI
+                    handleEdit(item);
+                  }} className="p-2 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={18} /></button>
+                  <button onClick={() => {
+                    if (!checkPermission()) return; // <--- BỌC LẠI
+                    deleteLoan(item.id);
+                  }} className="p-2 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={18} /></button>
+                </div>
+              </div>
 
-                <div className="pt-3 border-t border-slate-50 flex flex-col gap-2 relative z-20">
-                   <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                     <Calendar size={14} className="text-gray-400" /> Ngày tạo: {new Date(item.startDate).toLocaleDateString('vi-VN')}
-                   </div>
-                   {item.dueDate && (
-                     <div className={`flex items-center gap-2 text-xs font-bold ${overdue ? 'text-red-600' : 'text-indigo-600'}`}>
-                       <CalendarClock size={14} /> Hạn trả: {new Date(item.dueDate).toLocaleDateString('vi-VN')}
-                       {overdue && <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[10px]">Quá hạn</span>}
-                     </div>
-                   )}
+              <div className="mb-4 relative z-20">
+                <h4 className="text-lg font-bold text-gray-800">{item.person}</h4>
+                <p className={`text-2xl font-bold mt-1 ${item.type === 'lent' ? 'text-green-600' : 'text-orange-600'}`}>{formatCurrency(item.amount)}</p>
+                {item.note && <p className="text-sm text-gray-500 mt-2 line-clamp-2">{item.note}</p>}
+              </div>
+
+              <div className="pt-3 border-t border-slate-50 flex flex-col gap-2 relative z-20">
+                <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                  <Calendar size={14} className="text-gray-400" /> Ngày tạo: {new Date(item.startDate).toLocaleDateString('vi-VN')}
                 </div>
-             </div>
-           );
+                {item.dueDate && (
+                  <div className={`flex items-center gap-2 text-xs font-bold ${overdue ? 'text-red-600' : 'text-indigo-600'}`}>
+                    <CalendarClock size={14} /> Hạn trả: {new Date(item.dueDate).toLocaleDateString('vi-VN')}
+                    {overdue && <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[10px]">Quá hạn</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
         })}
         {sortedLoans.length === 0 && (
           <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
-             <HandCoins size={48} className="mb-4 opacity-20" />
-             <p>Chưa có khoản vay/mượn nào.</p>
+            <HandCoins size={48} className="mb-4 opacity-20" />
+            <p>Chưa có khoản vay/mượn nào.</p>
           </div>
         )}
       </div>
@@ -1602,59 +1602,59 @@ const LoanContent = ({
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
-             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h3 className="text-lg font-bold text-gray-800">{editingLoan ? 'Cập nhật khoản vay' : 'Thêm khoản vay/mượn mới'}</h3>
-                <button onClick={() => setShowModal(false)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18}/></button>
-             </div>
-             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                <div className="flex bg-slate-100 p-1 rounded-xl">
-                  <button type="button" onClick={() => setFormData({...formData, type: 'lent'})} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${formData.type === 'lent' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Cho vay (Phải thu)</button>
-                  <button type="button" onClick={() => setFormData({...formData, type: 'borrowed'})} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${formData.type === 'borrowed' ? 'bg-white text-orange-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Đi vay (Phải trả)</button>
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-800">{editingLoan ? 'Cập nhật khoản vay' : 'Thêm khoản vay/mượn mới'}</h3>
+              <button onClick={() => setShowModal(false)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button type="button" onClick={() => setFormData({ ...formData, type: 'lent' })} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${formData.type === 'lent' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Cho vay (Phải thu)</button>
+                <button type="button" onClick={() => setFormData({ ...formData, type: 'borrowed' })} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${formData.type === 'borrowed' ? 'bg-white text-orange-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Đi vay (Phải trả)</button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{formData.type === 'lent' ? 'Người vay' : 'Chủ nợ'}</label>
+                  <input required autoFocus type="text" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 font-medium" placeholder="Nhập tên..." value={formData.person} onChange={e => setFormData({ ...formData, person: e.target.value })} />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                   <div className="col-span-2">
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{formData.type === 'lent' ? 'Người vay' : 'Chủ nợ'}</label>
-                     <input required autoFocus type="text" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 font-medium" placeholder="Nhập tên..." value={formData.person} onChange={e => setFormData({...formData, person: e.target.value})} />
-                   </div>
-                   <div className="col-span-2">
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số tiền</label>
-                     <input required type="number" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-lg font-bold" placeholder="0" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
-                   </div>
-                   <div>
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày bắt đầu</label>
-                     <input required type="date" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm font-medium" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
-                   </div>
-                   <div>
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hạn trả (Tuỳ chọn)</label>
-                     <input type="date" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm font-medium" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} />
-                   </div>
-                   <div className="col-span-2">
-                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ghi chú</label>
-                     <textarea className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm" rows="2" placeholder="Nội dung chi tiết..." value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})}></textarea>
-                   </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số tiền</label>
+                  <input required type="number" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-lg font-bold" placeholder="0" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày bắt đầu</label>
+                  <input required type="date" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm font-medium" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hạn trả (Tuỳ chọn)</label>
+                  <input type="date" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm font-medium" value={formData.dueDate} onChange={e => setFormData({ ...formData, dueDate: e.target.value })} />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ghi chú</label>
+                  <textarea className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm" rows="2" placeholder="Nội dung chi tiết..." value={formData.note} onChange={e => setFormData({ ...formData, note: e.target.value })}></textarea>
+                </div>
+              </div>
 
-                {/* --- UI TRẠNG THÁI MỚI: RÕ RÀNG HƠN --- */}
-                {editingLoan && (
-                   <div 
-                     onClick={() => setFormData({...formData, status: formData.status === 'completed' ? 'pending' : 'completed'})}
-                     className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex items-center gap-3 select-none ${formData.status === 'completed' ? 'bg-green-50 border-green-500 text-green-700' : 'bg-slate-50 border-slate-200 text-gray-500 hover:bg-slate-100'}`}
-                   >
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${formData.status === 'completed' ? 'border-green-600 bg-green-600 text-white' : 'border-gray-400 bg-white'}`}>
-                        {formData.status === 'completed' && <CheckCircle2 size={16} />}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-sm">{formData.status === 'completed' ? 'Đã thanh toán xong' : 'Đánh dấu đã xong'}</p>
-                        <p className="text-xs opacity-80">{formData.status === 'completed' ? 'Khoản này đã được quyết toán' : 'Khoản này vẫn đang hiệu lực'}</p>
-                      </div>
-                   </div>
-                )}
+              {/* --- UI TRẠNG THÁI MỚI: RÕ RÀNG HƠN --- */}
+              {editingLoan && (
+                <div
+                  onClick={() => setFormData({ ...formData, status: formData.status === 'completed' ? 'pending' : 'completed' })}
+                  className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex items-center gap-3 select-none ${formData.status === 'completed' ? 'bg-green-50 border-green-500 text-green-700' : 'bg-slate-50 border-slate-200 text-gray-500 hover:bg-slate-100'}`}
+                >
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${formData.status === 'completed' ? 'border-green-600 bg-green-600 text-white' : 'border-gray-400 bg-white'}`}>
+                    {formData.status === 'completed' && <CheckCircle2 size={16} />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-sm">{formData.status === 'completed' ? 'Đã thanh toán xong' : 'Đánh dấu đã xong'}</p>
+                    <p className="text-xs opacity-80">{formData.status === 'completed' ? 'Khoản này đã được quyết toán' : 'Khoản này vẫn đang hiệu lực'}</p>
+                  </div>
+                </div>
+              )}
 
-                <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 mt-2">
-                  {editingLoan ? 'Cập nhật' : 'Lưu khoản nợ'}
-                </button>
-             </form>
+              <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 mt-2">
+                {editingLoan ? 'Cập nhật' : 'Lưu khoản nợ'}
+              </button>
+            </form>
           </div>
         </div>
       )}
@@ -1668,13 +1668,13 @@ export default function FinanceApp({ user }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
-  const [monthlyIncome, setMonthlyIncome] = useState(0); 
+  const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [allMonthlyIncome, setAllMonthlyIncome] = useState({});
-  const [customCategoryConfig, setCustomCategoryConfig] = useState({}); 
-  const [categoryVisibility, setCategoryVisibility] = useState({}); 
-  const [categoryAlerts, setCategoryAlerts] = useState({}); 
+  const [customCategoryConfig, setCustomCategoryConfig] = useState({});
+  const [categoryVisibility, setCategoryVisibility] = useState({});
+  const [categoryAlerts, setCategoryAlerts] = useState({});
   const [noteStats, setNoteStats] = useState({});
-  const [recurringItems, setRecurringItems] = useState([]); 
+  const [recurringItems, setRecurringItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -1684,7 +1684,7 @@ export default function FinanceApp({ user }) {
 
   // 1. GỌI HOOK TRIAL
   const { isReadOnly, daysLeft } = useTrial(user);
-  
+
   // 2. STATE ĐIỀU KHIỂN MODAL
   const [showTrialModal, setShowTrialModal] = useState(false);
 
@@ -1700,8 +1700,7 @@ export default function FinanceApp({ user }) {
 
   // Hàm xử lý khi bấm nút Nâng cấp trong Modal
   const handleUpgrade = () => {
-    alert("Chuyển hướng đến cổng thanh toán...");
-    // Logic thanh toán của bạn ở đây
+    navigate('/pricing');
     setShowTrialModal(false);
   };
 
@@ -1720,9 +1719,9 @@ export default function FinanceApp({ user }) {
   const loadedUserIdRef = React.useRef(null);
 
   const showSuccess = (msg) => {
-     if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
-     setNotification(msg);
-     notificationTimeoutRef.current = setTimeout(() => setNotification(null), 3000);
+    if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
+    setNotification(msg);
+    notificationTimeoutRef.current = setTimeout(() => setNotification(null), 3000);
   };
 
   // --- DEBUG RENDER (Thêm dòng này ngay dưới khai báo state để check) ---
@@ -1743,8 +1742,8 @@ export default function FinanceApp({ user }) {
       if (parentPath) {
         const loansRef = collection(parentPath, 'loans');
         onSnapshot(loansRef, (snapshot) => {
-           const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-           setLoans(data);
+          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setLoans(data);
         });
       }
     } catch (err) {
@@ -1762,10 +1761,10 @@ export default function FinanceApp({ user }) {
       try {
         console.log(`>>> [Data] Received ${snapshot.docs.length} transactions`);
         const data = snapshot.docs.map(doc => {
-           const d = doc.data();
-           return { id: doc.id, ...d, date: d.date || new Date().toISOString() };
+          const d = doc.data();
+          return { id: doc.id, ...d, date: d.date || new Date().toISOString() };
         });
-        
+
         // Sort giảm dần theo ngày
         data.sort((a, b) => new Date(b.date) - new Date(a.date));
         setTransactions(data);
@@ -1782,45 +1781,45 @@ export default function FinanceApp({ user }) {
     // --- 3. LISTENER BUDGETS (FIX: Xử lý dạng Collection) ---
     // Vì 'budgets' là collection, ta phải truy cập vào sub-collection của đường dẫn gốc
     // Nếu paths.budgetConfig trong firebase.js đang trỏ sai, ta tự dựng lại path thủ công cho chắc ăn:
-    
+
     let budgetQuery = paths.budgetConfig; // Mặc định dùng cái cũ
-    
+
     // Nếu user nói budgets là collection, ta thử query dạng collection:
     // Cách fix nhanh: Lấy parent path của transactions (là folder user) -> trỏ vào 'budgets'
     try {
-        // Hack: Dựng lại path collection budgets từ path transactions
-        // transactions path: .../public/data/transactions
-        // budgets path mong muốn: .../public/data/budgets
-        const parentPath = paths.transactions.parent; // .../public/data
-        if (parentPath) {
-            const budgetsColRef = collection(parentPath, 'budgets');
-            
-            onSnapshot(budgetsColRef, (snapshot) => {
-                const newBudgets = { ...INITIAL_BUDGETS };
-                // Giả sử mỗi doc có id là tên category (vd: 'eating') và data có field 'amount' hoặc là số trực tiếp
-                snapshot.forEach(doc => {
-                    const d = doc.data();
-                    // Logic map: Nếu doc có field 'value' hoặc 'budget', hoặc lấy chính data làm value
-                    const val = d.value || d.budget || d.amount || 0;
-                    newBudgets[doc.id] = Number(val);
-                });
-                console.log(">>> [Data] Budgets loaded:", newBudgets);
-                setBudgets(newBudgets);
-            });
-        }
+      // Hack: Dựng lại path collection budgets từ path transactions
+      // transactions path: .../public/data/transactions
+      // budgets path mong muốn: .../public/data/budgets
+      const parentPath = paths.transactions.parent; // .../public/data
+      if (parentPath) {
+        const budgetsColRef = collection(parentPath, 'budgets');
+
+        onSnapshot(budgetsColRef, (snapshot) => {
+          const newBudgets = { ...INITIAL_BUDGETS };
+          // Giả sử mỗi doc có id là tên category (vd: 'eating') và data có field 'amount' hoặc là số trực tiếp
+          snapshot.forEach(doc => {
+            const d = doc.data();
+            // Logic map: Nếu doc có field 'value' hoặc 'budget', hoặc lấy chính data làm value
+            const val = d.value || d.budget || d.amount || 0;
+            newBudgets[doc.id] = Number(val);
+          });
+          console.log(">>> [Data] Budgets loaded:", newBudgets);
+          setBudgets(newBudgets);
+        });
+      }
     } catch (err) {
-        console.warn(">>> [Budgets] Error fetching collection, fallback to default", err);
+      console.warn(">>> [Budgets] Error fetching collection, fallback to default", err);
     }
 
     // --- 4. CÁC LISTENER KHÁC (Giữ nguyên, thêm try-catch) ---
     const unsubCustomCats = onSnapshot(paths.categories, (s) => s.exists() && setCustomCategoryConfig(s.data()));
     const unsubVisibility = onSnapshot(paths.visibility, (s) => s.exists() && setCategoryVisibility(s.data()));
     const unsubAlerts = onSnapshot(paths.alerts, (s) => s.exists() && setCategoryAlerts(s.data()));
-    
+
     // Cleanup
-    return () => { 
-        clearTimeout(safetyTimer);
-        unsubTx(); unsubCustomCats(); unsubVisibility(); unsubAlerts();
+    return () => {
+      clearTimeout(safetyTimer);
+      unsubTx(); unsubCustomCats(); unsubVisibility(); unsubAlerts();
     };
   }, [user]);
 
@@ -1838,17 +1837,17 @@ export default function FinanceApp({ user }) {
 
     const paths = getFirestorePaths(user);
     if (!paths) return;
-    
+
     // Check if this is a different user - if so, reset loading state
     const currentUserId = user.uid || (user.isAnonymous ? 'anonymous' : null);
     const isDifferentUser = loadedUserIdRef.current !== currentUserId;
-    
+
     if (isDifferentUser) {
       hasInitialLoadRef.current = false;
       dataLoadedRef.current = false;
       loadedUserIdRef.current = currentUserId;
     }
-    
+
     // Only show loading on very first load for this user
     // onSnapshot uses cache-first by default, so subsequent visits won't show loading
     const isFirstLoad = !hasInitialLoadRef.current;
@@ -1860,22 +1859,22 @@ export default function FinanceApp({ user }) {
     // Helper function to process transactions
     const processTransactions = (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
+
       // --- CẬP NHẬT LOGIC SẮP XẾP ---
       data.sort((a, b) => {
         // 1. So sánh theo ngày giao dịch (Date chọn trên lịch)
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
-        
+
         if (dateB !== dateA) {
           return dateB - dateA; // Ngày lớn hơn (mới hơn) xếp trước
         }
-        
+
         // 2. Nếu cùng ngày, so sánh theo thời gian tạo thực tế (createdAt)
         // Lưu ý: createdAt có thể null giây lát khi vừa tạo xong (latency compensation)
         const timeA = a.createdAt?.seconds || 0;
         const timeB = b.createdAt?.seconds || 0;
-        
+
         return timeB - timeA; // Tạo sau (mới hơn) xếp trước
       });
       // -------------------------------
@@ -1886,14 +1885,14 @@ export default function FinanceApp({ user }) {
         dataLoadedRef.current = true;
       }
     };
-    
+
     // Set up real-time listeners (these use cache-first by default)
     // This means if data exists in cache, it will be used immediately without API call
     const unsubTx = onSnapshot(
-      query(paths.transactions), 
+      query(paths.transactions),
       processTransactions,
-      (e) => { 
-        console.error(e); 
+      (e) => {
+        console.error(e);
         if (isFirstLoad) {
           setIsLoading(false);
           dataLoadedRef.current = true;
@@ -1904,7 +1903,7 @@ export default function FinanceApp({ user }) {
     const unsubBudget = onSnapshot(paths.budgetConfig, (s) => {
       if (s.exists()) setBudgets(s.data());
     });
-    
+
     const unsubCustomCats = onSnapshot(paths.categories, (s) => {
       if (s.exists()) setCustomCategoryConfig(s.data());
     });
@@ -1921,9 +1920,9 @@ export default function FinanceApp({ user }) {
       setRecurringItems(data);
     });
 
-    return () => { 
-      unsubTx(); unsubBudget(); unsubNotes(); unsubCustomCats(); 
-      unsubVisibility(); unsubAlerts(); unsubRecurring(); 
+    return () => {
+      unsubTx(); unsubBudget(); unsubNotes(); unsubCustomCats();
+      unsubVisibility(); unsubAlerts(); unsubRecurring();
     };
   }, [user]);
 
@@ -1941,11 +1940,11 @@ export default function FinanceApp({ user }) {
     });
 
     const unsubAllStats = onSnapshot(paths.allMonthlyStats, (snapshot) => {
-       const data = {};
-       snapshot.forEach(doc => {
-         data[doc.id] = doc.data().income || 0;
-       });
-       setAllMonthlyIncome(data);
+      const data = {};
+      snapshot.forEach(doc => {
+        data[doc.id] = doc.data().income || 0;
+      });
+      setAllMonthlyIncome(data);
     });
 
     return () => { unsubMonthlyStats(); unsubAllStats(); };
@@ -1956,17 +1955,17 @@ export default function FinanceApp({ user }) {
 
     const checkAndExecuteRecurring = async () => {
       const now = new Date();
-      const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`; 
+      const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
       const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
       const paths = getFirestorePaths(user);
 
       recurringItems.forEach(async (item) => {
         if (item.durationMonths) {
-            const startDate = new Date(item.startDate);
-            const monthsPassed = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
-            if (monthsPassed >= item.durationMonths) {
-                return;
-            }
+          const startDate = new Date(item.startDate);
+          const monthsPassed = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
+          if (monthsPassed >= item.durationMonths) {
+            return;
+          }
         }
 
         if (item.lastExecuted === currentMonthKey) return;
@@ -1975,21 +1974,21 @@ export default function FinanceApp({ user }) {
 
         if (now.getDate() >= targetDay) {
           try {
-             await addDoc(paths.transactions, {
-               amount: item.amount,
-               category: item.category,
-               date: new Date().toISOString().split('T')[0], 
-               note: `${item.name} (Tự động)`,
-               createdAt: serverTimestamp(),
-               isRecurring: true
-             });
+            await addDoc(paths.transactions, {
+              amount: item.amount,
+              category: item.category,
+              date: new Date().toISOString().split('T')[0],
+              note: `${item.name} (Tự động)`,
+              createdAt: serverTimestamp(),
+              isRecurring: true
+            });
 
-             const itemRef = doc(paths.recurring, item.id);
-             await updateDoc(itemRef, {
-               lastExecuted: currentMonthKey
-             });
-             
-             console.log(`Executed recurring expense: ${item.name}`);
+            const itemRef = doc(paths.recurring, item.id);
+            await updateDoc(itemRef, {
+              lastExecuted: currentMonthKey
+            });
+
+            console.log(`Executed recurring expense: ${item.name}`);
           } catch (error) {
             console.error("Error executing recurring expense:", error);
           }
@@ -2006,7 +2005,7 @@ export default function FinanceApp({ user }) {
       id: key,
       name: mergedConfig[key].label,
       color: mergedConfig[key].color,
-      icon: ICON_LIBRARY[mergedConfig[key].icon] || Star 
+      icon: ICON_LIBRARY[mergedConfig[key].icon] || Star
     }));
   }, [customCategoryConfig]);
 
@@ -2014,7 +2013,7 @@ export default function FinanceApp({ user }) {
     if (!user) return;
     const paths = getFirestorePaths(user);
     await addDoc(paths.transactions, { ...newTx, createdAt: serverTimestamp() });
-    
+
     if (newTx.note?.trim()) {
       const cleanNote = newTx.note.trim().replace(/\./g, '');
       if (cleanNote) await setDoc(paths.notes, { [cleanNote]: increment(1) }, { merge: true });
@@ -2082,7 +2081,7 @@ export default function FinanceApp({ user }) {
     await setDoc(paths.categories, {
       [id]: { label: name, color: randomColor }
     }, { merge: true });
-    
+
     await setDoc(paths.budgetConfig, {
       [id]: Number(budget)
     }, { merge: true });
@@ -2094,14 +2093,14 @@ export default function FinanceApp({ user }) {
     const paths = getFirestorePaths(user);
     await updateDoc(paths.categories, { [id]: deleteField() });
     await updateDoc(paths.budgetConfig, { [id]: deleteField() });
-    try { await updateDoc(paths.visibility, { [id]: deleteField() }); } catch(e) {}
-    try { await updateDoc(paths.alerts, { [id]: deleteField() }); } catch(e) {}
+    try { await updateDoc(paths.visibility, { [id]: deleteField() }); } catch (e) { }
+    try { await updateDoc(paths.alerts, { [id]: deleteField() }); } catch (e) { }
   };
 
   const updateCategoryName = async (id, newName) => {
     if (!user || !newName.trim()) return;
     const paths = getFirestorePaths(user);
-    
+
     // Check if it's a default category
     const defaultCategory = DEFAULT_CATEGORY_CONFIG[id];
     if (defaultCategory) {
@@ -2113,26 +2112,26 @@ export default function FinanceApp({ user }) {
       // For custom categories, use existing logic
       const currentCategory = customCategoryConfig[id];
       if (!currentCategory) return;
-      
+
       await setDoc(paths.categories, {
         [id]: { ...currentCategory, label: newName.trim() }
       }, { merge: true });
     }
-    
+
     showSuccess("Đã cập nhật tên danh mục thành công!");
   };
 
   const toggleVisibility = async (id) => {
     if (!user) return;
     const paths = getFirestorePaths(user);
-    const currentStatus = categoryVisibility[id] !== false; 
+    const currentStatus = categoryVisibility[id] !== false;
     await setDoc(paths.visibility, { [id]: !currentStatus }, { merge: true });
   };
 
   const toggleAlert = async (id) => {
     if (!user) return;
     const paths = getFirestorePaths(user);
-    const currentStatus = categoryAlerts[id] !== false; 
+    const currentStatus = categoryAlerts[id] !== false;
     await setDoc(paths.alerts, { [id]: !currentStatus }, { merge: true });
   };
 
@@ -2143,7 +2142,7 @@ export default function FinanceApp({ user }) {
       ...item,
       amount: Number(item.amount),
       day: Number(item.day),
-      lastExecuted: '', 
+      lastExecuted: '',
       startDate: new Date().toISOString()
     });
     showSuccess("Đã thêm lịch chi tiêu cố định thành công!");
@@ -2170,8 +2169,8 @@ export default function FinanceApp({ user }) {
 
   // --- MEMOIZED DATA CALCULATIONS ---
   const currentMonthTransactions = useMemo(() => transactions.filter(t => {
-      const d = new Date(t.date);
-      return d.getMonth() === parseInt(viewMonth) && d.getFullYear() === parseInt(viewYear);
+    const d = new Date(t.date);
+    return d.getMonth() === parseInt(viewMonth) && d.getFullYear() === parseInt(viewYear);
   }), [transactions, viewMonth, viewYear]);
 
   const previousMonthData = useMemo(() => {
@@ -2194,10 +2193,10 @@ export default function FinanceApp({ user }) {
     allCategories.forEach(c => data[c.id] = 0);
     currentMonthTransactions.forEach(t => { if (data[t.category] !== undefined) data[t.category] += Number(t.amount); });
     const total = Object.values(data).reduce((a, b) => a + b, 0);
-    
+
     let result = allCategories.map(cat => ({
-        id: cat.id, name: cat.name, value: data[cat.id] || 0, color: cat.color,
-        budget: budgets[cat.id] || 0, percentage: total > 0 ? ((data[cat.id] || 0) / total) * 100 : 0
+      id: cat.id, name: cat.name, value: data[cat.id] || 0, color: cat.color,
+      budget: budgets[cat.id] || 0, percentage: total > 0 ? ((data[cat.id] || 0) / total) * 100 : 0
     }));
 
     return result.filter(item => categoryVisibility[item.id] !== false).sort((a, b) => b.value - a.value);
@@ -2207,7 +2206,7 @@ export default function FinanceApp({ user }) {
     const days = new Date(viewYear, parseInt(viewMonth) + 1, 0).getDate();
     const data = Array.from({ length: days }, (_, i) => ({ name: i + 1, amount: 0, fullLabel: `Ngày ${i + 1}/${parseInt(viewMonth) + 1}` }));
     currentMonthTransactions.forEach(t => {
-      if (categoryVisibility[t.category] === false) return; 
+      if (categoryVisibility[t.category] === false) return;
       if (chartCategoryFilter !== 'all' && t.category !== chartCategoryFilter) return;
       const day = new Date(t.date).getDate() - 1;
       if (data[day]) data[day].amount += Number(t.amount);
@@ -2245,8 +2244,8 @@ export default function FinanceApp({ user }) {
   }), [currentMonthTransactions, search, filterCategory]);
 
   const AddTransactionModal = ({ onClose, transactionToEdit }) => {
-    const [mode, setMode] = useState(transactionToEdit ? 'simple' : 'simple'); 
-    
+    const [mode, setMode] = useState(transactionToEdit ? 'simple' : 'simple');
+
     useEffect(() => {
       document.body.style.overflow = 'hidden';
       return () => { document.body.style.overflow = 'unset'; };
@@ -2258,62 +2257,62 @@ export default function FinanceApp({ user }) {
       category: transactionToEdit.category,
       note: transactionToEdit.note,
       isIncurred: transactionToEdit.isIncurred || false
-    } : { 
-      date: new Date().toISOString().split('T')[0], 
-      amount: '', 
-      category: 'eating', 
-      note: '', 
-      isIncurred: false 
+    } : {
+      date: new Date().toISOString().split('T')[0],
+      amount: '',
+      category: 'eating',
+      note: '',
+      isIncurred: false
     });
-    
+
     const [advancedDate, setAdvancedDate] = useState(new Date().toISOString().split('T')[0]);
     const [advancedItems, setAdvancedItems] = useState([
       { amount: '', category: 'eating', note: '', isIncurred: false }
     ]);
-    const [activeRowIndex, setActiveRowIndex] = useState(null); 
+    const [activeRowIndex, setActiveRowIndex] = useState(null);
 
     const [suggestions, setSuggestions] = useState([]);
-    
+
     const handleNoteChange = (e, index = null) => {
       const val = e.target.value;
       if (mode === 'simple') {
-        setFormData({...formData, note: val});
+        setFormData({ ...formData, note: val });
       } else {
         const newItems = [...advancedItems];
         newItems[index].note = val;
         setAdvancedItems(newItems);
-        setActiveRowIndex(index); 
+        setActiveRowIndex(index);
       }
 
       if (val.length >= 3) {
-        const matches = Object.entries(noteStats).filter(([n, c]) => c >= 2 && n.toLowerCase().includes(val.toLowerCase())).sort((a,b)=>b[1]-a[1]).map(([n])=>n).slice(0,5);
+        const matches = Object.entries(noteStats).filter(([n, c]) => c >= 2 && n.toLowerCase().includes(val.toLowerCase())).sort((a, b) => b[1] - a[1]).map(([n]) => n).slice(0, 5);
         setSuggestions(matches);
       } else setSuggestions([]);
     };
 
     const handleSelectSuggestion = (val, index = null) => {
-        if (mode === 'simple') {
-            setFormData({...formData, note: val});
-        } else {
-            const newItems = [...advancedItems];
-            newItems[index].note = val;
-            setAdvancedItems(newItems);
-        }
-        setSuggestions([]);
-        setActiveRowIndex(null);
+      if (mode === 'simple') {
+        setFormData({ ...formData, note: val });
+      } else {
+        const newItems = [...advancedItems];
+        newItems[index].note = val;
+        setAdvancedItems(newItems);
+      }
+      setSuggestions([]);
+      setActiveRowIndex(null);
     }
 
-    const handleSubmitSimple = async (e) => { 
-      e.preventDefault(); 
-      if (!formData.amount || !formData.date) return; 
-      
+    const handleSubmitSimple = async (e) => {
+      e.preventDefault();
+      if (!formData.amount || !formData.date) return;
+
       if (transactionToEdit) {
         await updateTransaction(transactionToEdit.id, formData);
       } else {
-        await addTransaction(formData); 
+        await addTransaction(formData);
         showSuccess("Đã thêm giao dịch mới thành công!");
       }
-      onClose(); 
+      onClose();
     };
 
     const handleSubmitAdvanced = async (e) => {
@@ -2325,7 +2324,7 @@ export default function FinanceApp({ user }) {
         ...item,
         date: advancedDate
       })));
-      
+
       showSuccess(`Đã thêm thành công ${validItems.length} giao dịch!`);
       onClose();
     };
@@ -2354,13 +2353,13 @@ export default function FinanceApp({ user }) {
               <h3 className="text-lg font-bold text-gray-800">{transactionToEdit ? 'Cập nhật giao dịch' : 'Thêm giao dịch'}</h3>
               {!transactionToEdit && (
                 <div className="flex bg-slate-100 rounded-lg p-1">
-                  <button 
+                  <button
                     onClick={() => setMode('simple')}
                     className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${mode === 'simple' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
                     Đơn giản
                   </button>
-                  <button 
+                  <button
                     onClick={() => setMode('advanced')}
                     className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${mode === 'advanced' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
@@ -2369,11 +2368,11 @@ export default function FinanceApp({ user }) {
                 </div>
               )}
             </div>
-            <button 
-              onClick={onClose} 
+            <button
+              onClick={onClose}
               className="bg-gray-100 sm:hover:bg-gray-200 p-2 rounded-full transition-colors active:scale-90 active:bg-gray-200"
             >
-              <X size={18} className="text-gray-600"/>
+              <X size={18} className="text-gray-600" />
             </button>
           </div>
 
@@ -2384,11 +2383,11 @@ export default function FinanceApp({ user }) {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Số tiền</label>
-                    <input type="number" required className="w-full p-3 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0" autoFocus />
+                    <input type="number" required className="w-full p-3 border-2 border-slate-100 rounded-xl focus:border-blue-500 focus:ring-0 outline-none text-xl font-bold text-gray-800 transition-all bg-slate-50 focus:bg-white" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} placeholder="0" autoFocus />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Danh mục</label>
-                    <select className="custom-select w-full p-3 border-2 border-slate-100 rounded-xl focus:ring-0 focus:border-blue-500 outline-none bg-white text-base font-medium text-gray-700 h-[56px]" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                    <select className="custom-select w-full p-3 border-2 border-slate-100 rounded-xl focus:ring-0 focus:border-blue-500 outline-none bg-white text-base font-medium text-gray-700 h-[56px]" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
                       {allCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
@@ -2398,12 +2397,12 @@ export default function FinanceApp({ user }) {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Ngày</label>
-                    <input type="date" required className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-sm font-medium text-gray-700" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                    <input type="date" required className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-sm font-medium text-gray-700" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
                   </div>
                   <div className="flex items-end">
-                    <div 
-                      className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl border transition-all cursor-pointer active:scale-[0.98] ${formData.isIncurred ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-white border-slate-200 text-gray-600'}`} 
-                      onClick={() => setFormData({...formData, isIncurred: !formData.isIncurred})}
+                    <div
+                      className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl border transition-all cursor-pointer active:scale-[0.98] ${formData.isIncurred ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-white border-slate-200 text-gray-600'}`}
+                      onClick={() => setFormData({ ...formData, isIncurred: !formData.isIncurred })}
                     >
                       <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${formData.isIncurred ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'}`}>{formData.isIncurred && <X size={12} className="text-white" />}</div>
                       <span className="text-sm font-bold select-none">Phát sinh</span>
@@ -2424,8 +2423,8 @@ export default function FinanceApp({ user }) {
                   )}
                 </div>
 
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold sm:hover:bg-blue-700 shadow-lg shadow-blue-200 transform active:scale-[0.98] active:bg-blue-700 transition-all mt-4"
                 >
                   {transactionToEdit ? 'Lưu Thay Đổi' : 'Lưu Giao Dịch'}
@@ -2435,12 +2434,12 @@ export default function FinanceApp({ user }) {
               <form onSubmit={handleSubmitAdvanced} className="space-y-6">
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col sm:flex-row items-center gap-4">
                   <label className="text-sm font-bold text-blue-800 whitespace-nowrap">Chọn ngày áp dụng chung:</label>
-                  <input 
-                    type="date" 
-                    required 
-                    className="w-full sm:w-auto p-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-200 outline-none text-sm font-medium text-gray-700" 
-                    value={advancedDate} 
-                    onChange={e => setAdvancedDate(e.target.value)} 
+                  <input
+                    type="date"
+                    required
+                    className="w-full sm:w-auto p-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-200 outline-none text-sm font-medium text-gray-700"
+                    value={advancedDate}
+                    onChange={e => setAdvancedDate(e.target.value)}
                   />
                 </div>
                 <div className="space-y-4">
@@ -2459,14 +2458,14 @@ export default function FinanceApp({ user }) {
                           </div>
                         </div>
                         <div className="relative">
-                            <input type="text" placeholder="Nội dung chi tiêu..." className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none" value={item.note} onChange={(e) => handleNoteChange(e, index)} onFocus={() => setActiveRowIndex(index)} />
-                            {suggestions.length > 0 && activeRowIndex === index && (
-                                <div className="absolute z-50 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">
-                                {suggestions.map((s, idx) => (
-                                    <div key={idx} onClick={() => handleSelectSuggestion(s, index)} className="px-4 py-2 sm:hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>
-                                ))}
-                                </div>
-                            )}
+                          <input type="text" placeholder="Nội dung chi tiêu..." className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none" value={item.note} onChange={(e) => handleNoteChange(e, index)} onFocus={() => setActiveRowIndex(index)} />
+                          {suggestions.length > 0 && activeRowIndex === index && (
+                            <div className="absolute z-50 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 max-h-40 overflow-y-auto animate-fade-in py-2">
+                              {suggestions.map((s, idx) => (
+                                <div key={idx} onClick={() => handleSelectSuggestion(s, index)} className="px-4 py-2 sm:hover:bg-slate-50 cursor-pointer text-sm text-gray-700 flex items-center gap-2 active:bg-gray-100"><List size={14} className="text-gray-400" />{s}</div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                       {advancedItems.length > 1 && (
@@ -2508,7 +2507,7 @@ export default function FinanceApp({ user }) {
     </div>
   );
 
-  
+
 
   if (!user) {
     return <LoginScreen />;
@@ -2566,20 +2565,20 @@ export default function FinanceApp({ user }) {
 
         * { -webkit-tap-highlight-color: transparent; }
       `}</style>
-      
+
       {/* Mobile Header */}
       <div className="flex-none md:hidden bg-white px-5 py-4 flex justify-between items-center z-40 border-b border-gray-100 shadow-sm">
         <h1 className="font-bold text-lg text-gray-900 flex items-center gap-2">{userName} {user.isAnonymous && <Globe size={16} className="text-blue-500" />}</h1>
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="p-2 sm:hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 transition-colors"
         >
-          {isMobileMenuOpen ? <X size={24}/> : <Menu size={24}/>}
+          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-50 md:hidden animate-fade-in backdrop-blur-sm"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -2587,15 +2586,15 @@ export default function FinanceApp({ user }) {
 
       {/* --- CẬP NHẬT SIDEBAR --- */}
       <aside className={`fixed inset-y-0 left-0 z-[60] w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:z-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none pt-0`}>
-        
+
         {/* User Info (Đã xóa nút Back ở đây) */}
         <div className="p-8 border-b border-slate-50 flex-none">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-blue-200 shadow-lg">
-                  {userInitial}
-                </div>
-                <div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">{user.isAnonymous ? 'Public Shared Dashboard' : 'Personal Finance'}</p></div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-blue-200 shadow-lg">
+              {userInitial}
             </div>
+            <div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">{user.isAnonymous ? 'Public Shared Dashboard' : 'Personal Finance'}</p></div>
+          </div>
         </div>
 
         {/* Nav Items */}
@@ -2605,15 +2604,15 @@ export default function FinanceApp({ user }) {
           <SidebarItem id="recurring" label="Chi tiêu cố định" icon={Repeat} active={activeTab === 'recurring'} />
           <SidebarItem id="budget" label="Cài đặt hạn mức" icon={Settings} active={activeTab === 'budget'} />
           <div className="pt-4 border-t border-slate-50 mt-4">
-             <SidebarItem id="debt" label="Dư nợ" icon={ClipboardList} active={activeTab === 'debt'} />
-             <SidebarItem id="loans" label="Sổ nợ" icon={HandCoins} active={activeTab === 'loans'} />
+            <SidebarItem id="debt" label="Dư nợ" icon={ClipboardList} active={activeTab === 'debt'} />
+            <SidebarItem id="loans" label="Sổ nợ" icon={HandCoins} active={activeTab === 'loans'} />
           </div>
         </nav>
 
         {/* --- BOTTOM ACTIONS (CẬP NHẬT MỚI) --- */}
         <div className="p-6 space-y-2 flex-none border-t border-slate-50">
           {/* Nút Quay lại Menu */}
-          <button 
+          <button
             onClick={() => navigate('/')}
             className="w-full bg-white hover:bg-slate-50 text-slate-600 p-4 rounded-2xl flex items-center gap-3 transition-colors font-medium border border-slate-100 active:scale-[0.98]"
           >
@@ -2622,7 +2621,7 @@ export default function FinanceApp({ user }) {
           </button>
 
           {/* Nút Đăng xuất */}
-          <button 
+          <button
             onClick={handleLogout}
             className="w-full bg-slate-50 hover:bg-slate-100 text-slate-600 p-4 rounded-2xl flex items-center gap-3 transition-colors font-medium active:scale-[0.98]"
           >
@@ -2634,33 +2633,33 @@ export default function FinanceApp({ user }) {
 
       <main className="flex-1 overflow-y-auto relative scroll-smooth bg-slate-50 w-full">
 
-          {/* --- BANNER DÙNG THỬ --- */}
-          {isReadOnly ? (
-            <div className="bg-red-600 text-white px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md z-50 sticky top-0">
-              <Lock size={16} />
-              HẾT HẠN DÙNG THỬ: Bạn đang ở chế độ CHỈ XEM. Dữ liệu vẫn an toàn.
+        {/* --- BANNER DÙNG THỬ --- */}
+        {isReadOnly ? (
+          <div className="bg-red-600 text-white px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md z-50 sticky top-0">
+            <Lock size={16} />
+            HẾT HẠN DÙNG THỬ: Bạn đang ở chế độ CHỈ XEM. Dữ liệu vẫn an toàn.
+          </div>
+        ) : (
+          daysLeft !== null && daysLeft <= 3 && (
+            <div className="bg-orange-100 text-orange-800 px-4 py-1 text-xs font-bold text-center border-b border-orange-200">
+              Bạn còn {daysLeft} ngày dùng thử miễn phí.
             </div>
-          ) : (
-            daysLeft !== null && daysLeft <= 3 && (
-              <div className="bg-orange-100 text-orange-800 px-4 py-1 text-xs font-bold text-center border-b border-orange-200">
-                Bạn còn {daysLeft} ngày dùng thử miễn phí.
-              </div>
-            )
-          )}
-          {/* ----------------------- */}
+          )
+        )}
+        {/* ----------------------- */}
 
-          {activeTab !== 'debt' && activeTab !== 'loans' && (
+        {activeTab !== 'debt' && activeTab !== 'loans' && (
           <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-30 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
             <div className="flex items-center gap-4 w-full sm:w-auto">
               {(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}
             </div>
-            
-            <button 
+
+            <button
               onClick={() => {
-                  if (!checkPermission()) return;
-                  setEditingTransaction(null); 
-                  setShowAddModal(true); 
-              }} 
+                if (!checkPermission()) return;
+                setEditingTransaction(null);
+                setShowAddModal(true);
+              }}
               className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"
             >
               <PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span>
@@ -2674,27 +2673,27 @@ export default function FinanceApp({ user }) {
           ) : (
             <>
               {activeTab === 'dashboard' && (
-                <DashboardContent 
-                  totalSpent={totalSpent} 
-                  monthlyIncome={monthlyIncome} 
-                  updateMonthlyIncome={updateMonthlyIncome} 
-                  spendingDiff={spendingDiff} 
-                  totalIncurred={totalIncurred} 
-                  alerts={alerts} 
-                  spendingByCategory={spendingByCategory} currentChartData={chartMode === 'daily' ? dailySpendingData : monthlySpendingData} 
-                  chartMode={chartMode} setChartMode={setChartMode} 
+                <DashboardContent
+                  totalSpent={totalSpent}
+                  monthlyIncome={monthlyIncome}
+                  updateMonthlyIncome={updateMonthlyIncome}
+                  spendingDiff={spendingDiff}
+                  totalIncurred={totalIncurred}
+                  alerts={alerts}
+                  spendingByCategory={spendingByCategory} currentChartData={chartMode === 'daily' ? dailySpendingData : monthlySpendingData}
+                  chartMode={chartMode} setChartMode={setChartMode}
                   chartCategoryFilter={chartCategoryFilter} setChartCategoryFilter={setChartCategoryFilter}
                   allCategories={allCategories}
-                  categoryVisibility={categoryVisibility} 
+                  categoryVisibility={categoryVisibility}
                   userName={userName}
                   isPublic={user.isAnonymous}
                   checkPermission={checkPermission}
                 />
               )}
               {activeTab === 'transactions' && (
-                <TransactionContent 
-                  filtered={filteredTransactions} viewMonth={viewMonth} viewYear={viewYear} 
-                  search={search} setSearch={setSearch} filterCategory={filterCategory} setFilterCategory={setFilterCategory} 
+                <TransactionContent
+                  filtered={filteredTransactions} viewMonth={viewMonth} viewYear={viewYear}
+                  search={search} setSearch={setSearch} filterCategory={filterCategory} setFilterCategory={setFilterCategory}
                   deleteTransaction={deleteTransaction}
                   onEdit={(tx) => { setEditingTransaction(tx); setShowAddModal(true); }}
                   allCategories={allCategories}
@@ -2702,22 +2701,22 @@ export default function FinanceApp({ user }) {
                 />
               )}
               {activeTab === 'budget' && (
-                <BudgetContent 
-                  budgets={budgets} setBudgets={setBudgets} 
-                  saveBudgetsToDb={saveBudgetsToDb} 
+                <BudgetContent
+                  budgets={budgets} setBudgets={setBudgets}
+                  saveBudgetsToDb={saveBudgetsToDb}
                   allCategories={allCategories}
                   onAddCategory={addNewCategory}
                   categoryVisibility={categoryVisibility}
                   toggleVisibility={toggleVisibility}
-                  categoryAlerts={categoryAlerts} 
-                  toggleAlert={toggleAlert} 
+                  categoryAlerts={categoryAlerts}
+                  toggleAlert={toggleAlert}
                   deleteCustomCategory={deleteCustomCategory}
                   updateCategoryName={updateCategoryName}
                   checkPermission={checkPermission}
                 />
               )}
               {activeTab === 'recurring' && (
-                <RecurringContent 
+                <RecurringContent
                   recurringItems={recurringItems}
                   addRecurringItem={addRecurringItem}
                   updateRecurringItem={updateRecurringItem}
@@ -2727,7 +2726,7 @@ export default function FinanceApp({ user }) {
                 />
               )}
               {activeTab === 'loans' && (
-                <LoanContent 
+                <LoanContent
                   loans={loans}
                   addLoan={addLoan}
                   updateLoan={updateLoan}
@@ -2737,7 +2736,7 @@ export default function FinanceApp({ user }) {
                 />
               )}
               {activeTab === 'debt' && (
-                <DebtAuditContent 
+                <DebtAuditContent
                   transactions={transactions}
                   allMonthlyIncome={allMonthlyIncome}
                   checkPermission={checkPermission}
@@ -2762,7 +2761,7 @@ export default function FinanceApp({ user }) {
               <h4 className="font-bold text-gray-800 text-sm">Thành công!</h4>
               <p className="text-gray-500 text-xs mt-0.5">{notification}</p>
             </div>
-            <button 
+            <button
               onClick={() => setNotification(null)}
               className="text-gray-400 hover:text-gray-600 p-1"
             >
@@ -2772,8 +2771,8 @@ export default function FinanceApp({ user }) {
         </div>
       )}
 
-      <TrialLimitModal 
-        isOpen={showTrialModal} 
+      <TrialLimitModal
+        isOpen={showTrialModal}
         onClose={() => setShowTrialModal(false)}
         onUpgrade={handleUpgrade}
       />

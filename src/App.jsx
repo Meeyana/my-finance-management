@@ -8,6 +8,7 @@ import LoginScreen from './features/auth/LoginScreen';
 import PortalScreen from './PortalScreen';
 import FinanceApp from './features/finance/FinanceApp';
 import HabitApp from './features/habits/HabitApp';
+import PricingPage from './pages/PricingPage';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -39,28 +40,33 @@ export default function App() {
         - Nếu chưa đăng nhập (!user) -> Hiện LoginScreen
         - Nếu đã đăng nhập (user) -> Hiện PortalScreen
       */}
-      <Route 
-        path="/" 
-        element={!user ? <LoginScreen /> : <PortalScreen user={user} />} 
+      <Route
+        path="/"
+        element={!user ? <LoginScreen /> : <PortalScreen user={user} />}
       />
-      
+
       {/* TRANG FINANCE (/finance):
         - Nếu chưa đăng nhập -> Dùng <Navigate> để đá về trang chủ '/' (URL sẽ đổi theo)
         - Nếu đã đăng nhập -> Hiện FinanceApp
       */}
-      <Route 
-        path="/finance" 
-        element={!user ? <Navigate to="/" replace /> : <FinanceApp user={user} />} 
+      <Route
+        path="/finance"
+        element={!user ? <Navigate to="/" replace /> : <FinanceApp user={user} />}
       />
-      
+
       {/* TRANG HABITS (/habits):
         - Tương tự như Finance
       */}
-      <Route 
-        path="/habits" 
-        element={!user ? <Navigate to="/" replace /> : <HabitApp user={user} />} 
+      <Route
+        path="/habits"
+        element={!user ? <Navigate to="/" replace /> : <HabitApp user={user} />}
       />
-      
+
+      <Route
+        path="/pricing"
+        element={<PricingPage user={user} />}
+      />
+
       {/* CATCH ALL (*):
         - Gõ linh tinh cũng về trang chủ
       */}
