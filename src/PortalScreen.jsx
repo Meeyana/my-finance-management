@@ -6,12 +6,14 @@ import { auth } from './lib/firebase';
 import { useNavigate } from 'react-router-dom';
 import { useTrial } from './hooks/useTrial';
 import Logo from './components/common/Logo';
+import UserProfileModal from './components/common/UserProfileModal';
 
 export default function PortalScreen({ user }) {
   const navigate = useNavigate();
   const userName = user.isAnonymous ? 'Khách' : (user.displayName || user.email?.split('@')[0]);
   const userInitial = userName.charAt(0).toUpperCase();
-  const { isPremium } = useTrial(user);
+  const { isPremium, createdAt, expirationDate } = useTrial(user);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogout = () => {
@@ -53,7 +55,10 @@ export default function PortalScreen({ user }) {
         <div className="max-w-4xl mx-auto w-full flex justify-between items-start">
           <div>
             <div className="mb-4">
-              <div className="relative inline-block">
+              <div
+                className="relative inline-block cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => setIsProfileOpen(true)}
+              >
                 <div className={`
                 w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-blue-200 shadow-lg
                 ${isPremium ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
@@ -132,6 +137,16 @@ export default function PortalScreen({ user }) {
           <LogOut size={20} /> Đăng xuất
         </button>
       </div>
-    </div>
+
+
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        user={user}
+        isPremium={isPremium}
+        createdAt={createdAt}
+        expirationDate={expirationDate}
+      />
+    </div >
   );
 }
