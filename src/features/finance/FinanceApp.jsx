@@ -1902,23 +1902,23 @@ export default function FinanceApp({ user }) {
 
     const unsubBudget = onSnapshot(paths.budgetConfig, (s) => {
       if (s.exists()) setBudgets(s.data());
-    });
+    }, (e) => { });
 
     const unsubCustomCats = onSnapshot(paths.categories, (s) => {
       if (s.exists()) setCustomCategoryConfig(s.data());
-    });
+    }, (e) => { });
     const unsubVisibility = onSnapshot(paths.visibility, (s) => {
       if (s.exists()) setCategoryVisibility(s.data());
-    });
+    }, (e) => { });
     const unsubAlerts = onSnapshot(paths.alerts, (s) => {
       if (s.exists()) setCategoryAlerts(s.data());
-    });
-    const unsubNotes = onSnapshot(paths.notes, (s) => s.exists() && setNoteStats(s.data()));
+    }, (e) => { });
+    const unsubNotes = onSnapshot(paths.notes, (s) => s.exists() && setNoteStats(s.data()), (e) => { });
 
     const unsubRecurring = onSnapshot(paths.recurring, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setRecurringItems(data);
-    });
+    }, (e) => { });
 
     return () => {
       unsubTx(); unsubBudget(); unsubNotes(); unsubCustomCats();
@@ -1937,7 +1937,7 @@ export default function FinanceApp({ user }) {
       } else {
         setMonthlyIncome(0);
       }
-    });
+    }, (e) => { });
 
     const unsubAllStats = onSnapshot(paths.allMonthlyStats, (snapshot) => {
       const data = {};
@@ -1945,7 +1945,7 @@ export default function FinanceApp({ user }) {
         data[doc.id] = doc.data().income || 0;
       });
       setAllMonthlyIncome(data);
-    });
+    }, (e) => { });
 
     return () => { unsubMonthlyStats(); unsubAllStats(); };
   }, [user, viewMonth, viewYear]);

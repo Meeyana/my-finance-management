@@ -37,7 +37,8 @@ const LoginScreen = () => {
           uid: user.uid,
           email: user.email || 'unknown',
           createdAt: serverTimestamp(),
-          isPremium: false
+          isUnlimited: false, // Default: Not lifetime
+          isPremium: null     // Default: No active subscription date
           // ĐÃ BỎ: isDemoAccount
         }, { merge: true });
 
