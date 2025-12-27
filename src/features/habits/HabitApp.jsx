@@ -4,7 +4,7 @@ import {
   PlusCircle, CheckCircle2, Trash2, X, Activity, ArrowLeft,
   LayoutDashboard, Menu, LogOut, Calendar as CalendarIcon,
   Settings, BarChart2, ChevronLeft, ChevronRight, Check, Edit,
-  RotateCcw, Filter, MousePointer2, Target, Flag, CalendarDays, ChevronDown, Lock
+  RotateCcw, Filter, MousePointer2, Target, Flag, CalendarDays, ChevronDown, Lock, Crown
 } from 'lucide-react';
 import {
   collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp
@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import EmojiPicker from 'emoji-picker-react';
 import { useTrial } from '../../hooks/useTrial';
 import TrialLimitModal from '../../components/common/TrialLimitModal';
+import UserProfileModal from '../../components/common/UserProfileModal';
 
 // --- CONSTANTS ---
 const GOAL_UNITS = [
@@ -931,8 +932,9 @@ export default function HabitApp({ user }) {
   const [habits, setHabits] = useState([]);
 
   // 1. GỌI HOOK TRIAL
-  const { isReadOnly, daysLeft } = useTrial(user);
+  const { isReadOnly, daysLeft, isPremium, createdAt, expirationDate } = useTrial(user);
   const [showTrialModal, setShowTrialModal] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // 2. CHECK PERMISSION
   const checkPermission = () => {
@@ -1230,13 +1232,28 @@ export default function HabitApp({ user }) {
 
         {/* 1. Header User Info */}
         <div className="p-8 border-b border-slate-50 flex-none">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-blue-200 shadow-lg">
-              {userInitial}
+          <div
+            className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-xl transition-colors"
+            onClick={() => setIsProfileOpen(true)}
+          >
+            <div className="relative">
+              <div className={`
+                  w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-blue-200 shadow-lg
+                  ${isPremium ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
+                `}>
+                {userInitial}
+              </div>
+              {isPremium && (
+                <div className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 p-0.5 rounded-full shadow-md border-2 border-white transform rotate-12">
+                  <Crown size={12} fill="currentColor" strokeWidth={2.5} />
+                </div>
+              )}
             </div>
             <div>
               <h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1>
-              <p className="text-xs text-gray-400 font-medium mt-1">Habit Tracker</p>
+              <p className="text-xs text-gray-400 font-medium mt-1">
+                {isPremium ? 'Premium Habit Tracker' : 'Habit Tracker'}
+              </p>
             </div>
           </div>
         </div>
@@ -1259,9 +1276,6 @@ export default function HabitApp({ user }) {
         <div className="p-6 space-y-2 flex-none border-t border-slate-50">
           <button onClick={() => navigate('/')} className="w-full bg-white hover:bg-slate-50 text-slate-600 p-4 rounded-2xl flex items-center gap-3 transition-colors font-medium border border-slate-100 active:scale-[0.98]">
             <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><ArrowLeft size={16} /></div> Quay lại Menu
-          </button>
-          <button onClick={handleLogout} className="w-full bg-slate-50 hover:bg-slate-100 text-slate-600 p-4 rounded-2xl flex items-center gap-3 transition-colors font-medium active:scale-[0.98]">
-            <div className="w-8 h-8 rounded-full bg-white text-slate-500 flex items-center justify-center shadow-sm"><LogOut size={16} /></div> Đăng xuất
           </button>
         </div>
       </aside>
@@ -2029,6 +2043,22 @@ export default function HabitApp({ user }) {
         </div>
       )}
 
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        user={user}
+        isPremium={isPremium}
+        createdAt={createdAt}
+        expirationDate={expirationDate}
+      />
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        user={user}
+        isPremium={isPremium}
+        createdAt={createdAt}
+        expirationDate={expirationDate}
+      />
       <TrialLimitModal
         isOpen={showTrialModal}
         onClose={() => setShowTrialModal(false)}

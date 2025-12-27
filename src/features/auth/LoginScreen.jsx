@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Wallet, AlertCircle, User, Lock, Eye, EyeOff, ArrowUpRight } from 'lucide-react';
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword // Import thêm để tự tạo demo user
+  createUserWithEmailAndPassword
 } from 'firebase/auth';
 
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
+import Logo from '../../components/common/Logo';
 
 // CẤU HÌNH TÀI KHOẢN DEMO
 const DEMO_CREDENTIALS = {
@@ -110,13 +111,7 @@ const LoginScreen = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border border-slate-100">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-lg shadow-blue-200">
-            <Wallet size={32} />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Quản Lý Chi Tiêu</h1>
-          <p className="text-gray-500 text-sm mt-1">Đăng nhập để truy cập dữ liệu cá nhân</p>
-        </div>
+        <Logo size={32} showText={true} className="mb-8" />
 
         <form onSubmit={handleLogin} className="space-y-5">
           {error && (

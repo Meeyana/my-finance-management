@@ -11,7 +11,7 @@ import {
   Heart, Star, Gift, Music, Briefcase, Plane, Gamepad2, GraduationCap,
   Baby, Dog, Car, Zap, Wifi, Phone, Dumbbell,
   Eye, EyeOff, Bell, BellOff, LogOut, Lock, User, Globe, Plus, DollarSign, Calculator,
-  ClipboardList, ArrowLeft, Filter, HandCoins, CalendarDays, CheckCircle
+  ClipboardList, ArrowLeft, Filter, HandCoins, CalendarDays, CheckCircle, Crown
 } from 'lucide-react';
 
 // FIREBASE IMPORTS
@@ -33,6 +33,7 @@ import LoginScreen from '../auth/LoginScreen';
 import { useNavigate } from 'react-router-dom';
 import { useTrial } from '../../hooks/useTrial';
 import TrialLimitModal from '../../components/common/TrialLimitModal';
+import UserProfileModal from '../../components/common/UserProfileModal';
 
 // --- ICON LIBRARY ---
 const ICON_LIBRARY = {
@@ -1666,6 +1667,7 @@ const LoanContent = ({
 export default function FinanceApp({ user }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
   const [monthlyIncome, setMonthlyIncome] = useState(0);
@@ -1683,7 +1685,7 @@ export default function FinanceApp({ user }) {
   //const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // 1. GỌI HOOK TRIAL
-  const { isReadOnly, daysLeft } = useTrial(user);
+  const { isReadOnly, daysLeft, isPremium, expirationDate, createdAt } = useTrial(user);
 
   // 2. STATE ĐIỀU KHIỂN MODAL
   const [showTrialModal, setShowTrialModal] = useState(false);
@@ -2588,10 +2590,24 @@ export default function FinanceApp({ user }) {
       <aside className={`fixed inset-y-0 left-0 z-[60] w-72 bg-white border-r border-slate-100 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:z-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-2xl md:shadow-none pt-0`}>
 
         {/* User Info (Đã xóa nút Back ở đây) */}
+        {/* User Info */}
         <div className="p-8 border-b border-slate-50 flex-none">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-blue-200 shadow-lg">
-              {userInitial}
+          <div
+            className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-xl transition-colors"
+            onClick={() => setIsProfileOpen(true)}
+          >
+            <div className="relative">
+              <div className={`
+                w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-blue-200 shadow-lg
+                ${isPremium ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
+              `}>
+                {userInitial}
+              </div>
+              {isPremium && (
+                <div className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 p-0.5 rounded-full shadow-md border-2 border-white transform rotate-12">
+                  <Crown size={12} fill="currentColor" strokeWidth={2.5} />
+                </div>
+              )}
             </div>
             <div><h1 className="font-extrabold text-xl text-gray-900 tracking-tight leading-none">{userName}</h1><p className="text-xs text-gray-400 font-medium mt-1">{user.isAnonymous ? 'Public Shared Dashboard' : 'Personal Finance'}</p></div>
           </div>
@@ -2620,14 +2636,7 @@ export default function FinanceApp({ user }) {
             Quay lại Menu
           </button>
 
-          {/* Nút Đăng xuất */}
-          <button
-            onClick={handleLogout}
-            className="w-full bg-slate-50 hover:bg-slate-100 text-slate-600 p-4 rounded-2xl flex items-center gap-3 transition-colors font-medium active:scale-[0.98]"
-          >
-            <div className="w-8 h-8 rounded-full bg-white text-slate-500 flex items-center justify-center shadow-sm"><LogOut size={16} /></div>
-            Đăng xuất
-          </button>
+
         </div>
       </aside>
 
@@ -2778,6 +2787,14 @@ export default function FinanceApp({ user }) {
       />
 
       {showAddModal && <AddTransactionModal onClose={() => { setShowAddModal(false); setEditingTransaction(null); }} transactionToEdit={editingTransaction} />}
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        user={user}
+        isPremium={isPremium}
+        createdAt={createdAt}
+        expirationDate={expirationDate}
+      />
     </div>
   );
 }

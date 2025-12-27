@@ -1,6 +1,6 @@
 // src/hooks/useTrial.js
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot } from "firebase/firestore"; // No updateDoc needed
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from '../lib/firebase';
 
 const TRIAL_LIMIT_DAYS = 7;
@@ -9,13 +9,29 @@ export const useTrial = (user) => {
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [daysLeft, setDaysLeft] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isPremium, setIsPremium] = useState(false);
+  const [activationDate, setActivationDate] = useState(null);
+  const [expirationDate, setExpirationDate] = useState(null);
+
+  useEffect(() => {
+    if (user?.metadata?.creationTime) {
+      setActivationDate(new Date(user.metadata.creationTime));
+    } else {
+      setActivationDate(new Date());
+    }
+  }, [user]);
+
+  /* New State */
+  const [createdDate, setCreatedDate] = useState(null);
 
   useEffect(() => {
     // 1. Anonymous / No User -> Allow
     if (!user || user.isAnonymous) {
       setIsReadOnly(false);
       setDaysLeft(null);
+      setIsPremium(false);
       setLoading(false);
+      setCreatedDate(new Date()); /* Default for anon */
       return;
     }
 
@@ -24,22 +40,25 @@ export const useTrial = (user) => {
     const unsub = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        // Capture createdAt
+        setCreatedDate(data.createdAt?.toDate ? data.createdAt.toDate() : new Date());
+
         let isPremiumActive = false;
+        let expDate = null; // Local calc
 
         // A. LIFETIME CHECK
-        // Check both boolean true and string "true" (common manual entry mistake)
         if (data.isUnlimited === true || data.isUnlimited === "true") {
           isPremiumActive = true;
-          console.log("User has Unlimited Access (Lifetime)");
+          expDate = 'lifetime';
         }
 
         // B. EXPIRATION DATE CHECK
-        // 'isPremium' is now treated as a Timestamp (if it exists)
         if (!isPremiumActive && data.isPremium && data.isPremium.toDate) {
           const expireDate = data.isPremium.toDate();
           const now = new Date();
           if (now < expireDate) {
             isPremiumActive = true;
+            expDate = expireDate;
           }
         }
 
@@ -47,8 +66,11 @@ export const useTrial = (user) => {
           // User is Valid Premium
           setIsReadOnly(false);
           setDaysLeft(null);
+          setIsPremium(true);
+          setExpirationDate(expDate);
         } else {
           // Fallback to TRIAL Logic
+          setIsPremium(false);
           const startDate = data.createdAt?.toDate() || new Date();
           const now = new Date();
           const diffTime = now - startDate;
@@ -57,6 +79,11 @@ export const useTrial = (user) => {
 
           setDaysLeft(remaining > 0 ? remaining : 0);
           setIsReadOnly(remaining <= 0); // Lock if trial over
+
+          // Calculate trial expiration date
+          const trialExp = new Date(startDate);
+          trialExp.setDate(trialExp.getDate() + TRIAL_LIMIT_DAYS);
+          setExpirationDate(trialExp);
         }
       }
       setLoading(false);
@@ -65,5 +92,5 @@ export const useTrial = (user) => {
     return () => unsub();
   }, [user]);
 
-  return { isReadOnly, daysLeft, loading };
+  return { isReadOnly, daysLeft, loading, isPremium, activationDate, expirationDate, createdAt: createdDate };
 };
