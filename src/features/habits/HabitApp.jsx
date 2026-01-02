@@ -680,9 +680,15 @@ const GoalMetrics = ({ goals }) => {
 const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, onAddClick, viewDate, setViewDate, onReorder }) => {
 
   // Sensors
+  // Sensors
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250, // Hold 250ms to pick up
+        tolerance: 5 // Can move 5px before canceling hold
+      }
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -1021,8 +1027,13 @@ export default function HabitApp({ user }) {
 
   // DnD SENSORS
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5
+      }
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
