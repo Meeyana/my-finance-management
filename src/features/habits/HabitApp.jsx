@@ -7,8 +7,26 @@ import {
   RotateCcw, Filter, MousePointer2, Target, Flag, CalendarDays, ChevronDown, Lock, Crown
 } from 'lucide-react';
 import {
-  collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp
+  collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch
 } from "firebase/firestore";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  TouchSensor,
+  MouseSensor
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { signOut } from "firebase/auth";
 import { db, auth } from '../../lib/firebase';
 import { useNavigate } from 'react-router-dom';
@@ -145,6 +163,33 @@ const isHabitDueOnDate = (habit, date) => {
     return true;
   }
   return true;
+};
+
+// --- COMPONENT: SORTABLE ITEM (DnD) ---
+const SortableItem = ({ id, children, className }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : 'auto',
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative',
+    touchAction: 'none'
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={className}>
+      {children}
+    </div>
+  );
 };
 
 // --- COMPONENT: INFINITE DATE CAROUSEL ---
@@ -632,7 +677,21 @@ const GoalMetrics = ({ goals }) => {
 
 // 5. Goals View (THÊM MỚI - Module Mục tiêu)
 // --- COMPONENT: GOALS VIEW (CLICK BADGE ĐỂ CHỈNH LẠI) ---
-const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, onAddClick, viewDate, setViewDate }) => {
+const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, onAddClick, viewDate, setViewDate, onReorder }) => {
+
+  // Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      onReorder(active.id, over.id);
+    }
+  };
 
   // State Modal
   const [updatingGoal, setUpdatingGoal] = useState(null);
@@ -736,125 +795,132 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, 
       </div>
 
       {/* DANH SÁCH MỤC TIÊU (ĐÃ SỬA LỖI GIAO DIỆN MOBILE) */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        {filteredGoals.length > 0 ? (
-          filteredGoals.map((goal) => {
-            const percent = calculateProgress(goal.currentAmount, goal.targetAmount);
-            const isCompleted = percent >= 100;
-            const themeColor = goal.color || '#6366F1';
+      {/* DANH SÁCH MỤC TIÊU (DnD Enabled) */}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={filteredGoals.map(g => g.id)} strategy={verticalListSortingStrategy}>
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            {filteredGoals.length > 0 ? (
+              filteredGoals.map((goal) => {
+                const percent = calculateProgress(goal.currentAmount, goal.targetAmount);
+                const isCompleted = percent >= 100;
+                const themeColor = goal.color || '#6366F1';
 
-            return (
-              <div
-                key={goal.id}
-                // Thêm 'group/item' để scope hover chính xác hơn
-                className="group/item relative p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
-              >
-                {/* 1. ICON & INFO (Bên trái) */}
-                <div className="flex items-center gap-4 flex-1 w-full sm:w-auto">
-                  {/* Icon Box */}
-                  <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm"
-                    style={{ backgroundColor: `${themeColor}15`, color: themeColor }}
-                  >
-                    {goal.icon || '🎯'}
-                  </div>
-
-                  {/* Text Info & Progress Bar */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-center mb-1">
-                      <h3 className="font-bold text-gray-800 text-base truncate pr-2">{goal.name}</h3>
-                    </div>
-
-                    {/* Thanh tiến độ */}
-                    <div className="w-full max-w-[200px] h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1.5">
-                      <div
-                        className="h-full rounded-full transition-all duration-1000"
-                        style={{ width: `${percent}%`, backgroundColor: themeColor }}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3 text-xs text-gray-400">
-                      <span className="flex items-center gap-1">
-                        <CalendarDays size={10} /> {new Date(goal.deadline).toLocaleDateString('vi-VN')}
-                      </span>
-                      {goal.description && (
-                        <span className="truncate max-w-[150px] border-l border-slate-200 pl-2 font-medium">
-                          {goal.description}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. STATS & ACTIONS (Bên phải - Chứa tất cả nút bấm) */}
-                <div className="flex items-center justify-between w-full sm:w-auto gap-4 pl-0 sm:pl-4 sm:border-l sm:border-slate-50 mt-2 sm:mt-0">
-                  {/* Con số thống kê */}
-                  <div className="text-right shrink-0">
-                    {/* SỬA LẠI: Luôn dùng themeColor cho con số, bất kể đã xong hay chưa */}
+                return (
+                  <SortableItem key={goal.id} id={goal.id}>
                     <div
-                      className="text-base font-black leading-none"
-                      style={{ color: themeColor }}
+                      // Thêm 'group/item' để scope hover chính xác hơn
+                      className="group/item relative p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                      style={{ cursor: 'grab' }}
                     >
-                      {goal.currentAmount.toLocaleString()}
+                      {/* 1. ICON & INFO (Bên trái) */}
+                      <div className="flex items-center gap-4 flex-1 w-full sm:w-auto">
+                        {/* Icon Box */}
+                        <div
+                          className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm"
+                          style={{ backgroundColor: `${themeColor}15`, color: themeColor }}
+                        >
+                          {goal.icon || '🎯'}
+                        </div>
+
+                        {/* Text Info & Progress Bar */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-center mb-1">
+                            <h3 className="font-bold text-gray-800 text-base truncate pr-2">{goal.name}</h3>
+                          </div>
+
+                          {/* Thanh tiến độ */}
+                          <div className="w-full max-w-[200px] h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1.5">
+                            <div
+                              className="h-full rounded-full transition-all duration-1000"
+                              style={{ width: `${percent}%`, backgroundColor: themeColor }}
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-3 text-xs text-gray-400">
+                            <span className="flex items-center gap-1">
+                              <CalendarDays size={10} /> {new Date(goal.deadline).toLocaleDateString('vi-VN')}
+                            </span>
+                            {goal.description && (
+                              <span className="truncate max-w-[150px] border-l border-slate-200 pl-2 font-medium">
+                                {goal.description}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. STATS & ACTIONS (Bên phải - Chứa tất cả nút bấm) */}
+                      <div className="flex items-center justify-between w-full sm:w-auto gap-4 pl-0 sm:pl-4 sm:border-l sm:border-slate-50 mt-2 sm:mt-0">
+                        {/* Con số thống kê */}
+                        <div className="text-right shrink-0">
+                          {/* SỬA LẠI: Luôn dùng themeColor cho con số, bất kể đã xong hay chưa */}
+                          <div
+                            className="text-base font-black leading-none"
+                            style={{ color: themeColor }}
+                          >
+                            {goal.currentAmount.toLocaleString()}
+                          </div>
+
+                          <div className="text-[10px] font-bold text-gray-400 mt-1">
+                            / {goal.targetAmount.toLocaleString()} {goal.unit}
+                          </div>
+                        </div>
+
+                        {/* CỤM NÚT HÀNH ĐỘNG (Đặt chung vào một khối flex) */}
+                        <div className="flex items-center gap-3">
+
+                          {/* Nút Sửa/Xóa: Mobile hiện mờ, Desktop hover mới hiện */}
+                          <div className="flex items-center gap-1 opacity-60 sm:opacity-0 group-hover/item:sm:opacity-100 transition-all">
+                            <button onClick={() => onEdit(goal)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+                              <Edit size={16} />
+                            </button>
+                            <button onClick={() => onDelete(goal.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+
+                          {/* Nút hành động chính (Cập nhật/Xong) */}
+                          {!isCompleted ? (
+                            <button
+                              onClick={() => openUpdateModal(goal)}
+                              className="px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-100 text-xs font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-200 shadow-sm transition-all active:scale-95 shrink-0"
+                            >
+                              Cập nhật
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => openUpdateModal(goal)}
+                              className="flex items-center gap-1 bg-green-50 text-green-700 px-3 py-1.5 rounded-lg border border-green-200 shadow-sm hover:bg-green-100 transition-colors shrink-0"
+                            >
+                              <CheckCircle2 size={14} strokeWidth={3} />
+                              <span className="text-[10px] font-extrabold uppercase">Xong</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* (Đã xóa phần div absolute cũ ở đây) */}
                     </div>
-
-                    <div className="text-[10px] font-bold text-gray-400 mt-1">
-                      / {goal.targetAmount.toLocaleString()} {goal.unit}
-                    </div>
-                  </div>
-
-                  {/* CỤM NÚT HÀNH ĐỘNG (Đặt chung vào một khối flex) */}
-                  <div className="flex items-center gap-3">
-
-                    {/* Nút Sửa/Xóa: Mobile hiện mờ, Desktop hover mới hiện */}
-                    <div className="flex items-center gap-1 opacity-60 sm:opacity-0 group-hover/item:sm:opacity-100 transition-all">
-                      <button onClick={() => onEdit(goal)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
-                        <Edit size={16} />
-                      </button>
-                      <button onClick={() => onDelete(goal.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-
-                    {/* Nút hành động chính (Cập nhật/Xong) */}
-                    {!isCompleted ? (
-                      <button
-                        onClick={() => openUpdateModal(goal)}
-                        className="px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-100 text-xs font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-200 shadow-sm transition-all active:scale-95 shrink-0"
-                      >
-                        Cập nhật
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => openUpdateModal(goal)}
-                        className="flex items-center gap-1 bg-green-50 text-green-700 px-3 py-1.5 rounded-lg border border-green-200 shadow-sm hover:bg-green-100 transition-colors shrink-0"
-                      >
-                        <CheckCircle2 size={14} strokeWidth={3} />
-                        <span className="text-[10px] font-extrabold uppercase">Xong</span>
-                      </button>
-                    )}
-                  </div>
+                  </SortableItem>
+                )
+              })
+            ) : (
+              /* EMPTY STATE (Giữ nguyên) */
+              <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+                  <Target size={32} />
                 </div>
-
-                {/* (Đã xóa phần div absolute cũ ở đây) */}
+                <div>
+                  <p className="text-gray-500 text-sm font-medium">Chưa có mục tiêu nào phù hợp.</p>
+                  <button onClick={onAddClick} className="mt-2 text-indigo-600 font-bold text-sm hover:underline">
+                    + Thêm mục tiêu mới ngay
+                  </button>
+                </div>
               </div>
-            )
-          })
-        ) : (
-          /* EMPTY STATE (Giữ nguyên) */
-          <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
-              <Target size={32} />
-            </div>
-            <div>
-              <p className="text-gray-500 text-sm font-medium">Chưa có mục tiêu nào phù hợp.</p>
-              <button onClick={onAddClick} className="mt-2 text-indigo-600 font-bold text-sm hover:underline">
-                + Thêm mục tiêu mới ngay
-              </button>
-            </div>
+            )}
           </div>
-        )}
-      </div>
+        </SortableContext>
+      </DndContext>
 
       <GoalMetrics goals={filteredGoals} />
 
@@ -936,6 +1002,13 @@ export default function HabitApp({ user }) {
   const [showTrialModal, setShowTrialModal] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
+  // DnD SENSORS
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
   // 2. CHECK PERMISSION
   const checkPermission = () => {
     if (isReadOnly) {
@@ -1013,7 +1086,13 @@ export default function HabitApp({ user }) {
         id: doc.id,
         ...doc.data()
       }));
-      data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      // Sort by position (asc), then createdAt (desc)
+      data.sort((a, b) => {
+        const posA = a.position ?? 999999;
+        const posB = b.position ?? 999999;
+        if (posA !== posB) return posA - posB;
+        return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
+      });
       setHabits(data);
     });
     return () => unsubscribe();
@@ -1025,7 +1104,12 @@ export default function HabitApp({ user }) {
     const base = getBasePath(user);
     const unsubscribe = onSnapshot(collection(db, `${base}/goals`), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      data.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+      data.sort((a, b) => {
+        const posA = a.position ?? 999999;
+        const posB = b.position ?? 999999;
+        if (posA !== posB) return posA - posB;
+        return new Date(a.deadline) - new Date(b.deadline);
+      });
       setGoals(data);
     });
     return () => unsubscribe();
@@ -1139,6 +1223,66 @@ export default function HabitApp({ user }) {
     // Đảm bảo không nhỏ hơn 0
     const finalValue = Math.max(0, Number(newValue));
     await updateDoc(doc(db, `${base}/goals`, goal.id), { currentAmount: finalValue });
+  };
+
+  // --- DnD HANDLERS ---
+  const handleHabitReorder = async (event) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = habits.findIndex(h => h.id === active.id);
+      const newIndex = habits.findIndex(h => h.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // 1. Optimistic Update (Cập nhật giao diện ngay lập tức)
+        const previousHabits = [...habits];
+        const newHabits = arrayMove(habits, oldIndex, newIndex);
+        setHabits(newHabits);
+
+        try {
+          // 2. Update Firestore
+          const batch = writeBatch(db);
+          const base = getBasePath(user);
+          newHabits.forEach((h, index) => {
+            const ref = doc(db, `${base}/habits`, h.id);
+            batch.update(ref, { position: index });
+          });
+          await batch.commit();
+        } catch (error) {
+          console.error("Failed to save habit order:", error);
+          alert("Không thể lưu vị trí mới. Vui lòng thử lại.");
+          setHabits(previousHabits); // Hoàn tác nếu lỗi
+        }
+      }
+    }
+  };
+
+  const handleGoalReorder = async (activeId, overId) => {
+    if (activeId !== overId) {
+      const oldIndex = goals.findIndex(g => g.id === activeId);
+      const newIndex = goals.findIndex(g => g.id === overId);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // 1. Optimistic Update
+        const previousGoals = [...goals];
+        const newGoals = arrayMove(goals, oldIndex, newIndex);
+        setGoals(newGoals);
+
+        try {
+          // 2. Update Firestore
+          const batch = writeBatch(db);
+          const base = getBasePath(user);
+          newGoals.forEach((g, index) => {
+            const ref = doc(db, `${base}/goals`, g.id);
+            batch.update(ref, { position: index });
+          });
+          await batch.commit();
+        } catch (error) {
+          console.error("Failed to save goal order:", error);
+          alert("Không thể lưu vị trí mới. Vui lòng thử lại.");
+          setGoals(previousGoals);
+        }
+      }
+    }
   };
 
   // --- COMMON HANDLERS ---
@@ -1464,6 +1608,7 @@ export default function HabitApp({ user }) {
               }}
               onDelete={deleteGoal}
               onUpdateValue={updateGoalValue}
+              onReorder={handleGoalReorder}
               onAddClick={() => {
                 if (!checkPermission()) return;
                 setModalType('goal');
@@ -1476,60 +1621,64 @@ export default function HabitApp({ user }) {
           {activeTab === 'settings' && (
             <div className="animate-fade-in space-y-6">
               <div><h2 className="text-2xl font-bold text-gray-800">Quản lý thói quen</h2></div>
-              <div className="grid gap-3">
-                {habits.map(habit => (
-                  <div key={habit.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 h-[88px] overflow-hidden w-full max-w-full">
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleHabitReorder}>
+                <SortableContext items={habits.map(h => h.id)} strategy={verticalListSortingStrategy}>
+                  <div className="grid gap-3">
+                    {habits.map(habit => (
+                      <SortableItem key={habit.id} id={habit.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 h-[88px] overflow-hidden w-full max-w-full" style={{ touchAction: 'none' }}>
 
-                    {/* 1. ICON (Cố định cứng - shrink-0) */}
-                    <div
-                      className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0"
-                      style={{ backgroundColor: `${habit.color}15` }}
-                    >
-                      {habit.icon}
-                    </div>
-
-                    {/* 2. TEXT CONTAINER (Scroll ngang tại đây) */}
-                    {/* w-0 flex-1: Ép container co lại vừa khít khoảng trống, ngăn tràn viền cha */}
-                    <div className="flex-1 w-0 flex flex-col justify-center">
-                      <div
-                        className="overflow-x-auto whitespace-nowrap pr-4"
-                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} // Ẩn thanh cuộn cho đẹp
-                      >
-                        {/* Tên Thói Quen */}
-                        <h4 className="font-bold text-gray-800 text-base leading-tight mb-1 inline-block">
-                          {habit.name}
-                        </h4>
-
-                        {/* Tags Info */}
-                        <div className="flex items-center gap-2 text-xs mt-0.5">
-                          <span className="font-bold text-gray-600 bg-slate-100 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">
-                            {habit.goalAmount} {habit.goalUnit}
-                          </span>
-                          <span className="font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded uppercase whitespace-nowrap shrink-0">
-                            {FREQUENCY_TYPES.find(f => f.value === habit.freqType)?.label || 'Hàng ngày'}
-                          </span>
+                        {/* 1. ICON (Cố định cứng - shrink-0) */}
+                        <div
+                          className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0"
+                          style={{ backgroundColor: `${habit.color}15` }}
+                        >
+                          {habit.icon}
                         </div>
-                      </div>
-                    </div>
 
-                    {/* 3. BUTTONS (Cố định cứng bên phải - shrink-0) */}
-                    <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-slate-50 h-10 bg-white">
-                      <button
-                        onClick={() => openEditModal(habit)}
-                        className="w-9 h-9 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => deleteHabit(habit.id)}
-                        className="w-9 h-9 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+                        {/* 2. TEXT CONTAINER (Scroll ngang tại đây) */}
+                        {/* w-0 flex-1: Ép container co lại vừa khít khoảng trống, ngăn tràn viền cha */}
+                        <div className="flex-1 w-0 flex flex-col justify-center">
+                          <div
+                            className="overflow-x-auto whitespace-nowrap pr-4"
+                            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} // Ẩn thanh cuộn cho đẹp
+                          >
+                            {/* Tên Thói Quen */}
+                            <h4 className="font-bold text-gray-800 text-base leading-tight mb-1 inline-block">
+                              {habit.name}
+                            </h4>
+
+                            {/* Tags Info */}
+                            <div className="flex items-center gap-2 text-xs mt-0.5">
+                              <span className="font-bold text-gray-600 bg-slate-100 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">
+                                {habit.goalAmount} {habit.goalUnit}
+                              </span>
+                              <span className="font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded uppercase whitespace-nowrap shrink-0">
+                                {FREQUENCY_TYPES.find(f => f.value === habit.freqType)?.label || 'Hàng ngày'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3. BUTTONS (Cố định cứng bên phải - shrink-0) */}
+                        <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-slate-50 h-10 bg-white">
+                          <button
+                            onClick={() => openEditModal(habit)}
+                            className="w-9 h-9 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => deleteHabit(habit.id)}
+                            className="w-9 h-9 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </SortableItem>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             </div>
           )}
         </div>
