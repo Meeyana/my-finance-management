@@ -827,102 +827,100 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, 
                 const themeColor = goal.color || '#6366F1';
 
                 return (
-                  <SortableItem key={goal.id} id={goal.id}>
-                    <div
-                      // Thêm 'group/item' để scope hover chính xác hơn
-                      // REMOVED touchAction: 'none' to fix mobile scrolling
-                      className="group/item relative p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
-                      style={{ cursor: 'grab' }}
-                    >
-                      {/* 1. ICON & INFO (Bên trái) */}
-                      <div className="flex items-center gap-4 flex-1 w-full sm:w-auto">
-                        {/* Icon Box */}
-                        <div
-                          className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm"
-                          style={{ backgroundColor: `${themeColor}15`, color: themeColor }}
-                        >
-                          {goal.icon || '🎯'}
-                        </div>
-
-                        {/* Text Info & Progress Bar */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-center mb-1">
-                            <h3 className="font-bold text-gray-800 text-base truncate pr-2">{goal.name}</h3>
-                          </div>
-
-                          {/* Thanh tiến độ */}
-                          <div className="w-full max-w-[200px] h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1.5">
-                            <div
-                              className="h-full rounded-full transition-all duration-1000"
-                              style={{ width: `${percent}%`, backgroundColor: themeColor }}
-                            />
-                          </div>
-
-                          <div className="flex items-center gap-3 text-xs text-gray-400">
-                            <span className="flex items-center gap-1">
-                              <CalendarDays size={10} /> {new Date(goal.deadline).toLocaleDateString('vi-VN')}
-                            </span>
-                            {goal.description && (
-                              <span className="truncate max-w-[150px] border-l border-slate-200 pl-2 font-medium">
-                                {goal.description}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                  <SortableItem
+                    key={goal.id}
+                    id={goal.id}
+                    // MOVED STYLING HERE to separate handle
+                    className="group/item relative p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                  >
+                    {/* 1. ICON & INFO (Bên trái) */}
+                    <div className="flex items-center gap-4 flex-1 w-full sm:w-auto">
+                      {/* Icon Box */}
+                      <div
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm"
+                        style={{ backgroundColor: `${themeColor}15`, color: themeColor }}
+                      >
+                        {goal.icon || '🎯'}
                       </div>
 
-                      {/* 2. STATS & ACTIONS (Bên phải - Chứa tất cả nút bấm) */}
-                      <div className="flex items-center justify-between w-full sm:w-auto gap-4 pl-0 sm:pl-4 sm:border-l sm:border-slate-50 mt-2 sm:mt-0">
-                        {/* Con số thống kê */}
-                        <div className="text-right shrink-0">
-                          {/* SỬA LẠI: Luôn dùng themeColor cho con số, bất kể đã xong hay chưa */}
-                          <div
-                            className="text-base font-black leading-none"
-                            style={{ color: themeColor }}
-                          >
-                            {goal.currentAmount.toLocaleString()}
-                          </div>
-
-                          <div className="text-[10px] font-bold text-gray-400 mt-1">
-                            / {goal.targetAmount.toLocaleString()} {goal.unit}
-                          </div>
+                      {/* Text Info & Progress Bar */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-center mb-1">
+                          <h3 className="font-bold text-gray-800 text-base truncate pr-2">{goal.name}</h3>
                         </div>
 
-                        {/* CỤM NÚT HÀNH ĐỘNG (Đặt chung vào một khối flex) */}
-                        <div className="flex items-center gap-3">
+                        {/* Thanh tiến độ */}
+                        <div className="w-full max-w-[200px] h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1.5">
+                          <div
+                            className="h-full rounded-full transition-all duration-1000"
+                            style={{ width: `${percent}%`, backgroundColor: themeColor }}
+                          />
+                        </div>
 
-                          {/* Nút Sửa/Xóa: Mobile hiện mờ, Desktop hover mới hiện */}
-                          <div className="flex items-center gap-1 opacity-60 sm:opacity-0 group-hover/item:sm:opacity-100 transition-all">
-                            <button onClick={() => onEdit(goal)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
-                              <Edit size={16} />
-                            </button>
-                            <button onClick={() => onDelete(goal.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-
-                          {/* Nút hành động chính (Cập nhật/Xong) */}
-                          {!isCompleted ? (
-                            <button
-                              onClick={() => openUpdateModal(goal)}
-                              className="px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-100 text-xs font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-200 shadow-sm transition-all active:scale-95 shrink-0"
-                            >
-                              Cập nhật
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => openUpdateModal(goal)}
-                              className="flex items-center gap-1 bg-green-50 text-green-700 px-3 py-1.5 rounded-lg border border-green-200 shadow-sm hover:bg-green-100 transition-colors shrink-0"
-                            >
-                              <CheckCircle2 size={14} strokeWidth={3} />
-                              <span className="text-[10px] font-extrabold uppercase">Xong</span>
-                            </button>
+                        <div className="flex items-center gap-3 text-xs text-gray-400">
+                          <span className="flex items-center gap-1">
+                            <CalendarDays size={10} /> {new Date(goal.deadline).toLocaleDateString('vi-VN')}
+                          </span>
+                          {goal.description && (
+                            <span className="truncate max-w-[150px] border-l border-slate-200 pl-2 font-medium">
+                              {goal.description}
+                            </span>
                           )}
                         </div>
                       </div>
-
-                      {/* (Đã xóa phần div absolute cũ ở đây) */}
                     </div>
+
+                    {/* 2. STATS & ACTIONS (Bên phải - Chứa tất cả nút bấm) */}
+                    <div className="flex items-center justify-between w-full sm:w-auto gap-4 pl-0 sm:pl-4 sm:border-l sm:border-slate-50 mt-2 sm:mt-0">
+                      {/* Con số thống kê */}
+                      <div className="text-right shrink-0">
+                        {/* SỬA LẠI: Luôn dùng themeColor cho con số, bất kể đã xong hay chưa */}
+                        <div
+                          className="text-base font-black leading-none"
+                          style={{ color: themeColor }}
+                        >
+                          {goal.currentAmount.toLocaleString()}
+                        </div>
+
+                        <div className="text-[10px] font-bold text-gray-400 mt-1">
+                          / {goal.targetAmount.toLocaleString()} {goal.unit}
+                        </div>
+                      </div>
+
+                      {/* CỤM NÚT HÀNH ĐỘNG (Đặt chung vào một khối flex) */}
+                      <div className="flex items-center gap-3">
+
+                        {/* Nút Sửa/Xóa: Mobile hiện mờ, Desktop hover mới hiện */}
+                        <div className="flex items-center gap-1 opacity-60 sm:opacity-0 group-hover/item:sm:opacity-100 transition-all">
+                          <button onClick={() => onEdit(goal)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+                            <Edit size={16} />
+                          </button>
+                          <button onClick={() => onDelete(goal.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+
+                        {/* Nút hành động chính (Cập nhật/Xong) */}
+                        {!isCompleted ? (
+                          <button
+                            onClick={() => openUpdateModal(goal)}
+                            className="px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-100 text-xs font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-200 shadow-sm transition-all active:scale-95 shrink-0"
+                          >
+                            Cập nhật
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => openUpdateModal(goal)}
+                            className="flex items-center gap-1 bg-green-50 text-green-700 px-3 py-1.5 rounded-lg border border-green-200 shadow-sm hover:bg-green-100 transition-colors shrink-0"
+                          >
+                            <CheckCircle2 size={14} strokeWidth={3} />
+                            <span className="text-[10px] font-extrabold uppercase">Xong</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* (Đã xóa phần div absolute cũ ở đây) */}
                   </SortableItem>
                 )
               })
