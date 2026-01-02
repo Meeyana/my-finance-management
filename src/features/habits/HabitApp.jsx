@@ -686,16 +686,21 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, 
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      onReorder(active.id, over.id);
-    }
-  };
-
   // State Modal
   const [updatingGoal, setUpdatingGoal] = useState(null);
   const [tempAmount, setTempAmount] = useState('');
+
+  // Manual Save State (Goals)
+  const hasChanges = onReorder.hasChanges;
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      onReorder.handleReorder(active.id, over.id);
+    }
+  };
+
+
 
   const openUpdateModal = (goal) => {
     setUpdatingGoal(goal);
@@ -796,6 +801,17 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, 
 
       {/* DANH SÁCH MỤC TIÊU (ĐÃ SỬA LỖI GIAO DIỆN MOBILE) */}
       {/* DANH SÁCH MỤC TIÊU (DnD Enabled) */}
+      <div className="flex justify-between items-center mb-2 px-1">
+        <h3 className="font-bold text-gray-700">Danh sách mục tiêu</h3>
+        {hasChanges && (
+          <button
+            onClick={onReorder.saveOrder}
+            className="px-3 py-1 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-sm hover:bg-indigo-700 transition-colors animate-pulse"
+          >
+            Lưu vị trí
+          </button>
+        )}
+      </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={filteredGoals.map(g => g.id)} strategy={verticalListSortingStrategy}>
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -809,6 +825,7 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, 
                   <SortableItem key={goal.id} id={goal.id}>
                     <div
                       // Thêm 'group/item' để scope hover chính xác hơn
+                      // REMOVED touchAction: 'none' to fix mobile scrolling
                       className="group/item relative p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
                       style={{ cursor: 'grab' }}
                     >
@@ -1038,6 +1055,10 @@ export default function HabitApp({ user }) {
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
   const [editingHabitId, setEditingHabitId] = useState(null);
 
+  // DnD Manual Save State
+  const [hasHabitChanges, setHasHabitChanges] = useState(false);
+  const [hasGoalChanges, setHasGoalChanges] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '', icon: '🎯', description: '', color: '', time: '',
     goalAmount: '1', goalUnit: 'lần', freqType: 'daily', freqValue: [],
@@ -1225,63 +1246,67 @@ export default function HabitApp({ user }) {
     await updateDoc(doc(db, `${base}/goals`, goal.id), { currentAmount: finalValue });
   };
 
-  // --- DnD HANDLERS ---
-  const handleHabitReorder = async (event) => {
+  // --- DnD HANDLERS (UPDATED FOR MANUAL SAVE) ---
+  const handleHabitReorder = (event) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
       const oldIndex = habits.findIndex(h => h.id === active.id);
       const newIndex = habits.findIndex(h => h.id === over.id);
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        // 1. Optimistic Update (Cập nhật giao diện ngay lập tức)
-        const previousHabits = [...habits];
         const newHabits = arrayMove(habits, oldIndex, newIndex);
         setHabits(newHabits);
-
-        try {
-          // 2. Update Firestore
-          const batch = writeBatch(db);
-          const base = getBasePath(user);
-          newHabits.forEach((h, index) => {
-            const ref = doc(db, `${base}/habits`, h.id);
-            batch.update(ref, { position: index });
-          });
-          await batch.commit();
-        } catch (error) {
-          console.error("Failed to save habit order:", error);
-          alert("Không thể lưu vị trí mới. Vui lòng thử lại.");
-          setHabits(previousHabits); // Hoàn tác nếu lỗi
-        }
+        setHasHabitChanges(true); // Mark as dirty
       }
     }
   };
 
-  const handleGoalReorder = async (activeId, overId) => {
+  const saveHabitOrder = async () => {
+    if (!hasHabitChanges) return;
+    try {
+      const batch = writeBatch(db);
+      const base = getBasePath(user);
+      habits.forEach((h, index) => {
+        const ref = doc(db, `${base}/habits`, h.id);
+        batch.update(ref, { position: index });
+      });
+      await batch.commit();
+      setHasHabitChanges(false);
+      alert("Đã lưu thứ tự thói quen!");
+    } catch (error) {
+      console.error("Failed to save habit order:", error);
+      alert("Lỗi khi lưu. Vui lòng thử lại.");
+    }
+  };
+
+  const handleGoalReorderLocal = (activeId, overId) => {
     if (activeId !== overId) {
       const oldIndex = goals.findIndex(g => g.id === activeId);
       const newIndex = goals.findIndex(g => g.id === overId);
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        // 1. Optimistic Update
-        const previousGoals = [...goals];
         const newGoals = arrayMove(goals, oldIndex, newIndex);
         setGoals(newGoals);
-
-        try {
-          // 2. Update Firestore
-          const batch = writeBatch(db);
-          const base = getBasePath(user);
-          newGoals.forEach((g, index) => {
-            const ref = doc(db, `${base}/goals`, g.id);
-            batch.update(ref, { position: index });
-          });
-          await batch.commit();
-        } catch (error) {
-          console.error("Failed to save goal order:", error);
-          alert("Không thể lưu vị trí mới. Vui lòng thử lại.");
-          setGoals(previousGoals);
-        }
+        setHasGoalChanges(true); // Mark as dirty
       }
+    }
+  };
+
+  const saveGoalOrder = async () => {
+    if (!hasGoalChanges) return;
+    try {
+      const batch = writeBatch(db);
+      const base = getBasePath(user);
+      goals.forEach((g, index) => {
+        const ref = doc(db, `${base}/goals`, g.id);
+        batch.update(ref, { position: index });
+      });
+      await batch.commit();
+      setHasGoalChanges(false);
+      alert("Đã lưu thứ tự mục tiêu!");
+    } catch (error) {
+      console.error("Failed to save goal order:", error);
+      alert("Lỗi khi lưu. Vui lòng thử lại.");
     }
   };
 
@@ -1608,7 +1633,11 @@ export default function HabitApp({ user }) {
               }}
               onDelete={deleteGoal}
               onUpdateValue={updateGoalValue}
-              onReorder={handleGoalReorder}
+              onReorder={{
+                handleReorder: handleGoalReorderLocal,
+                saveOrder: saveGoalOrder,
+                hasChanges: hasGoalChanges
+              }}
               onAddClick={() => {
                 if (!checkPermission()) return;
                 setModalType('goal');
@@ -1620,12 +1649,22 @@ export default function HabitApp({ user }) {
           {/* TAB: CÀI ĐẶT - QUẢN LÝ THÓI QUEN (ĐÃ FIX LAYOUT CỨNG) */}
           {activeTab === 'settings' && (
             <div className="animate-fade-in space-y-6">
-              <div><h2 className="text-2xl font-bold text-gray-800">Quản lý thói quen</h2></div>
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-800">Quản lý thói quen</h2>
+                {hasHabitChanges && (
+                  <button
+                    onClick={saveHabitOrder}
+                    className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow-md hover:bg-indigo-700 transition-colors animate-pulse"
+                  >
+                    Lưu thứ tự
+                  </button>
+                )}
+              </div>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleHabitReorder}>
                 <SortableContext items={habits.map(h => h.id)} strategy={verticalListSortingStrategy}>
                   <div className="grid gap-3">
                     {habits.map(habit => (
-                      <SortableItem key={habit.id} id={habit.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 h-[88px] overflow-hidden w-full max-w-full" style={{ touchAction: 'none' }}>
+                      <SortableItem key={habit.id} id={habit.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 h-[88px] overflow-hidden w-full max-w-full">
 
                         {/* 1. ICON (Cố định cứng - shrink-0) */}
                         <div
