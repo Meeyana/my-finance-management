@@ -4,7 +4,7 @@ import {
   PlusCircle, CheckCircle2, Trash2, X, Activity, ArrowLeft,
   LayoutDashboard, Menu, LogOut, Calendar as CalendarIcon,
   Settings, BarChart2, ChevronLeft, ChevronRight, Check, Edit,
-  RotateCcw, Filter, MousePointer2, Target, Flag, CalendarDays, ChevronDown, Lock, Crown
+  RotateCcw, Filter, MousePointer2, Target, Flag, CalendarDays, ChevronDown, Lock, Crown, Star
 } from 'lucide-react';
 import {
   collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch
@@ -1379,6 +1379,14 @@ export default function HabitApp({ user }) {
     });
   };
 
+  const togglePriority = async (habit) => {
+    if (!checkPermission()) return;
+    const base = getBasePath(user);
+    await updateDoc(doc(db, `${base}/habits`, habit.id), {
+      isPriority: !habit.isPriority
+    });
+  };
+
   const handleLogout = async () => {
     if (confirm("Bạn có chắc muốn đăng xuất?")) await signOut(auth);
   };
@@ -1544,7 +1552,15 @@ export default function HabitApp({ user }) {
 
                         {/* TEXT CONTENT */}
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-bold text-gray-800 text-lg leading-tight mb-1 truncate">{habit.name}</h4>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-bold text-gray-800 text-lg leading-tight truncate">{habit.name}</h4>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); togglePriority(habit); }}
+                              className={`p-1 rounded-full transition-all ${habit.isPriority ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'}`}
+                            >
+                              <Star size={16} fill={habit.isPriority ? "currentColor" : "none"} strokeWidth={habit.isPriority ? 0 : 2} />
+                            </button>
+                          </div>
                           <div className="flex items-center gap-2 truncate">
                             <span className="px-2 py-1 rounded-lg text-xs font-bold"
                               style={{ backgroundColor: `${themeColor}20`, color: themeColor }}>
@@ -1679,10 +1695,16 @@ export default function HabitApp({ user }) {
 
                         {/* 1. ICON (Cố định cứng - shrink-0) */}
                         <div
-                          className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0"
+                          className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 relative"
                           style={{ backgroundColor: `${habit.color}15` }}
                         >
                           {habit.icon}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); togglePriority(habit); }}
+                            className={`absolute -top-1 -right-1 p-1 rounded-full bg-white shadow-sm border border-slate-100 transition-all ${habit.isPriority ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'}`}
+                          >
+                            <Star size={12} fill={habit.isPriority ? "currentColor" : "none"} strokeWidth={habit.isPriority ? 0 : 2} />
+                          </button>
                         </div>
 
                         {/* 2. TEXT CONTAINER (Scroll ngang tại đây) */}
