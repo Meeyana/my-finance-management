@@ -4,7 +4,7 @@ import {
   PlusCircle, CheckCircle2, Trash2, X, Activity, ArrowLeft,
   LayoutDashboard, Menu, LogOut, Calendar as CalendarIcon,
   Settings, BarChart2, ChevronLeft, ChevronRight, Check, Edit,
-  RotateCcw, Filter, MousePointer2, Target, Flag, CalendarDays, ChevronDown, Lock, Crown, Star
+  RotateCcw, Filter, MousePointer2, Target, Flag, CalendarDays, ChevronDown, Lock, Crown, Star, GripVertical
 } from 'lucide-react';
 import {
   collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch
@@ -182,11 +182,15 @@ const SortableItem = ({ id, children, className }) => {
     zIndex: isDragging ? 50 : 'auto',
     opacity: isDragging ? 0.5 : 1,
     position: 'relative',
-    touchAction: 'none'
+    // touchAction: 'none' // REMOVED from container to allow scrolling
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={className}>
+    <div ref={setNodeRef} style={style} className={className}>
+      {/* DRAG HANDLE - Chỉ khu vực này mới chặn scroll */}
+      <div {...attributes} {...listeners} className="touch-none cursor-grab active:cursor-grabbing p-1 text-gray-400 hover:text-gray-600 shrink-0">
+        <GripVertical size={20} />
+      </div>
       {children}
     </div>
   );
@@ -683,12 +687,7 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, 
   // Sensors
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250, // Hold 250ms to pick up
-        tolerance: 5 // Can move 5px before canceling hold
-      }
-    }),
+    useSensor(TouchSensor), // Instant drag on handle
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -1028,12 +1027,7 @@ export default function HabitApp({ user }) {
   // DnD SENSORS
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250,
-        tolerance: 5
-      }
-    }),
+    useSensor(TouchSensor), // Instant drag on handle
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
