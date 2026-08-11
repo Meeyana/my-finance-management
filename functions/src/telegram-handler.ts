@@ -36,10 +36,13 @@ export function parseTelegramReply(text: string, categories: Record<string, stri
   return categoryId ? { type: 'category', categoryId } : { type: 'unknown' };
 }
 
-function resultForRule(hasAccountRule: boolean, label: string): string {
-  return hasAccountRule
-    ? `Đã gắn “${label}” và ghi nhớ rule STK.`
-    : `Đã gắn “${label}” cho giao dịch này.`;
+function resultForRule(
+  transaction: { counterpartyAccountKey?: string; merchantKey?: string },
+  label: string,
+): string {
+  if (transaction.counterpartyAccountKey) return `Đã gắn “${label}” và ghi nhớ rule STK.`;
+  if (transaction.merchantKey) return `Đã gắn “${label}” và ghi nhớ merchant.`;
+  return `Đã gắn “${label}” cho giao dịch này.`;
 }
 
 export async function handleTelegramUpdate(
@@ -55,7 +58,7 @@ export async function handleTelegramUpdate(
     if (action === 'cat' && categoryId) {
       if (!categories[categoryId]) throw new Error('Unknown category');
       const transaction = await classifyTransaction(config.uid, transactionId, { categoryId });
-      resultLabel = resultForRule(Boolean(transaction.counterpartyAccountKey), categories[categoryId]);
+      resultLabel = resultForRule(transaction, categories[categoryId]);
     } else if (action === 'internal') {
       const transaction = await classifyTransaction(config.uid, transactionId, { kind: 'transfer' });
       resultLabel = transaction.counterpartyAccountKey
@@ -108,7 +111,7 @@ export async function handleTelegramUpdate(
     resultLabel = 'Đã bỏ qua giao dịch.';
   } else if (replyAction.type === 'category') {
     const updated = await classifyTransaction(config.uid, transaction.id, { categoryId: replyAction.categoryId });
-    resultLabel = resultForRule(Boolean(updated.counterpartyAccountKey), categories[replyAction.categoryId]);
+    resultLabel = resultForRule(updated, categories[replyAction.categoryId]);
   } else {
     const choices = Object.values(categories).join(', ');
     await sendTelegramMessage(

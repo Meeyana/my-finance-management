@@ -132,7 +132,9 @@ export async function notifyPendingCategory(
       '',
       transaction.counterpartyAccountKey
         ? 'Bấm nút hoặc reply tin nhắn này bằng tên danh mục. Lựa chọn sẽ được nhớ cho đúng STK này ở các lần sau.'
-        : 'Không có STK để học rule; lựa chọn chỉ áp dụng cho giao dịch này.',
+        : transaction.merchantKey
+          ? 'Bấm nút hoặc reply bằng tên danh mục. Lựa chọn sẽ được nhớ cho merchant này ở các lần sau.'
+          : 'Không có STK hoặc merchant để học rule; lựa chọn chỉ áp dụng cho giao dịch này.',
     ].join('\n'),
     { inline_keyboard: rows },
   );
