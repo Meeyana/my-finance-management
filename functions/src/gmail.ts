@@ -40,20 +40,20 @@ export async function getAccessToken(credentials: OAuthCredentials): Promise<str
   return body.access_token;
 }
 
-export async function listGmailMessageIds(accessToken: string, query: string): Promise<string[]> {
+export async function listGmailMessageIds(accessToken: string, query: string, limit = 100): Promise<string[]> {
   const ids: string[] = [];
   let pageToken: string | undefined;
 
   do {
-    const params = new URLSearchParams({ q: query, maxResults: '100' });
+    const params = new URLSearchParams({ q: query, maxResults: String(Math.min(100, limit - ids.length)) });
     if (pageToken) params.set('pageToken', pageToken);
     const result = await googleRequest<{
       messages?: Array<{ id: string }>;
       nextPageToken?: string;
     }>(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`, accessToken);
-    ids.push(...(result.messages || []).map((message) => message.id));
+    ids.push(...(result.messages || []).map((message) => message.id).slice(0, limit - ids.length));
     pageToken = result.nextPageToken;
-  } while (pageToken && ids.length < 500);
+  } while (pageToken && ids.length < limit);
 
   return ids;
 }

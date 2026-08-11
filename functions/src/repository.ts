@@ -156,6 +156,20 @@ export async function classifyTransaction(
   });
 }
 
+export async function findTransactionByTelegramMessageId(
+  uid: string,
+  telegramMessageId: number,
+): Promise<StoredTransaction | null> {
+  const snapshot = await userRoot(uid)
+    .collection('transactions')
+    .where('telegramMessageId', '==', telegramMessageId)
+    .limit(1)
+    .get();
+  if (snapshot.empty) return null;
+  const document = snapshot.docs[0];
+  return { id: document.id, ...document.data() } as StoredTransaction;
+}
+
 export async function listUnnotifiedPendingTransactions(uid: string, limit = 20): Promise<StoredTransaction[]> {
   const snapshot = await userRoot(uid)
     .collection('transactions')

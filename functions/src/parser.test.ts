@@ -43,3 +43,19 @@ test('recognizes credit card payment so it is not counted as another expense', (
   assert.equal(parsed.amount, 3_500_000);
   assert.equal(parsed.sourceAccountLast4, '9988');
 });
+
+test('parses a VIB credit card purchase and matches the card last four digits', () => {
+  const parsed = parseVietnameseFinanceEmail(message('Thông báo giao dịch thẻ VIB', `
+    Thông báo giao dịch thẻ VIB
+    Thẻ: **** 6789
+    Số tiền giao dịch: VND 245,000
+    Thời gian: 11/08/2026 09:15:00
+    Đơn vị chấp nhận thẻ: GRAB HANOI VN
+  `));
+
+  assert.ok(parsed);
+  assert.equal(parsed.kind, 'expense');
+  assert.equal(parsed.amount, 245000);
+  assert.equal(parsed.sourceAccountLast4, '6789');
+  assert.equal(parsed.merchant, 'GRAB HANOI VN');
+});

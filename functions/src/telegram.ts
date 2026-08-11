@@ -25,6 +25,11 @@ export interface TelegramUpdate {
     message_id: number;
     chat: { id: number };
     text?: string;
+    reply_to_message?: {
+      message_id: number;
+      chat: { id: number };
+      text?: string;
+    };
   };
 }
 
@@ -48,6 +53,7 @@ export async function sendTelegramMessage(
   chatId: string,
   text: string,
   replyMarkup?: Record<string, unknown>,
+  replyToMessageId?: number,
 ): Promise<TelegramMessageResult> {
   return telegramRequest<TelegramMessageResult>(token, 'sendMessage', {
     chat_id: chatId,
@@ -55,6 +61,7 @@ export async function sendTelegramMessage(
     parse_mode: 'HTML',
     disable_web_page_preview: true,
     ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    ...(replyToMessageId ? { reply_parameters: { message_id: replyToMessageId } } : {}),
   });
 }
 
@@ -124,7 +131,7 @@ export async function notifyPendingCategory(
       `📝 ${escapeHtml(transaction.note || 'Không có nội dung')}`,
       '',
       transaction.counterpartyAccountKey
-        ? 'Lựa chọn sẽ được nhớ cho đúng STK này ở các lần sau.'
+        ? 'Bấm nút hoặc reply tin nhắn này bằng tên danh mục. Lựa chọn sẽ được nhớ cho đúng STK này ở các lần sau.'
         : 'Không có STK để học rule; lựa chọn chỉ áp dụng cho giao dịch này.',
     ].join('\n'),
     { inline_keyboard: rows },

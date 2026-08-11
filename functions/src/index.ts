@@ -8,7 +8,6 @@ import { dateKeyInTimeZone } from './domain.js';
 import { getAccessToken, getGmailMessage, listGmailMessageIds } from './gmail.js';
 import { parseVietnameseFinanceEmail } from './parser.js';
 import {
-  classifyTransaction,
   findTrackedAccount,
   hasProcessedEmail,
   listUnnotifiedPendingTransactions,
@@ -17,13 +16,8 @@ import {
   storeEmailTransaction,
 } from './repository.js';
 import { buildFinanceReport, sendReportOnce } from './reports.js';
-import {
-  answerCallbackQuery,
-  categoryNames,
-  markTelegramMessageReviewed,
-  notifyPendingCategory,
-  type TelegramUpdate,
-} from './telegram.js';
+import { notifyPendingCategory, type TelegramUpdate } from './telegram.js';
+import { handleTelegramUpdate } from './telegram-handler.js';
 
 initializeApp();
 setGlobalOptions({ region: 'asia-southeast1', maxInstances: 2 });
@@ -117,50 +111,15 @@ export const telegramFinanceWebhook = onRequest({
     return;
   }
   const update = request.body as TelegramUpdate;
-  const callback = update.callback_query;
-  if (!callback?.data || !callback.message) {
-    response.status(200).send('ok');
-    return;
-  }
-  if (String(callback.message.chat.id) !== TELEGRAM_CHAT_ID.value()) {
-    response.status(403).send('Wrong chat');
-    return;
-  }
-
   try {
-    const [action, transactionId, categoryId] = callback.data.split('|');
-    const uid = AUTOMATION_USER_ID.value();
-    let resultLabel = '';
-    if (action === 'cat' && categoryId) {
-      const categories = await categoryNames(uid);
-      if (!categories[categoryId]) throw new Error('Unknown category');
-      const transaction = await classifyTransaction(uid, transactionId, { categoryId });
-      resultLabel = transaction.counterpartyAccountKey
-        ? `Đã gắn “${categories[categoryId]}” và ghi nhớ rule STK.`
-        : `Đã gắn “${categories[categoryId]}” cho giao dịch này.`;
-    } else if (action === 'internal') {
-      const transaction = await classifyTransaction(uid, transactionId, { kind: 'transfer' });
-      resultLabel = transaction.counterpartyAccountKey
-        ? 'Đã đánh dấu chuyển nội bộ và ghi nhớ rule STK.'
-        : 'Đã đánh dấu chuyển nội bộ.';
-    } else if (action === 'ignore') {
-      await classifyTransaction(uid, transactionId, { ignore: true });
-      resultLabel = 'Đã bỏ qua giao dịch.';
-    } else {
-      throw new Error('Unsupported callback');
-    }
-    await answerCallbackQuery(TELEGRAM_BOT_TOKEN.value(), callback.id, resultLabel);
-    await markTelegramMessageReviewed(
-      TELEGRAM_BOT_TOKEN.value(),
-      callback.message.chat.id,
-      callback.message.message_id,
-      callback.message.text || 'Giao dịch',
-      resultLabel,
-    );
+    await handleTelegramUpdate({
+      uid: AUTOMATION_USER_ID.value(),
+      botToken: TELEGRAM_BOT_TOKEN.value(),
+      chatId: TELEGRAM_CHAT_ID.value(),
+    }, update);
     response.status(200).send('ok');
   } catch (error) {
-    logger.error('Telegram callback failed', error);
-    await answerCallbackQuery(TELEGRAM_BOT_TOKEN.value(), callback.id, 'Không thể cập nhật giao dịch.');
+    logger.error('Telegram update failed', error);
     response.status(500).send('error');
   }
 });

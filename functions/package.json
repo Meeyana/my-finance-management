@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "lint": "tsc --noEmit",
-    "test": "npm run build && node --test lib/domain.test.js lib/parser.test.js",
+    "test": "npm run build && node --test lib/domain.test.js lib/parser.test.js lib/telegram-handler.test.js",
     "oauth:url": "node scripts/google-oauth-url.mjs",
     "oauth:exchange": "node scripts/exchange-google-code.mjs",
     "telegram:webhook": "node scripts/set-telegram-webhook.mjs"

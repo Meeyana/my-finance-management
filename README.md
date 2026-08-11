@@ -1,7 +1,7 @@
 # My Finance Management
 
 Personal finance and habit tracking application built with React, Vite, Firebase
-Auth, Firestore, and Firebase Functions.
+Auth/Firestore, and Netlify Functions.
 
 ## Finance capabilities
 
@@ -31,9 +31,10 @@ npm.cmd --prefix functions install
 npm.cmd --prefix functions test
 ```
 
-Production Gmail, Telegram, and Firebase configuration is documented in
-[`docs/AUTOMATION_SETUP.md`](docs/AUTOMATION_SETUP.md). Acceptance status is in
-[`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md).
+Production Gmail, Telegram, Firebase Admin, and Netlify configuration is documented in
+[`docs/NETLIFY_PRODUCTION.md`](docs/NETLIFY_PRODUCTION.md). The older Firebase
+Functions deployment path remains in [`docs/AUTOMATION_SETUP.md`](docs/AUTOMATION_SETUP.md).
+Acceptance status is in [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md).
 
-Secrets must be stored in Firebase Secret Manager. Never expose Gmail or
-Telegram tokens through `VITE_*` environment variables.
+Secrets must be stored as Netlify environment variables with Functions scope.
+Never expose Gmail, Telegram, or Firebase Admin credentials through `VITE_*` variables.

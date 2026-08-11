@@ -38,8 +38,10 @@ export function extractMessageText(message: GmailMessage): string {
 
 function parseAmount(text: string): number | null {
   const patterns = [
-    /(?:so tien|gia tri giao dich|transaction amount|amount|tong tien)\s*[:\-]?\s*([+\-]?[\d.,\s]{3,})\s*(?:vnd|dong|d)/i,
-    /([+\-]?[\d][\d.,\s]{2,})\s*(?:vnd|dong|d)/i,
+    /(?:so tien(?: giao dich)?|gia tri giao dich|transaction amount|amount|tong tien)\s*[:\-]?\s*([+\-]?[\d.,\s]{3,})\s*(?:vnd|dong|d)\b/i,
+    /(?:so tien(?: giao dich)?|gia tri giao dich|transaction amount|amount|tong tien)\s*[:\-]?\s*(?:vnd|dong|d)\b\s*([+\-]?[\d.,\s]{3,})/i,
+    /([+\-]?[\d][\d.,\s]{2,})\s*(?:vnd|dong|d)\b/i,
+    /(?:vnd|dong)\b\s*([+\-]?[\d][\d.,\s]{2,})/i,
   ];
   for (const pattern of patterns) {
     const match = text.match(pattern);
@@ -107,7 +109,7 @@ export function parseVietnameseFinanceEmail(message: GmailMessage): ParsedEmailT
     /(?:the tin dung|credit card|card number)\s*[:\-]?\s*(?:x+|\*+)?\s*([0-9]{4,20})/i,
   ])?.slice(-4);
   const merchant = firstMatch(rawText, [
-    /(?:Nội dung|Nội dung giao dịch|Mô tả|Merchant|Đơn vị chấp nhận thẻ)\s*[:\-]\s*([^\n]{2,120})/i,
+    /(?:Nội dung|Nội dung giao dịch|Mô tả|Merchant|Đơn vị chấp nhận thẻ|Địa điểm|Tại)\s*[:\-]\s*([^\n]{2,120})/i,
   ]);
   const fallbackDate = message.internalDate ? new Date(Number(message.internalDate)) : new Date();
   const occurredAt = parseOccurredAt(rawText, fallbackDate);
