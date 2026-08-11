@@ -116,15 +116,16 @@ The webhook subscribes to both button callbacks and reply messages.
 
 ## 7. Production acceptance test
 
-1. In Netlify → Functions, open `sync-gmail` and select Run now.
-2. Confirm its log reports scanned/created counts without an authentication error.
-3. Confirm an unclassified transfer produces a Telegram message.
-4. Reply to that exact bot message with a category label such as `Ăn uống`.
-5. Confirm the transaction becomes posted and Telegram confirms that the STK rule was saved.
-6. Process another transfer to the same full destination STK; it must be categorized without another prompt.
-7. Process one VIB credit-card email and verify the card source, amount and merchant.
-8. Run the daily and weekly report functions manually once.
-9. Set `FINANCE_AUTOMATION_ENABLED=true` and trigger a new production deploy.
+1. After all secrets and tracked accounts are ready, set
+   `FINANCE_AUTOMATION_ENABLED=true` and trigger a production deploy.
+2. In Netlify → Functions, open `sync-gmail` and select Run now.
+3. Confirm its log reports scanned/created counts without an authentication error.
+4. Confirm an unclassified transfer produces a Telegram message.
+5. Reply to that exact bot message with a category label such as `Ăn uống`.
+6. Confirm the transaction becomes posted and Telegram confirms that the STK rule was saved.
+7. Process another transfer to the same full destination STK; it must be categorized without another prompt.
+8. Process one VIB credit-card email and verify the card source, amount and merchant.
+9. Run the daily and weekly report functions manually once.
 
 For a real VIB acceptance fixture, redact personal information from one purchase
 email but preserve the field labels and number formatting. The generic VIB test
