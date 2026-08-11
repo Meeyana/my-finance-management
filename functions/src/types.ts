@@ -9,27 +9,19 @@ export type TransactionKind =
 
 export type TransactionStatus = 'posted' | 'pending_category' | 'ignored';
 
-export interface GmailHeader {
-  name: string;
-  value: string;
-}
-
-export interface GmailPayload {
-  mimeType?: string;
-  headers?: GmailHeader[];
-  body?: { data?: string };
-  parts?: GmailPayload[];
-}
-
-export interface GmailMessage {
-  id: string;
+export interface N8nFinancePayload {
+  messageId: string;
   threadId?: string;
-  internalDate?: string;
+  sender?: string;
+  subject?: string;
+  html?: string;
+  text?: string;
   snippet?: string;
-  payload?: GmailPayload;
+  receivedAt?: string | number;
+  sourceAccountLast4?: string;
 }
 
-export interface ParsedEmailTransaction {
+export interface ParsedFinanceTransaction {
   amount: number;
   currency: string;
   occurredAt: Date;

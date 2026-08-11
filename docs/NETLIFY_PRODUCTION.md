@@ -1,132 +1,126 @@
-# Netlify finance automation production setup
+# Finance automation: n8n + Netlify
 
-Netlify deploys the frontend and all functions in `netlify/functions` from the
-same GitHub push. Scheduled functions use UTC; the configured schedules are:
-
-- Gmail sync: every 10 minutes.
-- Daily report: 14:00 UTC = 21:00 Asia/Ho_Chi_Minh.
-- Weekly report: Sunday 13:30 UTC = 20:30 Asia/Ho_Chi_Minh.
-
-## 1. Create the Telegram bot
-
-1. Open `@BotFather`, run `/newbot`, choose a name and username, then save the bot token.
-2. Open the new bot and send `/start`.
-3. Before setting a webhook, call `getUpdates` and copy `result[].message.chat.id`:
-
-```powershell
-$financeBotToken = Read-Host "Telegram bot token"
-Invoke-RestMethod "https://api.telegram.org/bot$financeBotToken/getUpdates" | ConvertTo-Json -Depth 8
-```
-
-Do not commit or send the bot token in chat.
-
-## 2. Create Gmail readonly OAuth credentials
-
-Enable Gmail API in Google Cloud, create a Web OAuth client, and add
-`http://localhost:8080/oauth/callback` as an authorized redirect URI.
-
-```powershell
-$env:GOOGLE_CLIENT_ID = "..."
-$env:GOOGLE_REDIRECT_URI = "http://localhost:8080/oauth/callback"
-npm.cmd --prefix functions run oauth:url
-```
-
-Open the generated URL, approve `gmail.readonly`, and copy the `code` query
-parameter from the final localhost URL even if the page itself does not load.
-
-```powershell
-$env:GOOGLE_CLIENT_SECRET = "..."
-$env:GOOGLE_AUTH_CODE = "..."
-npm.cmd --prefix functions run oauth:exchange
-```
-
-Store the returned refresh token immediately. A Google OAuth app left in
-External/Testing mode can issue refresh tokens that expire after seven days.
-
-## 3. Create Firebase Admin credentials
-
-In Firebase Console, open Project settings → Service accounts → Generate new
-private key. Store the downloaded JSON securely. Netlify supports either:
-
-- `FIREBASE_SERVICE_ACCOUNT_JSON`: the complete JSON on one line; or
-- `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, and
-  `FIREBASE_ADMIN_PRIVATE_KEY`.
-
-Never prefix server credentials with `VITE_`; Vite variables are exposed to the browser.
-
-Copy `AUTOMATION_USER_ID` from Firebase Console → Authentication → Users. It
-must be the UID of the account that owns the finance data.
-
-## 4. Add Netlify environment variables
-
-Add these in Project configuration → Environment variables. Use Production
-context and Functions scope when the plan supports scopes; otherwise All scopes
-is acceptable.
+Gmail is owned by n8n. Netlify does not connect to Gmail and does not need Google
+OAuth credentials.
 
 ```text
-FINANCE_AUTOMATION_ENABLED=false
-AUTOMATION_USER_ID=<Firebase Auth UID>
-GMAIL_QUERY=newer_than:2d
-GMAIL_MAX_MESSAGES=30
+Gmail -> n8n Gmail Trigger -> POST /api/finance/ingest
+      -> parse + account matching + deterministic deduplication
+      -> Firestore -> Telegram classification -> learned account/merchant rule
+```
 
-GOOGLE_CLIENT_ID=<OAuth client id>
-GOOGLE_CLIENT_SECRET=<OAuth client secret>
-GMAIL_REFRESH_TOKEN=<OAuth refresh token>
+Netlify also sends the daily report at 21:00 Asia/Ho_Chi_Minh, the weekly report
+at 20:30 on Sunday, and retries failed Telegram notifications every 10 minutes.
+
+## 1. Required Netlify environment variables
+
+Configure these for the Production context and Functions scope (or All scopes):
+
+```text
+FINANCE_AUTOMATION_ENABLED=true
+FINANCE_INGEST_SECRET=<random value, at least 32 characters>
+AUTOMATION_USER_ID=<Firebase Auth UID that owns the finance data>
 
 TELEGRAM_BOT_TOKEN=<BotFather token>
 TELEGRAM_CHAT_ID=<private chat id>
 TELEGRAM_WEBHOOK_SECRET=<random value, at least 32 characters>
-ACCOUNT_HMAC_SECRET=<another random value, at least 32 characters>
+ACCOUNT_HMAC_SECRET=<different random value, at least 32 characters>
 
-FIREBASE_SERVICE_ACCOUNT_JSON=<service account JSON on one line>
+FIREBASE_SERVICE_ACCOUNT_JSON=<Firebase service account JSON on one line>
 ```
 
-`TELEGRAM_WEBHOOK_SECRET` and `ACCOUNT_HMAC_SECRET` must be different. Changing
-`ACCOUNT_HMAC_SECRET` later invalidates previously learned STK rules.
+`FINANCE_INGEST_SECRET`, `TELEGRAM_WEBHOOK_SECRET`, and
+`ACCOUNT_HMAC_SECRET` must be different values. Do not prefix server secrets with
+`VITE_`. Changing `ACCOUNT_HMAC_SECRET` invalidates existing learned account
+rules.
 
-Keep `FINANCE_AUTOMATION_ENABLED=false` for the first deploy so scheduled jobs
-cannot process mail before the account list is ready.
-
-## 5. Add the debit account and VIB credit card
-
-In Finance → Tài khoản & thẻ:
-
-1. Add the debit account with its last four digits and enable Gmail ingestion.
-2. Add a second account with type `Thẻ tín dụng`, institution `VIB`, and the
-   last four digits shown in VIB transaction emails.
-3. Enable Gmail ingestion and reporting for the VIB card.
-
-The Gmail job scans the same mailbox for both sources. It matches each email to
-the correct account/card by last four digits. A VIB card purchase is an expense;
-a card-balance payment is `credit_payment` and is not counted as another expense.
-
-## 6. Deploy and configure the webhook
-
-After the GitHub/Netlify production deploy succeeds, configure Telegram with the
-production site URL:
+Generate a value without printing it into shell history:
 
 ```powershell
-$env:TELEGRAM_BOT_TOKEN = "..."
-$env:TELEGRAM_WEBHOOK_URL = "https://<your-site>/api/finance/telegram"
-$env:TELEGRAM_WEBHOOK_SECRET = "..."
-npm.cmd --prefix functions run telegram:webhook
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+$financeIngestSecret = [Convert]::ToHexString($bytes).ToLowerInvariant()
+$financeIngestSecret
 ```
 
-The webhook subscribes to both button callbacks and reply messages.
+Store that same value as `FINANCE_INGEST_SECRET` in both Netlify and n8n.
 
-## 7. Production acceptance test
+## 2. Configure tracked accounts
 
-1. After all secrets and tracked accounts are ready, set
-   `FINANCE_AUTOMATION_ENABLED=true` and trigger a production deploy.
-2. In Netlify → Functions, open `sync-gmail` and select Run now.
-3. Confirm its log reports scanned/created counts without an authentication error.
-4. Confirm an unclassified transfer produces a Telegram message.
-5. Reply to that exact bot message with a category label such as `Ăn uống`.
-6. Confirm the transaction becomes posted and Telegram confirms that the STK rule was saved.
-7. Process another transfer to the same full destination STK; it must be categorized without another prompt.
-8. Process one VIB credit-card email and verify the card source, amount and merchant.
-9. Run the daily and weekly report functions manually once.
+In Finance -> Accounts and cards:
 
-For a real VIB acceptance fixture, redact personal information from one purchase
-email but preserve the field labels and number formatting. The generic VIB test
-fixture cannot guarantee every VIB email template variant.
+1. Add the debit account and its last four digits.
+2. Add the VIB card as a credit-card account with the last four digits present
+   in VIB transaction emails.
+3. Enable email ingestion only for accounts/cards that should be tracked.
+4. Disable report inclusion for any account that should be ingested but excluded
+   from totals.
+
+An email without a tracked last-four match is rejected with HTTP 422; it is not
+silently assigned to the wrong account.
+
+## 3. Configure the n8n workflow
+
+The local `automation.json` export is intentionally ignored by Git because n8n
+exports can contain credentials. Its current version contains only:
+
+1. A VIB Gmail Trigger.
+2. A Code node that creates a minimal email payload.
+3. An authenticated HTTP Request to the Netlify ingestion endpoint.
+
+Create an n8n variable named `FINANCE_INGEST_SECRET` with the same value used in
+Netlify. The HTTP node sends it in the `x-finance-ingest-secret` header.
+
+The existing VIB trigger handles credit-card emails. To ingest the debit bank,
+duplicate the Gmail Trigger branch and change its Sender/Search filter to match
+that bank's email. Connect it to the same Code and HTTP nodes. Do not add a
+second Firebase write node; Netlify is the only Firestore writer for ingestion.
+
+Keep the Gmail message ID in `messageId`. Netlify derives a deterministic
+transaction ID from it, so n8n retries do not create duplicate transactions.
+
+## 4. Telegram webhook
+
+After Netlify deploys, set the webhook:
+
+```powershell
+$financeBotToken = Read-Host "Telegram bot token"
+$webhookSecret = Read-Host "Telegram webhook secret"
+$body = @{
+  url = "https://tp-finance.netlify.app/api/finance/telegram"
+  secret_token = $webhookSecret
+  allowed_updates = @("message", "callback_query")
+} | ConvertTo-Json
+Invoke-RestMethod "https://api.telegram.org/bot$financeBotToken/setWebhook" `
+  -Method Post -ContentType "application/json" -Body $body
+```
+
+When an unknown destination account or merchant arrives, reply to that exact
+bot message with a category label. The transaction is posted and a hashed
+account/merchant rule is saved for the next matching transaction.
+
+## 5. Production acceptance test
+
+1. Push the source and wait for the Netlify production deploy to succeed.
+2. Add `FINANCE_INGEST_SECRET` to Netlify and n8n, then redeploy Netlify once.
+3. Run one VIB execution manually in n8n. The HTTP node should return 201.
+4. Run the same Gmail message again. It should return 200 with `created: false`.
+5. Confirm the amount, VIB card, merchant, and transaction kind in Finance.
+6. For an unknown merchant/account, confirm Telegram asks for a category.
+7. Reply to the bot message and verify the transaction changes to `posted`.
+8. Process a later transaction for the same account/merchant and verify no new
+   classification prompt is sent.
+9. Add the debit Gmail Trigger and repeat the account-matching test.
+10. Run daily/weekly functions manually once and verify Telegram delivery.
+
+Expected ingestion responses:
+
+| HTTP | Meaning |
+| --- | --- |
+| 201 | New transaction created |
+| 200 | Message was already processed |
+| 400 | Invalid n8n payload |
+| 401 | Ingestion secret mismatch |
+| 413 | Payload is too large |
+| 422 | Email could not be parsed or account is not tracked |
+| 500/503 | Backend or environment configuration error |

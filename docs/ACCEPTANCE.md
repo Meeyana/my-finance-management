@@ -1,6 +1,6 @@
 # Finance upgrade acceptance checklist
 
-## Phase 0 — legacy stabilization
+## Phase 0 - legacy stabilization
 
 - [x] Browser-side recurring executor removed.
 - [x] Recurring menu hidden behind a disabled feature flag.
@@ -8,7 +8,7 @@
 - [x] Duplicate finance listeners removed; loans and accounts listeners clean up.
 - [x] Finance production build passes.
 
-## Phase 1 — finance domain and tracked accounts
+## Phase 1 - finance domain and tracked accounts
 
 - [x] Legacy transactions still count as expenses.
 - [x] Income, transfer, credit payment, refund and fee have separate semantics.
@@ -17,28 +17,31 @@
 - [x] `ingestEnabled` and `includeInReports` are independent controls.
 - [x] Manual transactions can select type and source account.
 
-## Phase 2 — Gmail ingestion
+## Phase 2 - n8n ingestion
 
-- [x] Gmail access runs in Firebase Functions, not the browser.
-- [x] OAuth refresh token is read only from Secret Manager.
+- [x] n8n owns Gmail OAuth and email triggering.
+- [x] Netlify exposes a secret-authenticated ingestion endpoint.
+- [x] Gmail/Google credentials are not required by Netlify.
 - [x] Only tracked account/card last-four matches are ingested.
-- [x] Deterministic Gmail transaction IDs and Firestore transactions prevent duplicates.
+- [x] Deterministic source IDs and Firestore transactions prevent duplicates.
 - [x] Credit payment, refund and fee event types are represented.
-- [x] Generic parser fixtures pass.
-- [ ] Real bank/card fixtures supplied and accepted.
-- [ ] Deployed Gmail end-to-end smoke test passes with production credentials.
+- [x] Debit transfer and VIB credit-card parser fixtures pass.
+- [x] Local n8n export is ignored by Git and no longer writes directly to Firebase.
+- [ ] Production VIB execution returns 201, then 200 on retry.
+- [ ] Debit-bank Gmail Trigger sender/search filter is supplied and tested.
 
-## Phase 3 — Telegram and learned account rules
+## Phase 3 - Telegram and learned account rules
 
 - [x] Unknown outgoing transfers become `pending_category` and do not affect totals yet.
 - [x] Telegram button or text reply can choose a category, internal transfer, or ignore.
 - [x] Destination account is HMACed before persistence.
-- [x] Category choice creates `counterpartyAccountKey → category/kind` rule.
-- [x] A repeated transfer to the same account applies the rule without another prompt.
+- [x] Category choice creates an account/merchant category rule.
+- [x] A repeated account/merchant applies the rule without another prompt.
+- [x] Failed immediate Telegram notifications are retried every 10 minutes.
 - [x] Daily 21:00 and Sunday 20:30 reports are idempotent.
-- [ ] Bot webhook deployed and smoke-tested with the owner's private chat.
+- [ ] Bot webhook and reply flow pass a production smoke test.
 
-## Phase 4 — release gate
+## Phase 4 - release gate
 
 - [x] Frontend finance lint passes.
 - [x] Frontend production build passes.
@@ -49,11 +52,8 @@
 - [x] Netlify Functions and UTC schedules are included in Git deployments.
 - [ ] Firebase rules tested against the target project/emulator before deployment.
 
-## Known release notes
+## Known release note
 
-- The legacy repository already tracks `node_modules`. New installs are ignored,
-  but the tracked dependency tree should be removed from Git in a dedicated
-  cleanup commit before merging this upgrade.
-- The current Firebase Functions dependency tree reports moderate transitive
-  `uuid` audit findings. npm offers only a breaking Firebase Admin downgrade, so
-  no forced downgrade was applied.
+The legacy repository already tracks `node_modules`. Existing unrelated dependency
+changes must remain outside finance commits and should be removed from Git in a
+separate cleanup.

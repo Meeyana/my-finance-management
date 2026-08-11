@@ -1,17 +1,13 @@
 import { dateKeyInTimeZone, merchantRuleKey, normalizeText } from './domain.js';
-import type { GmailMessage, GmailPayload, ParsedEmailTransaction, TransactionKind } from './types.js';
+import type { N8nFinancePayload, ParsedFinanceTransaction, TransactionKind } from './types.js';
 
-function decodeBase64Url(value?: string): string {
-  if (!value) return '';
-  return Buffer.from(value.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
-}
-
-function stripHtml(value: string): string {
+export function stripHtml(value: string): string {
   return value
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<br\s*\/?\s*>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
+    .replace(/<\/(?:td|th|tr)>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
@@ -19,16 +15,8 @@ function stripHtml(value: string): string {
     .replace(/&quot;/gi, '"');
 }
 
-function collectBody(payload?: GmailPayload): string[] {
-  if (!payload) return [];
-  const own = decodeBase64Url(payload.body?.data);
-  const values = own ? [payload.mimeType === 'text/html' ? stripHtml(own) : own] : [];
-  return values.concat((payload.parts || []).flatMap(collectBody));
-}
-
-export function extractMessageText(message: GmailMessage): string {
-  const subject = message.payload?.headers?.find((header) => header.name.toLowerCase() === 'subject')?.value || '';
-  return [subject, message.snippet || '', ...collectBody(message.payload)]
+function payloadText(payload: N8nFinancePayload): string {
+  return [payload.subject || '', payload.snippet || '', payload.text || '', stripHtml(payload.html || '')]
     .join('\n')
     .replace(/\r/g, '')
     .replace(/[ \t]+/g, ' ')
@@ -90,8 +78,8 @@ function classify(normalized: string): { kind: TransactionKind; direction: 'in' 
   return { kind: 'expense', direction: 'out' };
 }
 
-export function parseVietnameseFinanceEmail(message: GmailMessage): ParsedEmailTransaction | null {
-  const rawText = extractMessageText(message);
+export function parseN8nFinancePayload(payload: N8nFinancePayload): ParsedFinanceTransaction | null {
+  const rawText = payloadText(payload);
   const normalized = normalizeText(rawText);
   const amount = parseAmount(normalized);
   if (!amount) return null;
@@ -109,9 +97,13 @@ export function parseVietnameseFinanceEmail(message: GmailMessage): ParsedEmailT
     /(?:the tin dung|credit card|card number)\s*[:\-]?\s*(?:x+|\*+)?\s*([0-9]{4,20})/i,
   ])?.slice(-4);
   const merchant = firstMatch(rawText, [
-    /(?:Nội dung|Nội dung giao dịch|Mô tả|Merchant|Đơn vị chấp nhận thẻ|Địa điểm|Tại)\s*[:\-]\s*([^\n]{2,120})/i,
+    /(?:Nội dung|Nội dung giao dịch|Mô tả|Merchant|Đơn vị chấp nhận thẻ|Địa điểm|Tại)(?:\s*[:\-]\s*|\s+)([^\n]{2,120})/i,
   ]);
-  const fallbackDate = message.internalDate ? new Date(Number(message.internalDate)) : new Date();
+  const receivedAtValue = typeof payload.receivedAt === 'string' && /^\d+$/.test(payload.receivedAt)
+    ? Number(payload.receivedAt)
+    : payload.receivedAt;
+  const receivedAt = receivedAtValue ? new Date(receivedAtValue) : new Date();
+  const fallbackDate = Number.isNaN(receivedAt.getTime()) ? new Date() : receivedAt;
   const occurredAt = parseOccurredAt(rawText, fallbackDate);
 
   return {
@@ -120,12 +112,13 @@ export function parseVietnameseFinanceEmail(message: GmailMessage): ParsedEmailT
     occurredAt,
     date: dateKeyInTimeZone(occurredAt),
     ...classification,
-    note: merchant || message.snippet || 'Giao dịch nhập từ Gmail',
+    note: merchant || payload.snippet || payload.subject || 'Giao dịch nhập từ n8n',
     merchant,
     merchantKey: merchant ? merchantRuleKey(merchant) : undefined,
-    sourceAccountLast4: classification.kind === 'credit_payment'
-      ? creditCardLast4 || sourceAccount?.slice(-4)
-      : sourceAccount?.slice(-4),
+    sourceAccountLast4: payload.sourceAccountLast4?.replace(/\D/g, '').slice(-4)
+      || (classification.kind === 'credit_payment'
+        ? creditCardLast4 || sourceAccount?.slice(-4)
+        : sourceAccount?.slice(-4)),
     counterpartyAccount,
     counterpartyAccountLast4: counterpartyAccount?.slice(-4),
     confidence: counterpartyAccount || merchant ? 0.85 : 0.55,

@@ -1,22 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseVietnameseFinanceEmail } from './parser.js';
-import type { GmailMessage } from './types.js';
+import { parseN8nFinancePayload } from './parser.js';
+import type { N8nFinancePayload } from './types.js';
 
-function message(subject: string, body: string): GmailMessage {
+function message(subject: string, body: string): N8nFinancePayload {
   return {
-    id: 'mail-1',
-    internalDate: String(new Date(2026, 7, 11, 10, 30).getTime()),
-    payload: {
-      mimeType: 'multipart/alternative',
-      headers: [{ name: 'Subject', value: subject }],
-      parts: [{ mimeType: 'text/plain', body: { data: Buffer.from(body).toString('base64url') } }],
-    },
+    messageId: 'mail-1',
+    receivedAt: new Date(2026, 7, 11, 10, 30).toISOString(),
+    subject,
+    text: body,
   };
 }
 
 test('parses an outgoing transfer and extracts destination account', () => {
-  const parsed = parseVietnameseFinanceEmail(message('Thông báo chuyển khoản', [
+  const parsed = parseN8nFinancePayload(message('Thông báo chuyển khoản', [
     'Từ tài khoản: ****1234',
     'Đến tài khoản: 0123456789',
     'Số tiền: 250.000 VND',
@@ -32,7 +29,7 @@ test('parses an outgoing transfer and extracts destination account', () => {
 });
 
 test('recognizes credit card payment so it is not counted as another expense', () => {
-  const parsed = parseVietnameseFinanceEmail(message('Thanh toán dư nợ thẻ tín dụng', [
+  const parsed = parseN8nFinancePayload(message('Thanh toán dư nợ thẻ tín dụng', [
     'Từ tài khoản: ****1234',
     'Thẻ tín dụng: ****9988',
     'Số tiền: 3.500.000 VND',
@@ -45,7 +42,7 @@ test('recognizes credit card payment so it is not counted as another expense', (
 });
 
 test('parses a VIB credit card purchase and matches the card last four digits', () => {
-  const parsed = parseVietnameseFinanceEmail(message('Thông báo giao dịch thẻ VIB', `
+  const parsed = parseN8nFinancePayload(message('Thông báo giao dịch thẻ VIB', `
     Thông báo giao dịch thẻ VIB
     Thẻ: **** 6789
     Số tiền giao dịch: VND 245,000
@@ -58,4 +55,24 @@ test('parses a VIB credit card purchase and matches the card last four digits', 
   assert.equal(parsed.amount, 245000);
   assert.equal(parsed.sourceAccountLast4, '6789');
   assert.equal(parsed.merchant, 'GRAB HANOI VN');
+});
+
+test('parses a VIB HTML payload delivered by n8n', () => {
+  const parsed = parseN8nFinancePayload({
+    messageId: 'vib-html-1',
+    subject: 'Thông báo giao dịch thẻ VIB',
+    html: `
+      <table>
+        <tr><td>Thẻ</td><td>**** 6789</td></tr>
+        <tr><td>Số tiền giao dịch</td><td>350.000 VND</td></tr>
+        <tr><td>Ngày giao dịch</td><td>11/08/2026 19:20:00</td></tr>
+        <tr><td>Đơn vị chấp nhận thẻ</td><td>SHOPEE VN</td></tr>
+      </table>
+    `,
+  });
+
+  assert.ok(parsed);
+  assert.equal(parsed.amount, 350000);
+  assert.equal(parsed.sourceAccountLast4, '6789');
+  assert.equal(parsed.merchant, 'SHOPEE VN');
 });

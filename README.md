@@ -7,7 +7,7 @@ Auth/Firestore, and Netlify Functions.
 
 - Manual income and expense ledger with budgets and reports.
 - Bank account and credit-card tracking controls.
-- Gmail transaction ingestion with deterministic deduplication.
+- Gmail ingestion through n8n with deterministic backend deduplication.
 - Credit purchases, repayments, refunds, transfers, and fees have separate semantics.
 - Telegram classification for unknown destination accounts.
 - Learned HMAC account rules automatically categorize repeated transfers.
@@ -31,10 +31,9 @@ npm.cmd --prefix functions install
 npm.cmd --prefix functions test
 ```
 
-Production Gmail, Telegram, Firebase Admin, and Netlify configuration is documented in
-[`docs/NETLIFY_PRODUCTION.md`](docs/NETLIFY_PRODUCTION.md). The older Firebase
-Functions deployment path remains in [`docs/AUTOMATION_SETUP.md`](docs/AUTOMATION_SETUP.md).
-Acceptance status is in [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md).
+Production n8n, Telegram, Firebase Admin, and Netlify configuration is documented in
+[`docs/NETLIFY_PRODUCTION.md`](docs/NETLIFY_PRODUCTION.md). Acceptance status is in
+[`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md).
 
-Secrets must be stored as Netlify environment variables with Functions scope.
-Never expose Gmail, Telegram, or Firebase Admin credentials through `VITE_*` variables.
+Secrets must be stored in Netlify/n8n secret configuration. Never expose Telegram,
+ingestion, or Firebase Admin credentials through `VITE_*` variables.

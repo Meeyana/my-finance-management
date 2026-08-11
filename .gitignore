@@ -36,3 +36,6 @@ yarn-error.log*
 .env.production.local
 *.env
 *.env.*
+
+# Local n8n workflow export (may contain credentials)
+/automation.json

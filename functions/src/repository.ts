@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto';
 import { FieldValue, Timestamp, getFirestore, type DocumentReference } from 'firebase-admin/firestore';
 import { accountRuleKey, applyCategoryRule } from './domain.js';
 import type {
   CategoryRule,
   FinanceAccount,
-  ParsedEmailTransaction,
+  ParsedFinanceTransaction,
   StoredTransaction,
   TransactionKind,
 } from './types.js';
@@ -31,28 +32,32 @@ export async function getCategoryRule(uid: string, key?: string): Promise<Catego
   return snapshot.exists ? snapshot.data() as CategoryRule : null;
 }
 
-export async function hasProcessedEmail(uid: string, messageId: string): Promise<boolean> {
-  const safeMessageId = messageId.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const snapshot = await userRoot(uid).collection('gmail_events').doc(safeMessageId).get();
+export function safeIngestionId(sourceRef: string): string {
+  return createHash('sha256').update(sourceRef.trim()).digest('hex');
+}
+
+export async function hasProcessedIngestion(uid: string, sourceRef: string): Promise<boolean> {
+  const safeSourceRef = safeIngestionId(sourceRef);
+  const snapshot = await userRoot(uid).collection('ingestion_events').doc(safeSourceRef).get();
   return snapshot.data()?.status === 'processed';
 }
 
-interface StoreEmailInput {
+interface StoreIngestionInput {
   uid: string;
-  messageId: string;
-  parsed: ParsedEmailTransaction;
+  sourceRef: string;
+  parsed: ParsedFinanceTransaction;
   account: FinanceAccount;
   accountHmacSecret: string;
   parserVersion: string;
 }
 
-export async function storeEmailTransaction(input: StoreEmailInput): Promise<{ created: boolean; transaction: StoredTransaction }> {
+export async function storeIngestedTransaction(input: StoreIngestionInput): Promise<{ created: boolean; transaction: StoredTransaction }> {
   const db = getFirestore();
   const root = userRoot(input.uid);
-  const safeMessageId = input.messageId.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const transactionId = `gmail_${safeMessageId}`;
+  const safeSourceRef = safeIngestionId(input.sourceRef);
+  const transactionId = `n8n_${safeSourceRef}`;
   const transactionRef = root.collection('transactions').doc(transactionId);
-  const eventRef = root.collection('gmail_events').doc(safeMessageId);
+  const eventRef = root.collection('ingestion_events').doc(safeSourceRef);
 
   const counterpartyAccountKey = input.parsed.counterpartyAccount
     ? accountRuleKey(input.parsed.counterpartyAccount, input.accountHmacSecret)
@@ -80,8 +85,8 @@ export async function storeEmailTransaction(input: StoreEmailInput): Promise<{ c
     merchantKey: input.parsed.merchantKey,
     counterpartyAccountKey,
     counterpartyAccountLast4: input.parsed.counterpartyAccountLast4,
-    source: 'gmail',
-    sourceRef: input.messageId,
+    source: 'n8n',
+    sourceRef: input.sourceRef,
     parserVersion: input.parserVersion,
     confidence: input.parsed.confidence,
     createdAt: FieldValue.serverTimestamp(),
@@ -109,9 +114,9 @@ export async function storeEmailTransaction(input: StoreEmailInput): Promise<{ c
   return { created, transaction: { id: transactionId, ...transaction } as StoredTransaction };
 }
 
-export async function recordSkippedEmail(uid: string, messageId: string, status: string, details?: Record<string, unknown>): Promise<void> {
-  const safeMessageId = messageId.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const ref = userRoot(uid).collection('gmail_events').doc(safeMessageId);
+export async function recordSkippedIngestion(uid: string, sourceRef: string, status: string, details?: Record<string, unknown>): Promise<void> {
+  const safeSourceRef = safeIngestionId(sourceRef);
+  const ref = userRoot(uid).collection('ingestion_events').doc(safeSourceRef);
   await ref.set({ status, ...details, processedAt: FieldValue.serverTimestamp() }, { merge: true });
 }
 
