@@ -4,9 +4,9 @@ import { signOut } from "firebase/auth";
 import { auth } from '../../lib/firebase';
 
 const UserProfileModal = ({ isOpen, onClose, user, isPremium, createdAt, expirationDate }) => {
-    if (!isOpen) return null;
-
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+    if (!isOpen) return null;
 
     const userName = user?.displayName || user?.email?.split('@')[0] || 'User';
     const userInitial = userName.charAt(0).toUpperCase();

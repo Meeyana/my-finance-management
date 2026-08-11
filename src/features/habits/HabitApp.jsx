@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   PlusCircle, CheckCircle2, Trash2, X, Activity, ArrowLeft,
-  LayoutDashboard, Menu, LogOut, Calendar as CalendarIcon,
+  LayoutDashboard, Menu, Calendar as CalendarIcon,
   Settings, BarChart2, ChevronLeft, ChevronRight, Check, Edit,
   RotateCcw, Filter, MousePointer2, Target, Flag, CalendarDays, ChevronDown, Lock, Crown, Star, GripVertical
 } from 'lucide-react';
@@ -27,8 +27,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { signOut } from "firebase/auth";
-import { db, auth } from '../../lib/firebase';
+import { db } from '../../lib/firebase';
 import { useNavigate } from 'react-router-dom';
 import EmojiPicker from 'emoji-picker-react';
 import { useTrial } from '../../hooks/useTrial';
@@ -207,8 +206,11 @@ const DateCarousel = ({ selectedDate, onSelectDate, habits }) => {
   useEffect(() => {
     const newMonday = getMonday(selectedDate);
     if (newMonday.getTime() !== viewDate.getTime()) {
+      // Synchronize the carousel window when an external "go to date" action fires.
       setViewDate(newMonday);
     }
+    // `viewDate` is intentionally excluded: swiping changes it without changing selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
   const weeksData = useMemo(() => {
@@ -1011,6 +1013,12 @@ const GoalsView = ({ goals, filter, setFilter, onEdit, onDelete, onUpdateValue, 
 };
 
 // --- MAIN APP ---
+const HabitSidebarItem = ({ label, icon, active, onClick }) => (
+  <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium active:bg-gray-200 active:scale-[0.98] ${active ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' : 'text-gray-500 sm:hover:bg-gray-100 sm:hover:text-gray-900'}`}>
+    {React.createElement(icon, { size: 20, className: active ? 'text-white' : 'text-gray-400' })} {label}
+  </button>
+);
+
 export default function HabitApp({ user }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
@@ -1233,13 +1241,6 @@ export default function HabitApp({ user }) {
     }
   };
 
-  const updateGoalProgress = async (goal, amount) => {
-    if (!checkPermission()) return;
-    const base = getBasePath(user);
-    const newAmount = Math.max(0, (goal.currentAmount || 0) + amount);
-    await updateDoc(doc(db, `${base}/goals`, goal.id), { currentAmount: newAmount });
-  };
-
   // Hàm cập nhật giá trị chính xác (dùng cho nhập số trực tiếp)
   const updateGoalValue = async (goal, newValue) => {
     if (!checkPermission()) return;
@@ -1379,17 +1380,7 @@ export default function HabitApp({ user }) {
     });
   };
 
-  const handleLogout = async () => {
-    if (confirm("Bạn có chắc muốn đăng xuất?")) await signOut(auth);
-  };
-
   const goToday = () => setCurrentDate(new Date());
-
-  const SidebarItem = ({ id, label, icon: Icon, active, onClick }) => (
-    <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium active:bg-gray-200 active:scale-[0.98] ${active ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' : 'text-gray-500 sm:hover:bg-gray-100 sm:hover:text-gray-900'}`}>
-      <Icon size={20} className={active ? 'text-white' : 'text-gray-400'} /> {label}
-    </button>
-  );
 
   const userName = user.isAnonymous ? 'Demo User' : (user.displayName || user.email?.split('@')[0]);
   const userInitial = userName.charAt(0).toUpperCase();
@@ -1441,14 +1432,14 @@ export default function HabitApp({ user }) {
         {/* 2. Nav Items */}
         <nav className="p-6 space-y-2 flex-1 overflow-y-auto">
           {/* NHÓM CHÍNH: Thói quen, Báo cáo & Cài đặt */}
-          <SidebarItem id="overview" label="Thói quen" icon={LayoutDashboard} active={activeTab === 'overview'} onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }} />
-          <SidebarItem id="tracker" label="Báo cáo" icon={BarChart2} active={activeTab === 'tracker'} onClick={() => { setActiveTab('tracker'); setIsMobileMenuOpen(false); }} />
-          <SidebarItem id="settings" label="Cài đặt" icon={Settings} active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }} />
+          <HabitSidebarItem label="Thói quen" icon={LayoutDashboard} active={activeTab === 'overview'} onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }} />
+          <HabitSidebarItem label="Báo cáo" icon={BarChart2} active={activeTab === 'tracker'} onClick={() => { setActiveTab('tracker'); setIsMobileMenuOpen(false); }} />
+          <HabitSidebarItem label="Cài đặt" icon={Settings} active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }} />
 
           {/* LINE NGĂN CÁCH */}
           <div className="pt-4 border-t border-slate-50 mt-4">
             {/* NHÓM TÁCH BIỆT: Mục tiêu dài hạn */}
-            <SidebarItem id="goals" label="Mục tiêu dài hạn" icon={Target} active={activeTab === 'goals'} onClick={() => { setActiveTab('goals'); setIsMobileMenuOpen(false); }} />
+            <HabitSidebarItem label="Mục tiêu dài hạn" icon={Target} active={activeTab === 'goals'} onClick={() => { setActiveTab('goals'); setIsMobileMenuOpen(false); }} />
           </div>
         </nav>
 

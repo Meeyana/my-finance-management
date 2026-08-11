@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LabelList, LineChart, Line
 } from 'recharts';
@@ -16,17 +16,10 @@ import {
 
 // FIREBASE IMPORTS
 import {
-  signInWithEmailAndPassword,
-  signInAnonymously,
-  signOut,
-  onAuthStateChanged,
-  signInWithCustomToken
-} from "firebase/auth";
-import {
   collection, addDoc, onSnapshot, query,
   deleteDoc, doc, setDoc, updateDoc, deleteField, serverTimestamp, increment
 } from "firebase/firestore";
-import { auth, db, appId, getFirestorePaths } from '../../lib/firebase';
+import { getFirestorePaths } from '../../lib/firebase';
 import { formatCurrency, formatShortCurrency, getRandomColor } from '../../utils/format';
 import { Card, Badge } from '../../components/common/Card';
 import LoginScreen from '../auth/LoginScreen';
@@ -34,6 +27,16 @@ import { useNavigate } from 'react-router-dom';
 import { useTrial } from '../../hooks/useTrial';
 import TrialLimitModal from '../../components/common/TrialLimitModal';
 import UserProfileModal from '../../components/common/UserProfileModal';
+import { FINANCE_FEATURES } from './config';
+import AccountSettings from './AccountSettings';
+import {
+  getExpenseImpact,
+  getIncomeImpact,
+  getTransactionKind,
+  TRANSACTION_KIND,
+  TRANSACTION_KIND_LABELS,
+  withTransactionDefaults,
+} from './transactionDomain';
 
 // --- ICON LIBRARY ---
 const ICON_LIBRARY = {
@@ -120,7 +123,7 @@ const DashboardContent = React.memo(({
 
   const chartColor = chartMode === 'daily' ? '#3B82F6' : '#8B5CF6';
 
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+  const renderCustomizedLabel = ({ cx, cy, midAngle, outerRadius, percent }) => {
     const RADIAN = Math.PI / 180;
     const radius = outerRadius * 1.1;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -445,7 +448,7 @@ const DashboardContent = React.memo(({
 
 // --- COMPONENT: TRANSACTION CONTENT ---
 const TransactionContent = ({
-  filtered, viewMonth, viewYear, search, setSearch, filterCategory, setFilterCategory, deleteTransaction, onEdit, allCategories, checkPermission
+  filtered, viewMonth, viewYear, search, setSearch, filterCategory, setFilterCategory, deleteTransaction, onEdit, allCategories, accounts, checkPermission
 }) => {
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -493,7 +496,15 @@ const TransactionContent = ({
                   </td>
                   <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap"><Badge color={allCategories.find(c => c.id === tx.category)?.color || '#999'}>{allCategories.find(c => c.id === tx.category)?.name}</Badge></td>
                   <td className="px-2 py-3 sm:px-6 sm:py-4 text-gray-800 font-medium break-words max-w-[200px]">{tx.note}</td>
-                  <td className="px-2 py-3 sm:px-6 sm:py-4 text-right font-bold text-gray-800 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
+                  <td className="px-2 py-3 sm:px-6 sm:py-4 text-right whitespace-nowrap">
+                    <div className={`font-bold ${getTransactionKind(tx) === TRANSACTION_KIND.INCOME || getTransactionKind(tx) === TRANSACTION_KIND.REFUND ? 'text-green-600' : getTransactionKind(tx) === TRANSACTION_KIND.TRANSFER || getTransactionKind(tx) === TRANSACTION_KIND.CREDIT_PAYMENT ? 'text-gray-500' : 'text-gray-800'}`}>
+                      {getTransactionKind(tx) === TRANSACTION_KIND.INCOME || getTransactionKind(tx) === TRANSACTION_KIND.REFUND ? '+' : '-'}{formatCurrency(tx.amount)}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      {TRANSACTION_KIND_LABELS[getTransactionKind(tx)] || 'Giao dịch'}
+                      {tx.accountId && accounts.find(account => account.id === tx.accountId)?.name ? ` • ${accounts.find(account => account.id === tx.accountId).name}` : ''}
+                    </div>
+                  </td>
                   <td className="px-2 py-3 sm:px-6 sm:py-4 text-center">
                     <div className="flex items-center justify-center gap-1">
                       <button
@@ -994,12 +1005,13 @@ const RecurringContent = ({
 };
 
 // --- NEW COMPONENT: DEBT AUDIT CONTENT ---
-const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
+const DebtAuditContent = ({ transactions, allMonthlyIncome, accounts }) => {
   const [startMonth, setStartMonth] = useState('');
   const [startYear, setStartYear] = useState('');
   const [endMonth, setEndMonth] = useState('');
   const [endYear, setEndYear] = useState('');
   const [showFilter, setShowFilter] = useState(false);
+  const accountsById = useMemo(() => new Map(accounts.map(account => [account.id, account])), [accounts]);
 
   // Get min and max month/year from data
   const monthRange = useMemo(() => {
@@ -1073,8 +1085,9 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
     filteredTransactions.forEach(tx => {
       const d = new Date(tx.date);
       const key = `${d.getFullYear()}-${d.getMonth()}`;
-      if (!monthlyData[key]) monthlyData[key] = { spent: 0, income: 0, month: d.getMonth(), year: d.getFullYear() };
-      monthlyData[key].spent += Number(tx.amount);
+      if (!monthlyData[key]) monthlyData[key] = { spent: 0, recordedIncome: 0, manualIncome: 0, month: d.getMonth(), year: d.getFullYear() };
+      monthlyData[key].spent += getExpenseImpact(tx, accountsById);
+      monthlyData[key].recordedIncome += getIncomeImpact(tx, accountsById);
     });
 
     // Filter income data by month/year range if set
@@ -1095,15 +1108,15 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
       }
 
       if (!monthlyData[key]) {
-        monthlyData[key] = { spent: 0, income: 0, month: m, year: y };
+        monthlyData[key] = { spent: 0, recordedIncome: 0, manualIncome: 0, month: m, year: y };
       }
-      monthlyData[key].income = allMonthlyIncome[key];
+      monthlyData[key].manualIncome = allMonthlyIncome[key];
     });
 
-    const list = Object.values(monthlyData).map(item => ({
-      ...item,
-      balance: item.income - item.spent
-    })).sort((a, b) => {
+    const list = Object.values(monthlyData).map(item => {
+      const income = item.recordedIncome > 0 ? item.recordedIncome : item.manualIncome;
+      return { ...item, income, balance: income - item.spent };
+    }).sort((a, b) => {
       if (b.year !== a.year) return b.year - a.year;
       return b.month - a.month;
     });
@@ -1111,7 +1124,7 @@ const DebtAuditContent = ({ transactions, allMonthlyIncome }) => {
     const totalBalance = list.reduce((sum, item) => sum + item.balance, 0);
 
     return { list, totalBalance };
-  }, [transactions, allMonthlyIncome, startMonth, startYear, endMonth, endYear]);
+  }, [transactions, allMonthlyIncome, startMonth, startYear, endMonth, endYear, accountsById]);
 
   const trendData = useMemo(() => {
     return [...stats.list]
@@ -1682,6 +1695,7 @@ export default function FinanceApp({ user }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [loans, setLoans] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   //const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // 1. GỌI HOOK TRIAL
@@ -1726,110 +1740,12 @@ export default function FinanceApp({ user }) {
     notificationTimeoutRef.current = setTimeout(() => setNotification(null), 3000);
   };
 
-  // --- DEBUG RENDER (Thêm dòng này ngay dưới khai báo state để check) ---
-  console.log(`>>> [RENDER] isLoading: ${isLoading} | Transactions: ${transactions.length} | Budgets: ${Object.keys(budgets).length}`);
-
-  // --- LOGIC FETCH DATA (FIXED: Budgets Collection) ---
-  useEffect(() => {
-    // 1. Kiểm tra User
-    if (!user) return;
-    console.log(">>> [FinanceApp] Effect started for User:", user.uid);
-    setIsLoading(true);
-
-    const paths = getFirestorePaths(user);
-    if (!paths) { setIsLoading(false); return; }
-
-    try {
-      const parentPath = paths.transactions.parent;
-      if (parentPath) {
-        const loansRef = collection(parentPath, 'loans');
-        onSnapshot(loansRef, (snapshot) => {
-          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setLoans(data);
-        });
-      }
-    } catch (err) {
-      console.warn("Error fetching loans:", err);
-    }
-
-    // --- SAFETY TIMEOUT (Phòng hờ treo mạng) ---
-    const safetyTimer = setTimeout(() => {
-      console.warn(">>> [Timeout] Force loading off");
-      setIsLoading(false);
-    }, 3000);
-
-    // --- 2. LISTENER TRANSACTIONS (Giao dịch) ---
-    const unsubTx = onSnapshot(query(paths.transactions), (snapshot) => {
-      try {
-        console.log(`>>> [Data] Received ${snapshot.docs.length} transactions`);
-        const data = snapshot.docs.map(doc => {
-          const d = doc.data();
-          return { id: doc.id, ...d, date: d.date || new Date().toISOString() };
-        });
-
-        // Sort giảm dần theo ngày
-        data.sort((a, b) => new Date(b.date) - new Date(a.date));
-        setTransactions(data);
-
-        // QUAN TRỌNG: Tắt loading ngay khi có giao dịch
-        setIsLoading(false);
-        clearTimeout(safetyTimer);
-      } catch (e) {
-        console.error("Tx Error:", e);
-        setIsLoading(false);
-      }
-    });
-
-    // --- 3. LISTENER BUDGETS (FIX: Xử lý dạng Collection) ---
-    // Vì 'budgets' là collection, ta phải truy cập vào sub-collection của đường dẫn gốc
-    // Nếu paths.budgetConfig trong firebase.js đang trỏ sai, ta tự dựng lại path thủ công cho chắc ăn:
-
-    let budgetQuery = paths.budgetConfig; // Mặc định dùng cái cũ
-
-    // Nếu user nói budgets là collection, ta thử query dạng collection:
-    // Cách fix nhanh: Lấy parent path của transactions (là folder user) -> trỏ vào 'budgets'
-    try {
-      // Hack: Dựng lại path collection budgets từ path transactions
-      // transactions path: .../public/data/transactions
-      // budgets path mong muốn: .../public/data/budgets
-      const parentPath = paths.transactions.parent; // .../public/data
-      if (parentPath) {
-        const budgetsColRef = collection(parentPath, 'budgets');
-
-        onSnapshot(budgetsColRef, (snapshot) => {
-          const newBudgets = { ...INITIAL_BUDGETS };
-          // Giả sử mỗi doc có id là tên category (vd: 'eating') và data có field 'amount' hoặc là số trực tiếp
-          snapshot.forEach(doc => {
-            const d = doc.data();
-            // Logic map: Nếu doc có field 'value' hoặc 'budget', hoặc lấy chính data làm value
-            const val = d.value || d.budget || d.amount || 0;
-            newBudgets[doc.id] = Number(val);
-          });
-          console.log(">>> [Data] Budgets loaded:", newBudgets);
-          setBudgets(newBudgets);
-        });
-      }
-    } catch (err) {
-      console.warn(">>> [Budgets] Error fetching collection, fallback to default", err);
-    }
-
-    // --- 4. CÁC LISTENER KHÁC (Giữ nguyên, thêm try-catch) ---
-    const unsubCustomCats = onSnapshot(paths.categories, (s) => s.exists() && setCustomCategoryConfig(s.data()));
-    const unsubVisibility = onSnapshot(paths.visibility, (s) => s.exists() && setCategoryVisibility(s.data()));
-    const unsubAlerts = onSnapshot(paths.alerts, (s) => s.exists() && setCategoryAlerts(s.data()));
-
-    // Cleanup
-    return () => {
-      clearTimeout(safetyTimer);
-      unsubTx(); unsubCustomCats(); unsubVisibility(); unsubAlerts();
-    };
-  }, [user]);
-
   useEffect(() => {
     if (!user) {
       setTransactions([]);
       setBudgets(INITIAL_BUDGETS);
       setRecurringItems([]);
+      setAccounts([]);
       setMonthlyIncome(0);
       hasInitialLoadRef.current = false;
       dataLoadedRef.current = false;
@@ -1904,27 +1820,38 @@ export default function FinanceApp({ user }) {
 
     const unsubBudget = onSnapshot(paths.budgetConfig, (s) => {
       if (s.exists()) setBudgets(s.data());
-    }, (e) => { });
+    }, () => {});
 
     const unsubCustomCats = onSnapshot(paths.categories, (s) => {
       if (s.exists()) setCustomCategoryConfig(s.data());
-    }, (e) => { });
+    }, () => {});
     const unsubVisibility = onSnapshot(paths.visibility, (s) => {
       if (s.exists()) setCategoryVisibility(s.data());
-    }, (e) => { });
+    }, () => {});
     const unsubAlerts = onSnapshot(paths.alerts, (s) => {
       if (s.exists()) setCategoryAlerts(s.data());
-    }, (e) => { });
-    const unsubNotes = onSnapshot(paths.notes, (s) => s.exists() && setNoteStats(s.data()), (e) => { });
+    }, () => {});
+    const unsubNotes = onSnapshot(paths.notes, (s) => s.exists() && setNoteStats(s.data()), () => {});
 
     const unsubRecurring = onSnapshot(paths.recurring, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setRecurringItems(data);
-    }, (e) => { });
+    }, () => {});
+
+    const loansRef = collection(paths.transactions.parent, 'loans');
+    const unsubLoans = onSnapshot(loansRef, (snapshot) => {
+      setLoans(snapshot.docs.map(item => ({ id: item.id, ...item.data() })));
+    }, () => {});
+
+    const unsubAccounts = onSnapshot(paths.accounts, (snapshot) => {
+      const data = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+      data.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
+      setAccounts(data);
+    }, () => {});
 
     return () => {
       unsubTx(); unsubBudget(); unsubNotes(); unsubCustomCats();
-      unsubVisibility(); unsubAlerts(); unsubRecurring();
+      unsubVisibility(); unsubAlerts(); unsubRecurring(); unsubLoans(); unsubAccounts();
     };
   }, [user]);
 
@@ -1939,7 +1866,7 @@ export default function FinanceApp({ user }) {
       } else {
         setMonthlyIncome(0);
       }
-    }, (e) => { });
+    }, () => {});
 
     const unsubAllStats = onSnapshot(paths.allMonthlyStats, (snapshot) => {
       const data = {};
@@ -1947,59 +1874,10 @@ export default function FinanceApp({ user }) {
         data[doc.id] = doc.data().income || 0;
       });
       setAllMonthlyIncome(data);
-    }, (e) => { });
+    }, () => {});
 
     return () => { unsubMonthlyStats(); unsubAllStats(); };
   }, [user, viewMonth, viewYear]);
-
-  useEffect(() => {
-    if (!user || recurringItems.length === 0) return;
-
-    const checkAndExecuteRecurring = async () => {
-      const now = new Date();
-      const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-      const paths = getFirestorePaths(user);
-
-      recurringItems.forEach(async (item) => {
-        if (item.durationMonths) {
-          const startDate = new Date(item.startDate);
-          const monthsPassed = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
-          if (monthsPassed >= item.durationMonths) {
-            return;
-          }
-        }
-
-        if (item.lastExecuted === currentMonthKey) return;
-
-        const targetDay = Math.min(item.day, daysInMonth);
-
-        if (now.getDate() >= targetDay) {
-          try {
-            await addDoc(paths.transactions, {
-              amount: item.amount,
-              category: item.category,
-              date: new Date().toISOString().split('T')[0],
-              note: `${item.name} (Tự động)`,
-              createdAt: serverTimestamp(),
-              isRecurring: true
-            });
-
-            const itemRef = doc(paths.recurring, item.id);
-            await updateDoc(itemRef, {
-              lastExecuted: currentMonthKey
-            });
-
-            console.log(`Executed recurring expense: ${item.name}`);
-          } catch (error) {
-            console.error("Error executing recurring expense:", error);
-          }
-        }
-      });
-    };
-
-    checkAndExecuteRecurring();
-  }, [recurringItems, user]);
 
   const allCategories = useMemo(() => {
     const mergedConfig = { ...DEFAULT_CATEGORY_CONFIG, ...customCategoryConfig };
@@ -2014,7 +1892,8 @@ export default function FinanceApp({ user }) {
   const addTransaction = async (newTx) => {
     if (!user) return;
     const paths = getFirestorePaths(user);
-    await addDoc(paths.transactions, { ...newTx, createdAt: serverTimestamp() });
+    const normalizedTx = withTransactionDefaults(newTx);
+    await addDoc(paths.transactions, { ...normalizedTx, createdAt: serverTimestamp() });
 
     if (newTx.note?.trim()) {
       const cleanNote = newTx.note.trim().replace(/\./g, '');
@@ -2022,10 +1901,31 @@ export default function FinanceApp({ user }) {
     }
   };
 
+  const addAccount = async (account) => {
+    if (!user) return;
+    const paths = getFirestorePaths(user);
+    await addDoc(paths.accounts, { ...account, createdAt: serverTimestamp() });
+    showSuccess('Đã thêm tài khoản theo dõi!');
+  };
+
+  const updateAccount = async (id, updates) => {
+    if (!user) return;
+    const paths = getFirestorePaths(user);
+    await updateDoc(doc(paths.accounts, id), { ...updates, updatedAt: serverTimestamp() });
+    showSuccess('Đã cập nhật tài khoản!');
+  };
+
+  const deleteAccount = async (id) => {
+    if (!user || !confirm('Xóa tài khoản khỏi danh sách theo dõi? Giao dịch cũ vẫn được giữ.')) return;
+    const paths = getFirestorePaths(user);
+    await deleteDoc(doc(paths.accounts, id));
+    showSuccess('Đã xóa tài khoản khỏi danh sách theo dõi!');
+  };
+
   const updateTransaction = async (id, updatedTx) => {
     if (!user) return;
     const paths = getFirestorePaths(user);
-    const cleanTx = Object.fromEntries(Object.entries(updatedTx).filter(([_, v]) => v !== undefined));
+    const cleanTx = Object.fromEntries(Object.entries(updatedTx).filter((entry) => entry[1] !== undefined));
     await updateDoc(doc(paths.transactions, id), cleanTx);
     showSuccess("Đã cập nhật giao dịch thành công!");
   };
@@ -2095,8 +1995,8 @@ export default function FinanceApp({ user }) {
     const paths = getFirestorePaths(user);
     await updateDoc(paths.categories, { [id]: deleteField() });
     await updateDoc(paths.budgetConfig, { [id]: deleteField() });
-    try { await updateDoc(paths.visibility, { [id]: deleteField() }); } catch (e) { }
-    try { await updateDoc(paths.alerts, { [id]: deleteField() }); } catch (e) { }
+    try { await updateDoc(paths.visibility, { [id]: deleteField() }); } catch { /* setting may not exist yet */ }
+    try { await updateDoc(paths.alerts, { [id]: deleteField() }); } catch { /* setting may not exist yet */ }
   };
 
   const updateCategoryName = async (id, newName) => {
@@ -2163,13 +2063,9 @@ export default function FinanceApp({ user }) {
     await deleteDoc(doc(paths.recurring, id));
   };
 
-  const handleLogout = async () => {
-    if (confirm("Bạn có chắc muốn đăng xuất?")) {
-      await signOut(auth);
-    }
-  };
-
   // --- MEMOIZED DATA CALCULATIONS ---
+  const accountsById = useMemo(() => new Map(accounts.map(account => [account.id, account])), [accounts]);
+
   const currentMonthTransactions = useMemo(() => transactions.filter(t => {
     const d = new Date(t.date);
     return d.getMonth() === parseInt(viewMonth) && d.getFullYear() === parseInt(viewYear);
@@ -2181,19 +2077,21 @@ export default function FinanceApp({ user }) {
       const d = new Date(t.date);
       return d.getMonth() === prevDate.getMonth() && d.getFullYear() === prevDate.getFullYear();
     });
-    return { total: pTransactions.reduce((sum, t) => sum + Number(t.amount), 0) };
-  }, [transactions, viewMonth, viewYear]);
+    return { total: pTransactions.reduce((sum, t) => sum + getExpenseImpact(t, accountsById), 0) };
+  }, [transactions, viewMonth, viewYear, accountsById]);
 
   const currentYearTransactions = useMemo(() => transactions.filter(t => new Date(t.date).getFullYear() === parseInt(viewYear)), [transactions, viewYear]);
 
-  const totalSpent = currentMonthTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalSpent = currentMonthTransactions.reduce((sum, t) => sum + getExpenseImpact(t, accountsById), 0);
+  const recordedIncome = currentMonthTransactions.reduce((sum, t) => sum + getIncomeImpact(t, accountsById), 0);
+  const displayedMonthlyIncome = recordedIncome > 0 ? recordedIncome : monthlyIncome;
   const spendingDiff = totalSpent - previousMonthData.total;
-  const totalIncurred = currentMonthTransactions.filter(t => t.isIncurred).reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalIncurred = currentMonthTransactions.filter(t => t.isIncurred).reduce((sum, t) => sum + getExpenseImpact(t, accountsById), 0);
 
   const spendingByCategory = useMemo(() => {
     const data = {};
     allCategories.forEach(c => data[c.id] = 0);
-    currentMonthTransactions.forEach(t => { if (data[t.category] !== undefined) data[t.category] += Number(t.amount); });
+    currentMonthTransactions.forEach(t => { if (data[t.category] !== undefined) data[t.category] += getExpenseImpact(t, accountsById); });
     const total = Object.values(data).reduce((a, b) => a + b, 0);
 
     let result = allCategories.map(cat => ({
@@ -2202,7 +2100,7 @@ export default function FinanceApp({ user }) {
     }));
 
     return result.filter(item => categoryVisibility[item.id] !== false).sort((a, b) => b.value - a.value);
-  }, [currentMonthTransactions, budgets, allCategories, categoryVisibility]);
+  }, [currentMonthTransactions, budgets, allCategories, categoryVisibility, accountsById]);
 
   const dailySpendingData = useMemo(() => {
     const days = new Date(viewYear, parseInt(viewMonth) + 1, 0).getDate();
@@ -2211,10 +2109,10 @@ export default function FinanceApp({ user }) {
       if (categoryVisibility[t.category] === false) return;
       if (chartCategoryFilter !== 'all' && t.category !== chartCategoryFilter) return;
       const day = new Date(t.date).getDate() - 1;
-      if (data[day]) data[day].amount += Number(t.amount);
+      if (data[day]) data[day].amount += getExpenseImpact(t, accountsById);
     });
     return data;
-  }, [currentMonthTransactions, viewMonth, viewYear, chartCategoryFilter, categoryVisibility]);
+  }, [currentMonthTransactions, viewMonth, viewYear, chartCategoryFilter, categoryVisibility, accountsById]);
 
   const monthlySpendingData = useMemo(() => {
     const data = Array.from({ length: 12 }, (_, i) => ({ name: `T${i + 1}`, amount: 0, fullLabel: `Tháng ${i + 1}/${viewYear}` }));
@@ -2222,10 +2120,10 @@ export default function FinanceApp({ user }) {
       if (categoryVisibility[t.category] === false) return;
       if (chartCategoryFilter !== 'all' && t.category !== chartCategoryFilter) return;
       const m = new Date(t.date).getMonth();
-      if (data[m]) data[m].amount += Number(t.amount);
+      if (data[m]) data[m].amount += getExpenseImpact(t, accountsById);
     });
     return data;
-  }, [currentYearTransactions, viewYear, chartCategoryFilter, categoryVisibility]);
+  }, [currentYearTransactions, viewYear, chartCategoryFilter, categoryVisibility, accountsById]);
 
   const alerts = useMemo(() => {
     const results = [];
@@ -2258,13 +2156,17 @@ export default function FinanceApp({ user }) {
       amount: transactionToEdit.amount,
       category: transactionToEdit.category,
       note: transactionToEdit.note,
-      isIncurred: transactionToEdit.isIncurred || false
+      isIncurred: transactionToEdit.isIncurred || false,
+      kind: getTransactionKind(transactionToEdit),
+      accountId: transactionToEdit.accountId || ''
     } : {
       date: new Date().toISOString().split('T')[0],
       amount: '',
       category: 'eating',
       note: '',
-      isIncurred: false
+      isIncurred: false,
+      kind: TRANSACTION_KIND.EXPENSE,
+      accountId: ''
     });
 
     const [advancedDate, setAdvancedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -2381,6 +2283,25 @@ export default function FinanceApp({ user }) {
           <div className="overflow-y-auto custom-scrollbar p-6">
             {mode === 'simple' ? (
               <form onSubmit={handleSubmitSimple} className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Loại giao dịch</label>
+                    <select className="custom-select w-full p-3 border-2 border-slate-100 rounded-xl bg-white font-medium" value={formData.kind} onChange={(e) => setFormData({ ...formData, kind: e.target.value, direction: e.target.value === TRANSACTION_KIND.INCOME ? 'in' : 'out' })}>
+                      <option value={TRANSACTION_KIND.EXPENSE}>Chi tiêu</option>
+                      <option value={TRANSACTION_KIND.INCOME}>Thu nhập</option>
+                      <option value={TRANSACTION_KIND.TRANSFER}>Chuyển nội bộ</option>
+                      <option value={TRANSACTION_KIND.REFUND}>Hoàn tiền</option>
+                      <option value={TRANSACTION_KIND.FEE}>Phí / lãi</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Tài khoản nguồn</label>
+                    <select className="custom-select w-full p-3 border-2 border-slate-100 rounded-xl bg-white font-medium" value={formData.accountId} onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}>
+                      <option value="">Không xác định / tiền mặt</option>
+                      {accounts.map(account => <option key={account.id} value={account.id}>{account.name} •••• {account.last4}</option>)}
+                    </select>
+                  </div>
+                </div>
                 {/* Row 1: Amount + Category */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -2488,9 +2409,9 @@ export default function FinanceApp({ user }) {
     );
   };
 
-  const SidebarItem = ({ id, label, icon: Icon, active }) => (
+  const SidebarItem = ({ id, label, icon, active }) => (
     <button onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium active:bg-gray-200 active:scale-[0.98] ${active ? 'bg-gray-900 text-white shadow-lg shadow-gray-200' : 'text-gray-500 sm:hover:bg-gray-100 sm:hover:text-gray-900'}`}>
-      <Icon size={20} className={active ? 'text-white' : 'text-gray-400'} /> {label}
+      {React.createElement(icon, { size: 20, className: active ? 'text-white' : 'text-gray-400' })} {label}
     </button>
   );
 
@@ -2622,8 +2543,11 @@ export default function FinanceApp({ user }) {
         <nav className="p-6 space-y-2 flex-1 overflow-y-auto">
           <SidebarItem id="dashboard" label="Tổng quan" icon={LayoutDashboard} active={activeTab === 'dashboard'} />
           <SidebarItem id="transactions" label="Sổ giao dịch" icon={Receipt} active={activeTab === 'transactions'} />
-          <SidebarItem id="recurring" label="Chi tiêu cố định" icon={Repeat} active={activeTab === 'recurring'} />
+          {FINANCE_FEATURES.recurringExpenses && (
+            <SidebarItem id="recurring" label="Chi tiêu cố định" icon={Repeat} active={activeTab === 'recurring'} />
+          )}
           <SidebarItem id="budget" label="Cài đặt hạn mức" icon={Settings} active={activeTab === 'budget'} />
+          <SidebarItem id="accounts" label="Tài khoản & thẻ" icon={Wallet} active={activeTab === 'accounts'} />
           <div className="pt-4 border-t border-slate-50 mt-4">
             <SidebarItem id="debt" label="Dư nợ" icon={ClipboardList} active={activeTab === 'debt'} />
             <SidebarItem id="loans" label="Sổ nợ" icon={HandCoins} active={activeTab === 'loans'} />
@@ -2662,7 +2586,7 @@ export default function FinanceApp({ user }) {
         )}
         {/* ----------------------- */}
 
-        {activeTab !== 'debt' && activeTab !== 'loans' && (
+        {activeTab !== 'debt' && activeTab !== 'loans' && activeTab !== 'accounts' && (
           <header className="bg-white/80 backdrop-blur-md px-6 py-4 sticky top-0 z-30 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-200/50">
             <div className="flex items-center gap-4 w-full sm:w-auto">
               {(activeTab === 'dashboard' || activeTab === 'transactions') && <FilterBar />}
@@ -2676,7 +2600,7 @@ export default function FinanceApp({ user }) {
               }}
               className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 sm:hover:bg-black text-white px-5 py-2.5 rounded-xl shadow-lg shadow-gray-300 transition-all active:scale-95 font-bold text-sm"
             >
-              <PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm khoản chi</span>
+              <PlusCircle size={18} /> <span className="sm:hidden md:inline">Thêm giao dịch</span>
             </button>
           </header>
         )}
@@ -2689,7 +2613,7 @@ export default function FinanceApp({ user }) {
               {activeTab === 'dashboard' && (
                 <DashboardContent
                   totalSpent={totalSpent}
-                  monthlyIncome={monthlyIncome}
+                  monthlyIncome={displayedMonthlyIncome}
                   updateMonthlyIncome={updateMonthlyIncome}
                   spendingDiff={spendingDiff}
                   totalIncurred={totalIncurred}
@@ -2711,6 +2635,7 @@ export default function FinanceApp({ user }) {
                   deleteTransaction={deleteTransaction}
                   onEdit={(tx) => { setEditingTransaction(tx); setShowAddModal(true); }}
                   allCategories={allCategories}
+                  accounts={accounts}
                   checkPermission={checkPermission}
                 />
               )}
@@ -2729,13 +2654,22 @@ export default function FinanceApp({ user }) {
                   checkPermission={checkPermission}
                 />
               )}
-              {activeTab === 'recurring' && (
+              {FINANCE_FEATURES.recurringExpenses && activeTab === 'recurring' && (
                 <RecurringContent
                   recurringItems={recurringItems}
                   addRecurringItem={addRecurringItem}
                   updateRecurringItem={updateRecurringItem}
                   deleteRecurringItem={deleteRecurringItem}
                   allCategories={allCategories}
+                  checkPermission={checkPermission}
+                />
+              )}
+              {activeTab === 'accounts' && (
+                <AccountSettings
+                  accounts={accounts}
+                  addAccount={addAccount}
+                  updateAccount={updateAccount}
+                  deleteAccount={deleteAccount}
                   checkPermission={checkPermission}
                 />
               )}
@@ -2753,6 +2687,7 @@ export default function FinanceApp({ user }) {
                 <DebtAuditContent
                   transactions={transactions}
                   allMonthlyIncome={allMonthlyIncome}
+                  accounts={accounts}
                   checkPermission={checkPermission}
                 />
               )}

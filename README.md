@@ -1,16 +1,39 @@
-# React + Vite
+# My Finance Management
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Personal finance and habit tracking application built with React, Vite, Firebase
+Auth, Firestore, and Firebase Functions.
 
-Currently, two official plugins are available:
+## Finance capabilities
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Manual income and expense ledger with budgets and reports.
+- Bank account and credit-card tracking controls.
+- Gmail transaction ingestion with deterministic deduplication.
+- Credit purchases, repayments, refunds, transfers, and fees have separate semantics.
+- Telegram classification for unknown destination accounts.
+- Learned HMAC account rules automatically categorize repeated transfers.
+- Daily and weekly Telegram reports.
+- Legacy browser-side recurring expenses are disabled to prevent duplicates.
 
-## React Compiler
+## Local development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```powershell
+npm.cmd install
+npm.cmd run dev
+```
 
-## Expanding the ESLint configuration
+Quality gates:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```powershell
+npm.cmd run lint
+npm.cmd test
+npm.cmd run build
+npm.cmd --prefix functions install
+npm.cmd --prefix functions test
+```
+
+Production Gmail, Telegram, and Firebase configuration is documented in
+[`docs/AUTOMATION_SETUP.md`](docs/AUTOMATION_SETUP.md). Acceptance status is in
+[`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md).
+
+Secrets must be stored in Firebase Secret Manager. Never expose Gmail or
+Telegram tokens through `VITE_*` environment variables.

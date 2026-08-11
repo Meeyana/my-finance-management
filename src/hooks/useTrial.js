@@ -10,30 +10,17 @@ export const useTrial = (user) => {
   const [daysLeft, setDaysLeft] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
-  const [activationDate, setActivationDate] = useState(null);
   const [expirationDate, setExpirationDate] = useState(null);
-
-  useEffect(() => {
-    if (user?.metadata?.creationTime) {
-      setActivationDate(new Date(user.metadata.creationTime));
-    } else {
-      setActivationDate(new Date());
-    }
-  }, [user]);
+  const activationDate = user?.metadata?.creationTime
+    ? new Date(user.metadata.creationTime)
+    : new Date();
 
   /* New State */
   const [createdDate, setCreatedDate] = useState(null);
 
   useEffect(() => {
-    // 1. Anonymous / No User -> Allow
-    if (!user || user.isAnonymous) {
-      setIsReadOnly(false);
-      setDaysLeft(null);
-      setIsPremium(false);
-      setLoading(false);
-      setCreatedDate(new Date()); /* Default for anon */
-      return;
-    }
+    // Anonymous state is derived in the return value below and needs no DB subscription.
+    if (!user || user.isAnonymous) return;
 
     // 2. Authenticated User Check
     const userRef = doc(db, "users", user.uid);
@@ -87,10 +74,22 @@ export const useTrial = (user) => {
         }
       }
       setLoading(false);
-    }, (err) => setLoading(false));
+    }, () => setLoading(false));
 
     return () => unsub();
   }, [user]);
+
+  if (!user || user.isAnonymous) {
+    return {
+      isReadOnly: false,
+      daysLeft: null,
+      loading: false,
+      isPremium: false,
+      activationDate,
+      expirationDate: null,
+      createdAt: activationDate,
+    };
+  }
 
   return { isReadOnly, daysLeft, loading, isPremium, activationDate, expirationDate, createdAt: createdDate };
 };
