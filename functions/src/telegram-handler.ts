@@ -1,5 +1,9 @@
 import { normalizeText } from './domain.js';
-import { classifyTransaction, findTransactionByTelegramMessageId } from './repository.js';
+import {
+  classifyTransaction,
+  findTransactionByTelegramActionToken,
+  findTransactionByTelegramMessageId,
+} from './repository.js';
 import {
   answerCallbackQuery,
   categoryNames,
@@ -52,7 +56,12 @@ export async function handleTelegramUpdate(
   const callback = update.callback_query;
   if (callback?.data && callback.message) {
     if (String(callback.message.chat.id) !== config.chatId) throw new Error('Wrong chat');
-    const [action, transactionId, categoryId] = callback.data.split('|');
+    const [action, actionToken, categoryId] = callback.data.split('|');
+    const callbackTransaction = actionToken.startsWith('n8n_')
+      ? { id: actionToken }
+      : await findTransactionByTelegramActionToken(config.uid, actionToken);
+    if (!callbackTransaction?.id) throw new Error('Transaction action token not found');
+    const transactionId = callbackTransaction.id;
     const categories = await categoryNames(config.uid);
     let resultLabel = '';
     if (action === 'cat' && categoryId) {

@@ -36,6 +36,10 @@ export function safeIngestionId(sourceRef: string): string {
   return createHash('sha256').update(sourceRef.trim()).digest('hex');
 }
 
+export function telegramActionToken(transactionId: string): string {
+  return createHash('sha256').update(`telegram-action:${transactionId}`).digest('hex').slice(0, 24);
+}
+
 export async function hasProcessedIngestion(uid: string, sourceRef: string): Promise<boolean> {
   const safeSourceRef = safeIngestionId(sourceRef);
   const snapshot = await userRoot(uid).collection('ingestion_events').doc(safeSourceRef).get();
@@ -199,4 +203,26 @@ export async function markTelegramNotified(uid: string, transactionId: string, m
     telegramMessageId: messageId,
     telegramNotifiedAt: FieldValue.serverTimestamp(),
   });
+}
+
+export async function ensureTelegramActionToken(uid: string, transactionId: string): Promise<string> {
+  const token = telegramActionToken(transactionId);
+  await userRoot(uid).collection('transactions').doc(transactionId).set({
+    telegramActionToken: token,
+  }, { merge: true });
+  return token;
+}
+
+export async function findTransactionByTelegramActionToken(
+  uid: string,
+  token: string,
+): Promise<StoredTransaction | null> {
+  const snapshot = await userRoot(uid)
+    .collection('transactions')
+    .where('telegramActionToken', '==', token)
+    .limit(1)
+    .get();
+  if (snapshot.empty) return null;
+  const document = snapshot.docs[0];
+  return { id: document.id, ...document.data() } as StoredTransaction;
 }

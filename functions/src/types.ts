@@ -70,4 +70,5 @@ export interface StoredTransaction {
   merchantKey?: string;
   source?: string;
   telegramNotifiedAt?: unknown;
+  telegramActionToken?: string;
 }

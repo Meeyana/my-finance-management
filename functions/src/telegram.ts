@@ -1,5 +1,5 @@
 import { DEFAULT_CATEGORIES } from './domain.js';
-import { userRoot } from './repository.js';
+import { ensureTelegramActionToken, userRoot } from './repository.js';
 import type { StoredTransaction } from './types.js';
 
 interface TelegramResponse<T = unknown> {
@@ -107,15 +107,16 @@ export async function notifyPendingCategory(
 ): Promise<number | null> {
   if (!transaction.id) return null;
   const categories = await categoryNames(uid);
+  const actionToken = await ensureTelegramActionToken(uid, transaction.id);
   const preferred = ['eating', 'living', 'fuel', 'shopping', 'learning', 'investment', 'entertainment', 'other'];
   const categoryButtons = preferred
     .filter((id) => categories[id])
-    .map((id) => ({ text: categories[id], callback_data: `cat|${transaction.id}|${id}` }));
+    .map((id) => ({ text: categories[id], callback_data: `cat|${actionToken}|${id}` }));
   const rows = [];
   for (let index = 0; index < categoryButtons.length; index += 2) rows.push(categoryButtons.slice(index, index + 2));
   rows.push([
-    { text: '🔁 Chuyển nội bộ', callback_data: `internal|${transaction.id}` },
-    { text: '🚫 Bỏ qua', callback_data: `ignore|${transaction.id}` },
+    { text: '🔁 Chuyển nội bộ', callback_data: `internal|${actionToken}` },
+    { text: '🚫 Bỏ qua', callback_data: `ignore|${actionToken}` },
   ]);
 
   const accountText = transaction.counterpartyAccountLast4
