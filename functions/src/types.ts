@@ -69,4 +69,5 @@ export interface StoredTransaction {
   counterpartyAccountLast4?: string;
   merchantKey?: string;
   source?: string;
+  telegramNotifiedAt?: unknown;
 }

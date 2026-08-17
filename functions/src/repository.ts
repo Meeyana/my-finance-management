@@ -95,12 +95,19 @@ export async function storeIngestedTransaction(input: StoreIngestionInput): Prom
     Object.entries(rawTransaction).filter(([, value]) => value !== undefined),
   ) as StoredTransaction & Record<string, unknown>;
 
+  let storedTransaction: StoredTransaction | undefined;
   const created = await db.runTransaction(async (firestoreTransaction) => {
     const [existingTransaction, existingEvent] = await Promise.all([
       firestoreTransaction.get(transactionRef),
       firestoreTransaction.get(eventRef),
     ]);
-    if (existingTransaction.exists || existingEvent.data()?.status === 'processed') return false;
+    if (existingTransaction.exists || existingEvent.data()?.status === 'processed') {
+      storedTransaction = {
+        id: transactionId,
+        ...(existingTransaction.data() || transaction),
+      } as StoredTransaction;
+      return false;
+    }
     firestoreTransaction.create(transactionRef, transaction);
     firestoreTransaction.set(eventRef, {
       status: 'processed',
@@ -108,10 +115,11 @@ export async function storeIngestedTransaction(input: StoreIngestionInput): Prom
       parserVersion: input.parserVersion,
       processedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
+    storedTransaction = { id: transactionId, ...transaction } as StoredTransaction;
     return true;
   });
 
-  return { created, transaction: { id: transactionId, ...transaction } as StoredTransaction };
+  return { created, transaction: storedTransaction || { id: transactionId, ...transaction } as StoredTransaction };
 }
 
 export async function recordSkippedIngestion(uid: string, sourceRef: string, status: string, details?: Record<string, unknown>): Promise<void> {

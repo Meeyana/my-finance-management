@@ -79,8 +79,11 @@ export default async (request: Request) => {
       parserVersion: PARSER_VERSION,
     });
 
-    let telegramNotified = false;
-    if (result.created && result.transaction.status === 'pending_category' && result.transaction.id) {
+    let telegramNotified = Boolean(result.transaction.telegramNotifiedAt);
+    let telegramError: string | undefined;
+    if (result.transaction.status === 'pending_category'
+      && result.transaction.id
+      && !result.transaction.telegramNotifiedAt) {
       try {
         const telegramMessageId = await notifyPendingCategory(
           runtime.botToken,
@@ -94,6 +97,7 @@ export default async (request: Request) => {
         }
       } catch (error) {
         console.error('Immediate Telegram notification failed', { transactionId: result.transaction.id, error });
+        telegramError = error instanceof Error ? error.message : 'telegram_notification_failed';
       }
     }
 
@@ -104,6 +108,7 @@ export default async (request: Request) => {
       kind: result.transaction.kind,
       accountId: account.id,
       telegramNotified,
+      ...(telegramError ? { telegramError } : {}),
     }, result.created ? 201 : 200);
   } catch (error) {
     console.error('n8n finance ingestion failed', error);
