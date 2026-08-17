@@ -39,3 +39,4 @@ yarn-error.log*
 
 # Local n8n workflow export (may contain credentials)
 /automation.json
+/automation-credit-preview.json
