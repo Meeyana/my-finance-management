@@ -86,8 +86,12 @@ export async function handleTelegramUpdate(
         ? 'Đã đánh dấu chuyển nội bộ và ghi nhớ rule STK.'
         : 'Đã đánh dấu chuyển nội bộ.';
     } else if (action === 'ignore') {
-      await classifyTransaction(config.uid, transactionId, { ignore: true });
-      resultLabel = 'Đã bỏ qua giao dịch.';
+      const transaction = await classifyTransaction(config.uid, transactionId, { ignore: true });
+      resultLabel = transaction.counterpartyAccountKey
+        ? 'Đã bỏ qua và ghi nhớ rule STK.'
+        : transaction.merchantKey
+          ? 'Đã bỏ qua và ghi nhớ merchant.'
+          : 'Đã bỏ qua giao dịch.';
     } else {
       throw new Error('Unsupported callback');
     }
@@ -158,8 +162,12 @@ export async function handleTelegramUpdate(
       ? 'Đã đánh dấu chuyển nội bộ và ghi nhớ rule STK.'
       : 'Đã đánh dấu chuyển nội bộ.';
   } else if (replyAction.type === 'ignore') {
-    await classifyTransaction(config.uid, transaction.id, { ignore: true });
-    resultLabel = 'Đã bỏ qua giao dịch.';
+    const updated = await classifyTransaction(config.uid, transaction.id, { ignore: true });
+    resultLabel = updated.counterpartyAccountKey
+      ? 'Đã bỏ qua và ghi nhớ rule STK.'
+      : updated.merchantKey
+        ? 'Đã bỏ qua và ghi nhớ merchant.'
+        : 'Đã bỏ qua giao dịch.';
   } else if (replyAction.type === 'category') {
     const updated = await classifyTransaction(config.uid, transaction.id, { categoryId: replyAction.categoryId });
     resultLabel = resultForRule(updated, categories[replyAction.categoryId]);
