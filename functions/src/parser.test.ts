@@ -41,6 +41,17 @@ test('recognizes credit card payment so it is not counted as another expense', (
   assert.equal(parsed.sourceAccountLast4, '9988');
 });
 
+test('recognizes a monthly Mastercard statement payment as a credit payment', () => {
+  const parsed = parseN8nFinancePayload(message('Thanh toan sao ke the Master Card 07/2026', [
+    'Từ tài khoản: ****1234',
+    'Số tiền: 4.420.431 VND',
+    'Ngày: 31/07/2026 09:00',
+  ].join('\n')));
+  assert.ok(parsed);
+  assert.equal(parsed.kind, 'credit_payment');
+  assert.equal(parsed.amount, 4_420_431);
+});
+
 test('parses a VIB credit card purchase and matches the card last four digits', () => {
   const parsed = parseN8nFinancePayload(message('Thông báo giao dịch thẻ VIB', `
     Thông báo giao dịch thẻ VIB

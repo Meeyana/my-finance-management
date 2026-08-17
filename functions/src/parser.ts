@@ -66,7 +66,7 @@ function parseOccurredAt(text: string, fallback: Date): Date {
 
 function classify(normalized: string): { kind: TransactionKind; direction: 'in' | 'out' } {
   if (/hoan tien|refund|reversal/.test(normalized)) return { kind: 'refund', direction: 'in' };
-  if (/thanh toan du no|thanh toan the tin dung|credit card payment|payment received/.test(normalized)) {
+  if (/thanh toan du no|thanh toan sao ke|sao ke the|thanh toan the tin dung|credit card payment|payment received/.test(normalized)) {
     return { kind: 'credit_payment', direction: 'out' };
   }
   if (/phi thuong nien|phi giao dich|lai suat|tien lai|interest charge|fee/.test(normalized)) {
