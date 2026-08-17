@@ -54,11 +54,15 @@ export function parseNoteRuleCommand(text: string, categories: Record<string, st
 }
 
 function categoryFromReply(text: string, categories: Record<string, string>): string | null {
-  const normalized = normalizeText(text.replace(/^\//, '').trim());
+  const normalized = normalizeText(text.replace(/^[@/]/, '').trim());
   for (const [id, label] of Object.entries(categories)) {
     if (normalized === normalizeText(id) || normalized === normalizeText(label)) return id;
   }
   return null;
+}
+
+function escapeTelegramHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 export type TelegramReplyAction =
@@ -183,11 +187,25 @@ export async function handleTelegramUpdate(
     }
     return 'handled';
   }
+  if (message?.text && /^\/(?:category|categories)(?:@[a-z0-9_]+)?\b/i.test(message.text.trim())) {
+    const categories = await categoryNames(config.uid);
+    const lines = Object.entries(categories)
+      .map(([id, label]) => `• @${escapeTelegramHtml(id)} — ${escapeTelegramHtml(label)}`)
+      .join('\n');
+    await sendTelegramMessage(
+      config.botToken,
+      config.chatId,
+      `📚 Danh mục hiện có:\n${lines}\n\nDùng: /rule từ_khóa -> @category`,
+      undefined,
+      message.message_id,
+    );
+    return 'handled';
+  }
   if (message?.text && /^\/(?:start|help)\b/i.test(message.text.trim())) {
     await sendTelegramMessage(
       config.botToken,
       config.chatId,
-      '✅ Finance bot đã kết nối. Reply danh mục/Bỏ qua; dùng /rule cam -> ăn uống để thêm keyword hoặc /ignore_stk 0123456789 để bỏ qua STK.',
+      '✅ Finance bot đã kết nối. Dùng /category để xem danh mục; /rule cam -> @eating để thêm keyword; /ignore_stk 0123456789 để bỏ qua STK.',
       undefined,
       message.message_id,
     );

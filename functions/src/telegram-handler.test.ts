@@ -42,6 +42,11 @@ test('parses Telegram commands for custom note keyword rules', () => {
     term: 'TD',
     categoryId: 'entertainment',
   });
+  assert.deepEqual(parseNoteRuleCommand('/rule TD -> @entertainment', categories), {
+    type: 'set',
+    term: 'TD',
+    categoryId: 'entertainment',
+  });
   assert.deepEqual(parseNoteRuleCommand('/unrule cam', categories), { type: 'delete', term: 'cam' });
   assert.equal(parseNoteRuleCommand('/rule cam -> unknown', categories)?.type, 'invalid');
 });
