@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { FieldValue, Timestamp, getFirestore, type DocumentReference } from 'firebase-admin/firestore';
-import { accountRuleKey, applyCategoryRule, maskAccount } from './domain.js';
+import { accountRuleKey, applyCategoryRule, maskAccount, matchCategoryKeyword } from './domain.js';
 import type {
   CategoryRule,
   FinanceAccount,
@@ -99,8 +99,9 @@ export async function storeIngestedTransaction(input: StoreIngestionInput): Prom
     : undefined;
   const ruleKey = counterpartyAccountKey || input.parsed.merchantKey;
   const rule = await getCategoryRule(input.uid, ruleKey);
+  const keywordMatch = matchCategoryKeyword(input.parsed.note || input.parsed.merchant);
 
-  const resolved = applyCategoryRule(input.parsed.kind, rule);
+  const resolved = applyCategoryRule(input.parsed.kind, rule, keywordMatch?.categoryId);
   const kind: TransactionKind = resolved.kind;
   const category = resolved.categoryId;
   const needsCategory = resolved.needsCategory;
@@ -115,7 +116,7 @@ export async function storeIngestedTransaction(input: StoreIngestionInput): Prom
     status: needsCategory ? 'pending_category' : 'posted',
     category: category || (kind === 'fee' ? 'other' : undefined),
     accountId: input.account.id,
-    note: input.parsed.note,
+    note: keywordMatch?.term || input.parsed.note,
     merchant: input.parsed.merchant,
     merchantKey: input.parsed.merchantKey,
     counterpartyAccountKey,

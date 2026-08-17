@@ -122,6 +122,8 @@ export default async (request: Request) => {
       transactionId: result.transaction.id,
       status: result.transaction.status,
       kind: result.transaction.kind,
+      category: result.transaction.category || null,
+      note: result.transaction.note || null,
       accountId: account.id,
       telegramNotified,
       ...(telegramError ? { telegramError } : {}),

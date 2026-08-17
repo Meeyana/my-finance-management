@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { accountRuleKey, applyCategoryRule, creditImpact, expenseImpact, normalizeAccountNumber } from './domain.js';
+import { accountRuleKey, applyCategoryRule, creditImpact, expenseImpact, matchCategoryKeyword, normalizeAccountNumber } from './domain.js';
 
 test('account rule key is stable for equivalent account formatting', () => {
   const secret = 'test-secret-at-least-long-enough';
@@ -32,4 +32,23 @@ test('a learned destination account rule categorizes the next transfer without p
     kind: 'transfer',
     matchType: 'counterparty_account',
   }), { kind: 'transfer', categoryId: undefined, needsCategory: false });
+});
+
+test('matches the longest prepared keyword and returns the canonical category', () => {
+  assert.deepEqual(matchCategoryKeyword('CK mua do dung thang 8'), {
+    term: 'Mua đồ dùng',
+    categoryId: 'shopping',
+  });
+  assert.deepEqual(matchCategoryKeyword('chuyen tien tiet kiem va mua crypto'), {
+    term: 'Tiết kiệm và mua crypto',
+    categoryId: 'investment',
+  });
+});
+
+test('promotes a keyword-matched transfer to a posted expense', () => {
+  assert.deepEqual(applyCategoryRule('pending_transfer', null, 'living'), {
+    kind: 'expense',
+    categoryId: 'living',
+    needsCategory: false,
+  });
 });

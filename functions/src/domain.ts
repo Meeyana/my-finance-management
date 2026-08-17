@@ -27,6 +27,36 @@ export function normalizeAccountNumber(value: string): string {
   return value.replace(/[^0-9a-z]/gi, '').toUpperCase();
 }
 
+const CATEGORY_KEYWORD_RULES = [
+  { term: 'Trà sữa', categoryId: 'eating' },
+  { term: 'Nước cam', categoryId: 'eating' },
+  { term: 'Nước ép', categoryId: 'eating' },
+  { term: 'Ăn sáng', categoryId: 'eating' },
+  { term: 'Ăn trưa', categoryId: 'eating' },
+  { term: 'Ăn tối', categoryId: 'eating' },
+  { term: 'Ăn vặt', categoryId: 'eating' },
+  { term: 'Đổ xăng', categoryId: 'fuel' },
+  { term: 'Giữ xe', categoryId: 'fuel' },
+  { term: 'Đặt xe', categoryId: 'fuel' },
+  { term: 'Mua đồ dùng', categoryId: 'shopping' },
+  { term: 'Mua đồ', categoryId: 'shopping' },
+  { term: 'Đi siêu thị', categoryId: 'shopping' },
+  { term: 'Giặt đồ', categoryId: 'living' },
+  { term: 'Tiền thuê nhà', categoryId: 'living' },
+  { term: 'Nạp data', categoryId: 'living' },
+  { term: 'Tiếng Trung', categoryId: 'learning' },
+  { term: 'Tiết kiệm và mua crypto', categoryId: 'investment' },
+  { term: 'Tiết kiệm', categoryId: 'investment' },
+  { term: 'Tiệc công ty', categoryId: 'entertainment' },
+  { term: 'Thể thao', categoryId: 'entertainment' },
+].sort((left, right) => right.term.length - left.term.length);
+
+export function matchCategoryKeyword(value?: string): { term: string; categoryId: string } | undefined {
+  const normalized = normalizeText(value || '');
+  if (!normalized) return undefined;
+  return CATEGORY_KEYWORD_RULES.find((rule) => normalized.includes(normalizeText(rule.term)));
+}
+
 export function accountRuleKey(accountNumber: string, secret: string): string {
   const normalized = normalizeAccountNumber(accountNumber);
   if (normalized.length < 6) throw new Error('Counterparty account number is too short');
@@ -79,9 +109,10 @@ export function maskAccount(accountNumber?: string): string | undefined {
 export function applyCategoryRule(
   parsedKind: TransactionKind,
   rule: CategoryRule | null,
+  fallbackCategoryId?: string,
 ): { kind: TransactionKind; categoryId?: string; needsCategory: boolean } {
   let kind = rule?.kind || parsedKind;
-  const categoryId = rule?.categoryId;
+  const categoryId = rule?.categoryId || fallbackCategoryId;
   if (categoryId && kind === 'pending_transfer') kind = 'expense';
   const needsCategory = (kind === 'expense' || kind === 'pending_transfer' || kind === 'fee') && !categoryId;
   return { kind, categoryId, needsCategory };
