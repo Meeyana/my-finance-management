@@ -49,6 +49,7 @@ export interface FinanceAccount {
 }
 
 export interface CategoryRule {
+  ignore?: boolean;
   categoryId?: string;
   kind?: TransactionKind;
   matchType: 'counterparty_account' | 'merchant';

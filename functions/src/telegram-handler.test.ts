@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseTelegramReply } from './telegram-handler.js';
+import { parseCounterpartyRuleCommand, parseTelegramReply } from './telegram-handler.js';
 
 const categories = {
   eating: 'Ăn uống',
@@ -16,4 +16,16 @@ test('accepts category id and special reply actions', () => {
   assert.deepEqual(parseTelegramReply('Chuyển nội bộ', categories), { type: 'internal' });
   assert.deepEqual(parseTelegramReply('Bỏ qua', categories), { type: 'ignore' });
   assert.deepEqual(parseTelegramReply('không biết', categories), { type: 'unknown' });
+});
+
+test('parses Telegram commands for the counterparty ignore list', () => {
+  assert.deepEqual(parseCounterpartyRuleCommand('/ignore_stk 0123-456-789'), {
+    type: 'ignore',
+    accountNumber: '0123456789',
+  });
+  assert.deepEqual(parseCounterpartyRuleCommand('/unignore_stk 0123456789'), {
+    type: 'allow',
+    accountNumber: '0123456789',
+  });
+  assert.equal(parseCounterpartyRuleCommand('/ignore_stk 12345'), null);
 });

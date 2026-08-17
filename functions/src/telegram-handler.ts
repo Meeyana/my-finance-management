@@ -1,8 +1,9 @@
-import { normalizeText } from './domain.js';
+import { normalizeAccountNumber, normalizeText } from './domain.js';
 import {
   classifyTransaction,
   findTransactionByTelegramActionToken,
   findTransactionByTelegramMessageId,
+  setCounterpartyIgnoreRule,
 } from './repository.js';
 import {
   answerCallbackQuery,
@@ -16,6 +17,17 @@ export interface TelegramHandlerConfig {
   uid: string;
   botToken: string;
   chatId: string;
+  accountHmacSecret?: string;
+}
+
+export type CounterpartyRuleCommand = { type: 'ignore' | 'allow'; accountNumber: string };
+
+export function parseCounterpartyRuleCommand(text: string): CounterpartyRuleCommand | null {
+  const match = text.trim().match(/^\/(ignore_stk|unignore_stk)(?:@[a-z0-9_]+)?\s+([0-9][0-9\s-]{5,23})$/i);
+  if (!match) return null;
+  const accountNumber = normalizeAccountNumber(match[2]);
+  if (accountNumber.length < 6 || accountNumber.length > 24) return null;
+  return { type: match[1].toLowerCase() === 'ignore_stk' ? 'ignore' : 'allow', accountNumber };
 }
 
 function categoryFromReply(text: string, categories: Record<string, string>): string | null {
@@ -92,11 +104,31 @@ export async function handleTelegramUpdate(
 
   const message = update.message;
   if (message?.text && String(message.chat.id) !== config.chatId) throw new Error('Wrong chat');
+  const ruleCommand = message?.text ? parseCounterpartyRuleCommand(message.text) : null;
+  if (message?.text && ruleCommand) {
+    if (!config.accountHmacSecret) throw new Error('ACCOUNT_HMAC_SECRET is required for STK rules');
+    const last4 = await setCounterpartyIgnoreRule(
+      config.uid,
+      ruleCommand.accountNumber,
+      config.accountHmacSecret,
+      ruleCommand.type === 'ignore',
+    );
+    await sendTelegramMessage(
+      config.botToken,
+      config.chatId,
+      ruleCommand.type === 'ignore'
+        ? `✅ Đã thêm STK ••••${last4} vào danh sách bỏ qua. Giao dịch sau này sẽ không được ghi.`
+        : `✅ Đã bỏ STK ••••${last4} khỏi danh sách bỏ qua.`,
+      undefined,
+      message.message_id,
+    );
+    return 'handled';
+  }
   if (message?.text && /^\/(?:start|help)\b/i.test(message.text.trim())) {
     await sendTelegramMessage(
       config.botToken,
       config.chatId,
-      '✅ Finance bot đã kết nối. Khi có giao dịch cần phân loại, hãy bấm category hoặc reply đúng tin nhắn đó.',
+      '✅ Finance bot đã kết nối. Reply danh mục/Bỏ qua cho giao dịch hoặc dùng /ignore_stk 0123456789 và /unignore_stk 0123456789 để quản lý STK bỏ qua.',
       undefined,
       message.message_id,
     );

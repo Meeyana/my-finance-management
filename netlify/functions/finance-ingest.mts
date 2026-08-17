@@ -2,6 +2,7 @@ import type { Config } from '@netlify/functions';
 import { parseN8nFinancePayload } from '../../functions/src/parser.js';
 import {
   findTrackedAccount,
+  getIngestionIgnoreReason,
   markTelegramNotified,
   recordSkippedIngestion,
   storeIngestedTransaction,
@@ -58,6 +59,21 @@ export default async (request: Request) => {
       return json({ error: 'parse_failed', messageId: payload.messageId }, 422);
     }
 
+    const accountHmacSecret = requiredEnv('ACCOUNT_HMAC_SECRET');
+    const ignoreReason = await getIngestionIgnoreReason(runtime.uid, parsed, accountHmacSecret);
+    if (ignoreReason) {
+      await recordSkippedIngestion(runtime.uid, payload.messageId, 'ignored_rule', {
+        reason: ignoreReason,
+        parserVersion: PARSER_VERSION,
+      });
+      return json({
+        created: false,
+        status: 'ignored',
+        reason: ignoreReason,
+        telegramNotified: false,
+      });
+    }
+
     const account = await findTrackedAccount(runtime.uid, parsed.sourceAccountLast4);
     if (!account) {
       await recordSkippedIngestion(runtime.uid, payload.messageId, 'unmatched_or_disabled_account', {
@@ -75,7 +91,7 @@ export default async (request: Request) => {
       sourceRef: payload.messageId,
       parsed,
       account,
-      accountHmacSecret: requiredEnv('ACCOUNT_HMAC_SECRET'),
+      accountHmacSecret,
       parserVersion: PARSER_VERSION,
     });
 

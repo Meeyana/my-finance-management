@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { FieldValue, Timestamp, getFirestore, type DocumentReference } from 'firebase-admin/firestore';
-import { accountRuleKey, applyCategoryRule } from './domain.js';
+import { accountRuleKey, applyCategoryRule, maskAccount } from './domain.js';
 import type {
   CategoryRule,
   FinanceAccount,
@@ -30,6 +30,37 @@ export async function getCategoryRule(uid: string, key?: string): Promise<Catego
   if (!key) return null;
   const snapshot = await userRoot(uid).collection('category_rules').doc(key).get();
   return snapshot.exists ? snapshot.data() as CategoryRule : null;
+}
+
+export async function getIngestionIgnoreReason(
+  uid: string,
+  parsed: ParsedFinanceTransaction,
+  accountHmacSecret: string,
+): Promise<'credit_payment' | 'counterparty_account_rule' | 'merchant_rule' | undefined> {
+  if (parsed.kind === 'credit_payment') return 'credit_payment';
+
+  const counterpartyAccountKey = parsed.counterpartyAccount
+    ? accountRuleKey(parsed.counterpartyAccount, accountHmacSecret)
+    : undefined;
+  const rule = await getCategoryRule(uid, counterpartyAccountKey || parsed.merchantKey);
+  if (!rule?.ignore) return undefined;
+  return counterpartyAccountKey ? 'counterparty_account_rule' : 'merchant_rule';
+}
+
+export async function setCounterpartyIgnoreRule(
+  uid: string,
+  accountNumber: string,
+  accountHmacSecret: string,
+  ignore: boolean,
+): Promise<string | undefined> {
+  const key = accountRuleKey(accountNumber, accountHmacSecret);
+  await userRoot(uid).collection('category_rules').doc(key).set({
+    ignore,
+    matchType: 'counterparty_account',
+    counterpartyAccountLast4: maskAccount(accountNumber) || null,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return maskAccount(accountNumber);
 }
 
 export function safeIngestionId(sourceRef: string): string {
@@ -157,16 +188,27 @@ export async function classifyTransaction(
     firestoreTransaction.update(transactionRef, updates);
 
     const ruleKey = current.counterpartyAccountKey || current.merchantKey;
-    if (!action.ignore && ruleKey) {
+    if (ruleKey) {
       const ruleRef = root.collection('category_rules').doc(ruleKey);
-      firestoreTransaction.set(ruleRef, {
-        categoryId: action.categoryId || null,
-        kind,
-        matchType: current.counterpartyAccountKey ? 'counterparty_account' : 'merchant',
-        counterpartyAccountLast4: current.counterpartyAccountLast4 || null,
-        usageCount: FieldValue.increment(1),
-        updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
+      if (action.ignore) {
+        firestoreTransaction.set(ruleRef, {
+          ignore: true,
+          matchType: current.counterpartyAccountKey ? 'counterparty_account' : 'merchant',
+          counterpartyAccountLast4: current.counterpartyAccountLast4 || null,
+          usageCount: FieldValue.increment(1),
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      } else {
+        firestoreTransaction.set(ruleRef, {
+          ignore: false,
+          categoryId: action.categoryId || null,
+          kind,
+          matchType: current.counterpartyAccountKey ? 'counterparty_account' : 'merchant',
+          counterpartyAccountLast4: current.counterpartyAccountLast4 || null,
+          usageCount: FieldValue.increment(1),
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
     }
 
     return { ...current, ...updates, kind, category: action.categoryId || current.category } as StoredTransaction;

@@ -12,7 +12,10 @@ export default async (request: Request) => {
   initializeFinanceAdmin();
   try {
     const update = await request.json() as TelegramUpdate;
-    await handleTelegramUpdate(financeRuntimeConfig(), update);
+    await handleTelegramUpdate({
+      ...financeRuntimeConfig(),
+      accountHmacSecret: requiredEnv('ACCOUNT_HMAC_SECRET'),
+    }, update);
     return new Response('ok');
   } catch (error) {
     console.error('Telegram update failed', error);
