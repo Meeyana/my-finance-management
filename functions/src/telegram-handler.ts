@@ -82,9 +82,19 @@ export async function handleTelegramUpdate(
   }
 
   const message = update.message;
+  if (message?.text && String(message.chat.id) !== config.chatId) throw new Error('Wrong chat');
+  if (message?.text && /^\/(?:start|help)\b/i.test(message.text.trim())) {
+    await sendTelegramMessage(
+      config.botToken,
+      config.chatId,
+      '✅ Finance bot đã kết nối. Khi có giao dịch cần phân loại, hãy bấm category hoặc reply đúng tin nhắn đó.',
+      undefined,
+      message.message_id,
+    );
+    return 'handled';
+  }
   const repliedMessage = message?.reply_to_message;
   if (!message?.text || !repliedMessage) return 'ignored';
-  if (String(message.chat.id) !== config.chatId) throw new Error('Wrong chat');
 
   const transaction = await findTransactionByTelegramMessageId(config.uid, repliedMessage.message_id);
   if (!transaction?.id || transaction.status !== 'pending_category') {
