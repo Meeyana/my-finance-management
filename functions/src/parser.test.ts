@@ -76,3 +76,25 @@ test('parses a VIB HTML payload delivered by n8n', () => {
   assert.equal(parsed.sourceAccountLast4, '6789');
   assert.equal(parsed.merchant, 'SHOPEE VN');
 });
+
+test('parses a VIB domestic transfer email with đồng symbol and table fields', () => {
+  const parsed = parseN8nFinancePayload({
+    messageId: 'vib-transfer-html-1',
+    subject: 'Chuyển tiền nhanh đến tài khoản ngân hàng nội địa thành công',
+    text: [
+      'Ngày giao dịch 13:00 17/08/2026',
+      'Từ tài khoản 943524970',
+      'Đến tài khoản 0811000042065 - PHAN DINH TUAN',
+      'Số tiền 2,000 ₫',
+      'Diễn giải PHAN ĐÌNH TUẤN chuyen tien den PHAN DINH TUAN - 0811000042065',
+      'Hotline:19002200 (1.000 đồng/phút)',
+    ].join('\n'),
+  });
+
+  assert.ok(parsed);
+  assert.equal(parsed.amount, 2_000);
+  assert.equal(parsed.sourceAccountLast4, '4970');
+  assert.equal(parsed.counterpartyAccount, '0811000042065');
+  assert.equal(parsed.counterpartyAccountLast4, '2065');
+  assert.match(parsed.note, /PHAN ĐÌNH TUẤN chuyen tien den/);
+});

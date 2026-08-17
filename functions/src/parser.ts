@@ -26,6 +26,7 @@ function payloadText(payload: N8nFinancePayload): string {
 
 function parseAmount(text: string): number | null {
   const patterns = [
+    /(?:so tien(?: giao dich)?|gia tri giao dich|transaction amount|amount|tong tien)\s*[:\-]?\s*(?:vnd|dong|d)?\s*([+\-]?[\d][\d.,\s]*)/i,
     /(?:so tien(?: giao dich)?|gia tri giao dich|transaction amount|amount|tong tien)\s*[:\-]?\s*([+\-]?[\d.,\s]{3,})\s*(?:vnd|dong|d)\b/i,
     /(?:so tien(?: giao dich)?|gia tri giao dich|transaction amount|amount|tong tien)\s*[:\-]?\s*(?:vnd|dong|d)\b\s*([+\-]?[\d.,\s]{3,})/i,
     /([+\-]?[\d][\d.,\s]{2,})\s*(?:vnd|dong|d)\b/i,
@@ -97,8 +98,10 @@ export function parseN8nFinancePayload(payload: N8nFinancePayload): ParsedFinanc
     /(?:the tin dung|credit card|card number)\s*[:\-]?\s*(?:x+|\*+)?\s*([0-9]{4,20})/i,
   ])?.slice(-4);
   const merchant = firstMatch(rawText, [
-    /(?:Nội dung|Nội dung giao dịch|Mô tả|Merchant|Đơn vị chấp nhận thẻ|Địa điểm|Tại)(?:\s*[:\-]\s*|\s+)([^\n]{2,120})/i,
-  ]);
+    /(?:Diễn giải|Dien giai)\s*[:\-]?\s*([\s\S]{2,160}?)(?=\n\s*\n|$)/i,
+    /(?:Diễn giải|Dien giai|Nội dung|Nội dung giao dịch|Mô tả|Merchant)(?:\s*[:\-]\s*|\s+)([^\n]{2,120})/i,
+    /(?:Đơn vị chấp nhận thẻ|Địa điểm|Tại)(?:\s*[:\-]\s*|\s+)([^\n]{2,120})/i,
+  ])?.replace(/\s+/g, ' ').trim();
   const receivedAtValue = typeof payload.receivedAt === 'string' && /^\d+$/.test(payload.receivedAt)
     ? Number(payload.receivedAt)
     : payload.receivedAt;
