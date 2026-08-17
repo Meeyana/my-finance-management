@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseCounterpartyRuleCommand, parseTelegramReply } from './telegram-handler.js';
+import { parseCounterpartyRuleCommand, parseNoteRuleCommand, parseTelegramReply } from './telegram-handler.js';
 
 const categories = {
   eating: 'Ăn uống',
@@ -28,4 +28,20 @@ test('parses Telegram commands for the counterparty ignore list', () => {
     accountNumber: '0123456789',
   });
   assert.equal(parseCounterpartyRuleCommand('/ignore_stk 12345'), null);
+});
+
+test('parses Telegram commands for custom note keyword rules', () => {
+  const categories = { eating: 'Ăn uống', entertainment: 'Giải trí' };
+  assert.deepEqual(parseNoteRuleCommand('/rule cam -> ăn uống', categories), {
+    type: 'set',
+    term: 'cam',
+    categoryId: 'eating',
+  });
+  assert.deepEqual(parseNoteRuleCommand('/rule TD = Giải trí', categories), {
+    type: 'set',
+    term: 'TD',
+    categoryId: 'entertainment',
+  });
+  assert.deepEqual(parseNoteRuleCommand('/unrule cam', categories), { type: 'delete', term: 'cam' });
+  assert.equal(parseNoteRuleCommand('/rule cam -> unknown', categories)?.type, 'invalid');
 });

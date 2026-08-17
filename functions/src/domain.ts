@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import type { CategoryRule, StoredTransaction, TransactionKind } from './types.js';
+import type { NoteKeywordRule } from './types.js';
 
 export const DEFAULT_CATEGORIES: Record<string, string> = {
   eating: 'Ăn uống',
@@ -51,9 +52,18 @@ const CATEGORY_KEYWORD_RULES = [
   { term: 'Thể thao', categoryId: 'entertainment' },
 ].sort((left, right) => right.term.length - left.term.length);
 
-export function matchCategoryKeyword(value?: string): { term: string; categoryId: string } | undefined {
+export function matchCategoryKeyword(
+  value?: string,
+  customRules: NoteKeywordRule[] = [],
+): { term: string; categoryId: string } | undefined {
   const normalized = normalizeText(value || '');
   if (!normalized) return undefined;
+
+  const customMatch = [...customRules]
+    .sort((left, right) => right.term.length - left.term.length)
+    .find((rule) => ` ${normalized} `.includes(` ${normalizeText(rule.term)} `));
+  if (customMatch) return customMatch;
+
   return CATEGORY_KEYWORD_RULES.find((rule) => normalized.includes(normalizeText(rule.term)));
 }
 

@@ -55,6 +55,12 @@ export interface CategoryRule {
   matchType: 'counterparty_account' | 'merchant';
 }
 
+export interface NoteKeywordRule {
+  term: string;
+  categoryId: string;
+  updatedAt?: unknown;
+}
+
 export interface StoredTransaction {
   id?: string;
   amount: number;

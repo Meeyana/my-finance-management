@@ -5,6 +5,7 @@ import type {
   CategoryRule,
   FinanceAccount,
   ParsedFinanceTransaction,
+  NoteKeywordRule,
   StoredTransaction,
   TransactionKind,
 } from './types.js';
@@ -63,6 +64,44 @@ export async function setCounterpartyIgnoreRule(
   return maskAccount(accountNumber);
 }
 
+function noteKeywordRulesRef(uid: string): DocumentReference {
+  return userRoot(uid).collection('settings').doc('note_rules');
+}
+
+export async function getNoteKeywordRules(uid: string): Promise<NoteKeywordRule[]> {
+  const snapshot = await noteKeywordRulesRef(uid).get();
+  const rules = snapshot.data()?.rules;
+  if (!rules || typeof rules !== 'object') return [];
+  return Object.values(rules).filter((value): value is NoteKeywordRule => Boolean(
+    value && typeof value === 'object'
+      && typeof (value as NoteKeywordRule).term === 'string'
+      && typeof (value as NoteKeywordRule).categoryId === 'string',
+  ));
+}
+
+export async function setNoteKeywordRule(uid: string, term: string, categoryId: string): Promise<NoteKeywordRule> {
+  const normalizedTerm = term.trim();
+  if (!normalizedTerm) throw new Error('Keyword is required');
+  const rules = await getNoteKeywordRules(uid);
+  const nextRule: NoteKeywordRule = { term: normalizedTerm, categoryId, updatedAt: new Date().toISOString() };
+  const nextRules = Object.fromEntries([
+    ...rules.filter((rule) => rule.term.toLowerCase() !== normalizedTerm.toLowerCase()).map((rule) => [rule.term, rule]),
+    [normalizedTerm, nextRule],
+  ]);
+  await noteKeywordRulesRef(uid).set({ rules: nextRules, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  return nextRule;
+}
+
+export async function deleteNoteKeywordRule(uid: string, term: string): Promise<boolean> {
+  const rules = await getNoteKeywordRules(uid);
+  const nextRules = Object.fromEntries(
+    rules.filter((rule) => rule.term.toLowerCase() !== term.trim().toLowerCase()).map((rule) => [rule.term, rule]),
+  );
+  const changed = nextRules && Object.keys(nextRules).length !== rules.length;
+  if (changed) await noteKeywordRulesRef(uid).set({ rules: nextRules, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  return changed;
+}
+
 export function safeIngestionId(sourceRef: string): string {
   return createHash('sha256').update(sourceRef.trim()).digest('hex');
 }
@@ -99,7 +138,8 @@ export async function storeIngestedTransaction(input: StoreIngestionInput): Prom
     : undefined;
   const ruleKey = counterpartyAccountKey || input.parsed.merchantKey;
   const rule = await getCategoryRule(input.uid, ruleKey);
-  const keywordMatch = matchCategoryKeyword(input.parsed.note || input.parsed.merchant);
+  const customKeywordRules = await getNoteKeywordRules(input.uid);
+  const keywordMatch = matchCategoryKeyword(input.parsed.note || input.parsed.merchant, customKeywordRules);
 
   const resolved = applyCategoryRule(input.parsed.kind, rule, keywordMatch?.categoryId);
   const kind: TransactionKind = resolved.kind;

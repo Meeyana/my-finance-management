@@ -52,3 +52,11 @@ test('promotes a keyword-matched transfer to a posted expense', () => {
     needsCategory: false,
   });
 });
+
+test('custom keyword rules take precedence and match token boundaries', () => {
+  assert.deepEqual(matchCategoryKeyword('Thanh toán TD tháng này', [{ term: 'TD', categoryId: 'entertainment' }]), {
+    term: 'TD',
+    categoryId: 'entertainment',
+  });
+  assert.equal(matchCategoryKeyword('thanh toan tdd', [{ term: 'TD', categoryId: 'entertainment' }]), undefined);
+});

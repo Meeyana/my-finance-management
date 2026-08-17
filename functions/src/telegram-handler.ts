@@ -1,8 +1,10 @@
 import { normalizeAccountNumber, normalizeText } from './domain.js';
 import {
   classifyTransaction,
+  deleteNoteKeywordRule,
   findTransactionByTelegramActionToken,
   findTransactionByTelegramMessageId,
+  setNoteKeywordRule,
   setCounterpartyIgnoreRule,
 } from './repository.js';
 import {
@@ -22,12 +24,33 @@ export interface TelegramHandlerConfig {
 
 export type CounterpartyRuleCommand = { type: 'ignore' | 'allow'; accountNumber: string };
 
+export type NoteRuleCommand =
+  | { type: 'set'; term: string; categoryId: string }
+  | { type: 'delete'; term: string }
+  | { type: 'invalid'; term?: string };
+
 export function parseCounterpartyRuleCommand(text: string): CounterpartyRuleCommand | null {
   const match = text.trim().match(/^\/(ignore_stk|unignore_stk)(?:@[a-z0-9_]+)?\s+([0-9][0-9\s-]{5,23})$/i);
   if (!match) return null;
   const accountNumber = normalizeAccountNumber(match[2]);
   if (accountNumber.length < 6 || accountNumber.length > 24) return null;
   return { type: match[1].toLowerCase() === 'ignore_stk' ? 'ignore' : 'allow', accountNumber };
+}
+
+export function parseNoteRuleCommand(text: string, categories: Record<string, string>): NoteRuleCommand | null {
+  const trimmed = text.trim();
+  const removeMatch = trimmed.match(/^\/unrule(?:@[a-z0-9_]+)?\s+(.+)$/i);
+  if (removeMatch) {
+    const term = removeMatch[1].trim();
+    return term && term.length <= 40 ? { type: 'delete', term } : { type: 'invalid' };
+  }
+
+  const setMatch = trimmed.match(/^\/rule(?:@[a-z0-9_]+)?\s+(.+?)\s*(?:->|=|:)\s*(.+)$/i);
+  if (!setMatch) return null;
+  const term = setMatch[1].trim();
+  if (!term || term.length > 40) return { type: 'invalid' };
+  const categoryId = categoryFromReply(setMatch[2], categories);
+  return categoryId ? { type: 'set', term, categoryId } : { type: 'invalid', term };
 }
 
 function categoryFromReply(text: string, categories: Record<string, string>): string | null {
@@ -128,11 +151,43 @@ export async function handleTelegramUpdate(
     );
     return 'handled';
   }
+  if (message?.text && /^\/(?:rule|unrule)\b/i.test(message.text.trim())) {
+    const categories = await categoryNames(config.uid);
+    const noteRuleCommand = parseNoteRuleCommand(message.text, categories);
+    if (noteRuleCommand?.type === 'set') {
+      await setNoteKeywordRule(config.uid, noteRuleCommand.term, noteRuleCommand.categoryId);
+      await sendTelegramMessage(
+        config.botToken,
+        config.chatId,
+        `✅ Đã ghi nhớ từ khóa “${noteRuleCommand.term}” → “${categories[noteRuleCommand.categoryId]}”.`,
+        undefined,
+        message.message_id,
+      );
+    } else if (noteRuleCommand?.type === 'delete') {
+      const deleted = await deleteNoteKeywordRule(config.uid, noteRuleCommand.term);
+      await sendTelegramMessage(
+        config.botToken,
+        config.chatId,
+        deleted ? `✅ Đã xóa rule từ khóa “${noteRuleCommand.term}”.` : `Không tìm thấy rule “${noteRuleCommand.term}”.`,
+        undefined,
+        message.message_id,
+      );
+    } else {
+      await sendTelegramMessage(
+        config.botToken,
+        config.chatId,
+        'Cú pháp: /rule từ_khóa -> danh_mục hoặc /unrule từ_khóa. Ví dụ: /rule cam -> ăn uống',
+        undefined,
+        message.message_id,
+      );
+    }
+    return 'handled';
+  }
   if (message?.text && /^\/(?:start|help)\b/i.test(message.text.trim())) {
     await sendTelegramMessage(
       config.botToken,
       config.chatId,
-      '✅ Finance bot đã kết nối. Reply danh mục/Bỏ qua cho giao dịch hoặc dùng /ignore_stk 0123456789 và /unignore_stk 0123456789 để quản lý STK bỏ qua.',
+      '✅ Finance bot đã kết nối. Reply danh mục/Bỏ qua; dùng /rule cam -> ăn uống để thêm keyword hoặc /ignore_stk 0123456789 để bỏ qua STK.',
       undefined,
       message.message_id,
     );
