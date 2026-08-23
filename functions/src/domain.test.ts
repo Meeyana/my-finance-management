@@ -7,6 +7,7 @@ test('account rule key is stable for equivalent account formatting', () => {
   assert.equal(normalizeAccountNumber('0123 456-789'), '0123456789');
   assert.equal(accountRuleKey('0123 456-789', secret), accountRuleKey('0123456789', secret));
   assert.notEqual(accountRuleKey('0123456789', secret), accountRuleKey('0123456788', secret));
+  assert.equal(accountRuleKey('vqrqakdqq0814', secret), accountRuleKey('VQRQ-AKDQQ-0814', secret));
 });
 
 test('transfers and credit payments do not count as expenses', () => {

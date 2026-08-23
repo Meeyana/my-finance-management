@@ -83,7 +83,7 @@ function resultForRule(
   transaction: { counterpartyAccountKey?: string; merchantKey?: string },
   label: string,
 ): string {
-  if (transaction.counterpartyAccountKey) return `Đã gắn “${label}” và ghi nhớ rule STK.`;
+  if (transaction.counterpartyAccountKey) return `Đã gắn “${label}” và ghi nhớ người nhận.`;
   if (transaction.merchantKey) return `Đã gắn “${label}” và ghi nhớ merchant.`;
   return `Đã gắn “${label}” cho giao dịch này.`;
 }
@@ -110,12 +110,12 @@ export async function handleTelegramUpdate(
     } else if (action === 'internal') {
       const transaction = await classifyTransaction(config.uid, transactionId, { kind: 'transfer' });
       resultLabel = transaction.counterpartyAccountKey
-        ? 'Đã đánh dấu chuyển nội bộ và ghi nhớ rule STK.'
+        ? 'Đã đánh dấu chuyển nội bộ và ghi nhớ người nhận.'
         : 'Đã đánh dấu chuyển nội bộ.';
     } else if (action === 'ignore') {
       const transaction = await classifyTransaction(config.uid, transactionId, { ignore: true });
       resultLabel = transaction.counterpartyAccountKey
-        ? 'Đã bỏ qua và ghi nhớ rule STK.'
+        ? 'Đã bỏ qua và ghi nhớ người nhận.'
         : transaction.merchantKey
           ? 'Đã bỏ qua và ghi nhớ merchant.'
           : 'Đã bỏ qua giao dịch.';
@@ -232,12 +232,12 @@ export async function handleTelegramUpdate(
   if (replyAction.type === 'internal') {
     const updated = await classifyTransaction(config.uid, transaction.id, { kind: 'transfer' });
     resultLabel = updated.counterpartyAccountKey
-      ? 'Đã đánh dấu chuyển nội bộ và ghi nhớ rule STK.'
+      ? 'Đã đánh dấu chuyển nội bộ và ghi nhớ người nhận.'
       : 'Đã đánh dấu chuyển nội bộ.';
   } else if (replyAction.type === 'ignore') {
     const updated = await classifyTransaction(config.uid, transaction.id, { ignore: true });
     resultLabel = updated.counterpartyAccountKey
-      ? 'Đã bỏ qua và ghi nhớ rule STK.'
+      ? 'Đã bỏ qua và ghi nhớ người nhận.'
       : updated.merchantKey
         ? 'Đã bỏ qua và ghi nhớ merchant.'
         : 'Đã bỏ qua giao dịch.';

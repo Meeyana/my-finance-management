@@ -34,6 +34,7 @@ export interface ParsedFinanceTransaction {
   sourceAccountLast4?: string;
   counterpartyAccount?: string;
   counterpartyAccountLast4?: string;
+  counterpartyDisplay?: string;
   institution?: string;
   confidence: number;
 }
@@ -74,6 +75,7 @@ export interface StoredTransaction {
   accountId?: string;
   counterpartyAccountKey?: string;
   counterpartyAccountLast4?: string;
+  counterpartyDisplay?: string;
   merchantKey?: string;
   source?: string;
   telegramNotifiedAt?: unknown;

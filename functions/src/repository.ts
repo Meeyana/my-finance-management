@@ -161,6 +161,7 @@ export async function storeIngestedTransaction(input: StoreIngestionInput): Prom
     merchantKey: input.parsed.merchantKey,
     counterpartyAccountKey,
     counterpartyAccountLast4: input.parsed.counterpartyAccountLast4,
+    counterpartyDisplay: input.parsed.counterpartyDisplay,
     source: 'n8n',
     sourceRef: input.sourceRef,
     parserVersion: input.parserVersion,
@@ -177,11 +178,27 @@ export async function storeIngestedTransaction(input: StoreIngestionInput): Prom
       firestoreTransaction.get(transactionRef),
       firestoreTransaction.get(eventRef),
     ]);
-    if (existingTransaction.exists || existingEvent.data()?.status === 'processed') {
+    if (existingTransaction.exists) {
+      const existingData = existingTransaction.data() || {};
+      const identityBackfill: Record<string, unknown> = {};
+      if (!existingData.counterpartyAccountKey && transaction.counterpartyAccountKey) {
+        identityBackfill.counterpartyAccountKey = transaction.counterpartyAccountKey;
+        identityBackfill.counterpartyAccountLast4 = transaction.counterpartyAccountLast4 || null;
+        identityBackfill.counterpartyDisplay = transaction.counterpartyDisplay || null;
+        identityBackfill.parserVersion = input.parserVersion;
+      }
+      if (Object.keys(identityBackfill).length > 0) {
+        firestoreTransaction.update(transactionRef, identityBackfill);
+      }
       storedTransaction = {
         id: transactionId,
-        ...(existingTransaction.data() || transaction),
+        ...existingData,
+        ...identityBackfill,
       } as StoredTransaction;
+      return false;
+    }
+    if (existingEvent.data()?.status === 'processed') {
+      storedTransaction = { id: transactionId, ...transaction } as StoredTransaction;
       return false;
     }
     firestoreTransaction.create(transactionRef, transaction);
@@ -236,6 +253,7 @@ export async function classifyTransaction(
           ignore: true,
           matchType: current.counterpartyAccountKey ? 'counterparty_account' : 'merchant',
           counterpartyAccountLast4: current.counterpartyAccountLast4 || null,
+          counterpartyDisplay: current.counterpartyDisplay || null,
           usageCount: FieldValue.increment(1),
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
@@ -246,6 +264,7 @@ export async function classifyTransaction(
           kind,
           matchType: current.counterpartyAccountKey ? 'counterparty_account' : 'merchant',
           counterpartyAccountLast4: current.counterpartyAccountLast4 || null,
+          counterpartyDisplay: current.counterpartyDisplay || null,
           usageCount: FieldValue.increment(1),
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });

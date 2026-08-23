@@ -16,7 +16,7 @@ import {
   requiredEnv,
 } from './_runtime.mjs';
 
-const PARSER_VERSION = 'n8n-vi-finance-v1';
+const PARSER_VERSION = 'n8n-vi-finance-v2';
 const MAX_BODY_BYTES = 1_000_000;
 
 function json(body: Record<string, unknown>, status = 200): Response {

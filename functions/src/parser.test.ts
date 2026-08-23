@@ -107,5 +107,29 @@ test('parses a VIB domestic transfer email with đồng symbol and table fields'
   assert.equal(parsed.sourceAccountLast4, '4970');
   assert.equal(parsed.counterpartyAccount, '0811000042065');
   assert.equal(parsed.counterpartyAccountLast4, '2065');
+  assert.equal(parsed.counterpartyDisplay, '0811000042065 - PHAN DINH TUAN');
   assert.match(parsed.note, /PHAN ĐÌNH TUẤN chuyen tien den/);
+});
+
+test('parses and learns an alphanumeric VIB recipient identifier', () => {
+  const parsed = parseN8nFinancePayload({
+    messageId: 'vib-vietqr-transfer-1',
+    subject: 'Chuyển tiền nhanh đến tài khoản ngân hàng nội địa thành công',
+    text: [
+      'Ngày giao dịch 20:38 23/08/2026',
+      'Từ tài khoản 943524970',
+      'Đến tài khoản VQRQAKDQQ0814 - HO KINH DOANH PHAP UYEN',
+      'Tại ngân hàng Quân đội',
+      'Số tiền 150,000 ₫',
+      'Diễn giải VQRLOAMB20260702153010815',
+    ].join('\n'),
+  });
+
+  assert.ok(parsed);
+  assert.equal(parsed.amount, 150_000);
+  assert.equal(parsed.kind, 'pending_transfer');
+  assert.equal(parsed.counterpartyAccount, 'VQRQAKDQQ0814');
+  assert.equal(parsed.counterpartyAccountLast4, '0814');
+  assert.equal(parsed.counterpartyDisplay, 'VQRQAKDQQ0814 - HO KINH DOANH PHAP UYEN');
+  assert.equal(parsed.confidence, 0.85);
 });

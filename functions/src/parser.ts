@@ -50,6 +50,50 @@ function firstMatch(text: string, patterns: RegExp[]): string | undefined {
   return undefined;
 }
 
+function parseCounterpartyReference(rawText: string, normalizedText: string): {
+  identifier?: string;
+  display?: string;
+} {
+  const lines = rawText.split(/\r?\n/).map((line) => line.trim());
+  const labelPattern = /^(?:Đến tài khoản|Den tai khoan|Tài khoản nhận|Tai khoan nhan|Đến STK|Den STK|STK nhận|STK nhan|Beneficiary account|Destination account)\s*:?\s*(.*)$/i;
+  let display: string | undefined;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const labelMatch = lines[index].match(labelPattern);
+    if (!labelMatch) continue;
+    const candidate = (labelMatch[1] || lines.slice(index + 1).find(Boolean) || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const leadingCandidate = candidate.split(/\s+-\s+/, 1)[0];
+    const normalizedCandidate = leadingCandidate.replace(/[^0-9a-z]/gi, '');
+    // Avoid matching the email subject "... đến tài khoản ngân hàng nội địa ...".
+    if (normalizedCandidate.length >= 6 && /\d/.test(normalizedCandidate)) {
+      display = candidate;
+      break;
+    }
+  }
+
+  if (display) {
+    // VIB may return a VietQR/customer identifier instead of a numeric account,
+    // for example: "VQRQAKDQQ0814 - HO KINH DOANH PHAP UYEN".
+    // The part before " - " is the stable recipient identifier; the full value
+    // is retained for display and audit purposes.
+    const leadingIdentifier = display.match(/^([0-9a-z][0-9a-z._/\-]{5,63})(?:\s+-\s+|$)/i)?.[1];
+    return {
+      identifier: leadingIdentifier || display,
+      display,
+    };
+  }
+
+  const legacyNumericAccount = firstMatch(normalizedText, [
+    /(?:tai khoan nhan|den tai khoan|den stk|stk nhan|beneficiary account|destination account)\s*[:\-]?\s*([0-9]{6,24})/i,
+  ]);
+  return {
+    identifier: legacyNumericAccount,
+    display: legacyNumericAccount,
+  };
+}
+
 function parseOccurredAt(text: string, fallback: Date): Date {
   const match = text.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if (!match) return fallback;
@@ -91,9 +135,8 @@ export function parseN8nFinancePayload(payload: N8nFinancePayload): ParsedFinanc
     /(?:tai khoan nguon|tu tai khoan|so tai khoan|stk|the)\s*[:\-]?\s*(?:x+|\*+)?\s*([0-9]{4,20})/i,
     /(?:account|card)\s*[:\-]?\s*(?:x+|\*+)?\s*([0-9]{4,20})/i,
   ]);
-  const counterpartyAccount = firstMatch(normalized, [
-    /(?:tai khoan nhan|den tai khoan|den stk|stk nhan|beneficiary account|destination account)\s*[:\-]?\s*([0-9]{6,24})/i,
-  ]);
+  const counterparty = parseCounterpartyReference(rawText, normalized);
+  const counterpartyAccount = counterparty.identifier;
   const creditCardLast4 = firstMatch(normalized, [
     /(?:the tin dung|credit card|card number)\s*[:\-]?\s*(?:x+|\*+)?\s*([0-9]{4,20})/i,
   ])?.slice(-4);
@@ -124,6 +167,7 @@ export function parseN8nFinancePayload(payload: N8nFinancePayload): ParsedFinanc
         : sourceAccount?.slice(-4)),
     counterpartyAccount,
     counterpartyAccountLast4: counterpartyAccount?.slice(-4),
+    counterpartyDisplay: counterparty.display,
     confidence: counterpartyAccount || merchant ? 0.85 : 0.55,
   };
 }

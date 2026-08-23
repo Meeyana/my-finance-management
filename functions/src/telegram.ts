@@ -119,9 +119,11 @@ export async function notifyPendingCategory(
     { text: '🚫 Bỏ qua', callback_data: `ignore|${actionToken}` },
   ]);
 
-  const accountText = transaction.counterpartyAccountLast4
-    ? `STK nhận: •••• ${transaction.counterpartyAccountLast4}`
-    : 'Không đọc được STK nhận';
+  const accountText = transaction.counterpartyDisplay
+    ? `Người nhận: ${escapeHtml(transaction.counterpartyDisplay)}`
+    : transaction.counterpartyAccountLast4
+      ? `STK nhận: •••• ${transaction.counterpartyAccountLast4}`
+      : 'Không đọc được định danh người nhận';
   const result = await sendTelegramMessage(
     token,
     chatId,
@@ -132,7 +134,7 @@ export async function notifyPendingCategory(
       `📝 ${escapeHtml(transaction.note || 'Không có nội dung')}`,
       '',
       transaction.counterpartyAccountKey
-        ? 'Bấm nút hoặc reply tin nhắn này bằng tên danh mục. Lựa chọn sẽ được nhớ cho đúng STK này ở các lần sau.'
+        ? 'Bấm nút hoặc reply tin nhắn này bằng tên danh mục. Lựa chọn sẽ được nhớ cho đúng người nhận này ở các lần sau.'
         : transaction.merchantKey
           ? 'Bấm nút hoặc reply bằng tên danh mục. Lựa chọn sẽ được nhớ cho merchant này ở các lần sau.'
           : 'Không có STK hoặc merchant để học rule; lựa chọn chỉ áp dụng cho giao dịch này.',
