@@ -68,6 +68,28 @@ test('parses a VIB credit card purchase and matches the card last four digits', 
   assert.equal(parsed.merchant, 'GRAB HANOI VN');
 });
 
+test('does not classify a COFFEE merchant as a fee', () => {
+  const parsed = parseN8nFinancePayload({
+    messageId: 'vib-credit-coffee-1',
+    subject: 'Thông báo giao dịch Thẻ tín dụng VIB Online Plus 2in1',
+    sourceAccountLast4: '8340',
+    text: [
+      'Số thẻ: 5138***8340',
+      'Chủ thẻ: PHAN DINH TUAN',
+      'Giao dịch: Thanh toán dịch vụ - hàng hóa',
+      'Giá trị: 135,000 VND',
+      'Vào lúc: 19:45 24/08/2026',
+      'Tại SOCO COFFEE - UNG VAN',
+    ].join('\n'),
+  });
+
+  assert.ok(parsed);
+  assert.equal(parsed.amount, 135_000);
+  assert.equal(parsed.sourceAccountLast4, '8340');
+  assert.equal(parsed.merchant, 'SOCO COFFEE - UNG VAN');
+  assert.equal(parsed.kind, 'expense');
+});
+
 test('parses a VIB HTML payload delivered by n8n', () => {
   const parsed = parseN8nFinancePayload({
     messageId: 'vib-html-1',
