@@ -175,6 +175,63 @@ function retryLatestCreditEmail() {
   }
 }
 
+/**
+ * Backfill các email tín dụng gần đây trong FINANCE_GMAIL_QUERY.
+ * Hàm cố ý gửi lại cả email từng xử lý; backend chống trùng bằng messageId.
+ */
+function retryRecentCreditEmails() {
+  const config = getConfig();
+  const candidates = findCandidateMessages(config)
+    .filter(function (item) {
+      return extractEmailAddress(item.message.getFrom()) === CREDIT_SENDER;
+    })
+    .sort(function (left, right) {
+      return left.message.getDate().getTime() - right.message.getDate().getTime();
+    })
+    .slice(-config.maxMessages);
+
+  if (!candidates.length) throw new Error('No VIB credit email found');
+
+  let seenIds = loadSeenIds();
+  const results = [];
+
+  for (const item of candidates) {
+    const messageId = item.message.getId();
+    seenIds = seenIds.filter(function (id) {
+      return id !== messageId;
+    });
+
+    try {
+      const payload = buildFinancePayload(item.message, item.thread);
+      const result = postToFinance(payload, config);
+      if (result.remember) seenIds.push(messageId);
+      results.push({
+        messageId: messageId,
+        occurredAt: payload.occurredAt || payload.receivedAt,
+        amount: payload.amount || null,
+        merchant: payload.merchant || null,
+        httpCode: result.httpCode,
+        errorCode: result.errorCode,
+        success: result.success,
+        response: result.body,
+      });
+    } catch (error) {
+      results.push({
+        messageId: messageId,
+        success: false,
+        error: String(error),
+      });
+    }
+  }
+
+  saveSeenIds(seenIds);
+  Logger.log(JSON.stringify({
+    attempted: results.length,
+    succeeded: results.filter(function (result) { return result.success; }).length,
+    results: results,
+  }, null, 2));
+}
+
 function findLatestCreditMessage(config) {
   const candidates = findCandidateMessages(config).filter(function (item) {
     return extractEmailAddress(item.message.getFrom()) === CREDIT_SENDER;
