@@ -1,11 +1,16 @@
 const ALLOWED_SENDERS = [
   'info@myvib.vib.com.vn',
+  'myvib.info@vib.com.vn',
   'info@card.vib.com.vn',
 ];
 
 const CREDIT_SENDER = 'info@card.vib.com.vn';
 const CREDIT_DISCOVERY_QUERY =
   'newer_than:3d subject:"Thông báo giao dịch thẻ tín dụng"';
+const DEBIT_DISCOVERY_QUERIES = [
+  'newer_than:3d subject:"Chuyển tiền đến tài khoản VIB thành công"',
+  'newer_than:3d subject:"Chuyển tiền nhanh đến tài khoản ngân hàng nội địa thành công"',
+];
 
 const PROP = {
   ingestUrl: 'FINANCE_INGEST_URL',
@@ -28,7 +33,7 @@ function getConfig() {
     ingestSecret: ingestSecret,
     gmailQuery:
       props.getProperty(PROP.gmailQuery) ||
-      'newer_than:3d {from:info@myvib.vib.com.vn from:info@card.vib.com.vn}',
+      'newer_than:3d {from:info@myvib.vib.com.vn from:myvib.info@vib.com.vn from:info@card.vib.com.vn}',
     maxMessages: Number(props.getProperty(PROP.maxMessages) || 20),
   };
 }
@@ -40,7 +45,7 @@ function setup() {
   props.setProperties({
     [PROP.ingestUrl]: 'https://tp-finance.netlify.app/api/finance/ingest',
     [PROP.gmailQuery]:
-      'newer_than:3d {from:info@myvib.vib.com.vn from:info@card.vib.com.vn}',
+      'newer_than:3d {from:info@myvib.vib.com.vn from:myvib.info@vib.com.vn from:info@card.vib.com.vn}',
     [PROP.maxMessages]: '20',
   }, false);
 
@@ -176,6 +181,7 @@ function diagnoseRecentVibEmails() {
         sender: sender,
         subject: subject,
         officialVibSender: isOfficialVibSender(sender),
+        recognizedDebit: isDebitEmail(sender, subject),
         recognizedCredit: isCreditEmail(sender, subject),
       });
     }
@@ -232,7 +238,31 @@ function retryRecentCreditEmails() {
     })
     .slice(0, config.maxMessages);
 
-  if (!candidates.length) throw new Error('No VIB credit email found');
+  return retryFinanceCandidates(candidates, config, 'No VIB credit email found');
+}
+
+/**
+ * Gửi lại mọi giao dịch VIB của ngày hôm nay theo múi giờ Việt Nam.
+ * Bao gồm cả debit và credit; backend chống trùng bằng Gmail messageId.
+ */
+function retryTodayFinanceEmails() {
+  const config = getConfig();
+  const timeZone = 'Asia/Ho_Chi_Minh';
+  const today = Utilities.formatDate(new Date(), timeZone, 'yyyy-MM-dd');
+  const candidates = findCandidateMessages(config)
+    .filter(function (item) {
+      return Utilities.formatDate(item.message.getDate(), timeZone, 'yyyy-MM-dd') === today;
+    })
+    .sort(function (left, right) {
+      return right.message.getDate().getTime() - left.message.getDate().getTime();
+    })
+    .slice(0, config.maxMessages);
+
+  return retryFinanceCandidates(candidates, config, 'No VIB finance email found today');
+}
+
+function retryFinanceCandidates(candidates, config, emptyMessage) {
+  if (!candidates.length) throw new Error(emptyMessage);
 
   let seenIds = loadSeenIds();
   const results = [];
@@ -288,7 +318,7 @@ function findLatestCreditMessage(config) {
 }
 
 function findCandidateMessages(config) {
-  const queries = [config.gmailQuery, CREDIT_DISCOVERY_QUERY];
+  const queries = [config.gmailQuery, CREDIT_DISCOVERY_QUERY].concat(DEBIT_DISCOVERY_QUERIES);
   const threadIds = {};
   const threads = [];
   const result = [];
@@ -309,7 +339,7 @@ function findCandidateMessages(config) {
       if (messageIds[messageId]) continue;
       const sender = extractEmailAddress(message.getFrom());
       const subject = message.getSubject() || '';
-      if (!ALLOWED_SENDERS.includes(sender) && !isCreditEmail(sender, subject)) continue;
+      if (!ALLOWED_SENDERS.includes(sender) && !isFinanceEmail(sender, subject)) continue;
       messageIds[messageId] = true;
       result.push({ thread: thread, message: message });
     }
@@ -509,6 +539,18 @@ function isCreditEmail(sender, subject) {
   if (!isOfficialVibSender(sender)) return false;
   if (sender === CREDIT_SENDER) return true;
   return normalizeEmailText(subject).includes('giao dich the tin dung');
+}
+
+function isDebitEmail(sender, subject) {
+  if (!isOfficialVibSender(sender)) return false;
+  const normalizedSubject = normalizeEmailText(subject);
+  return normalizedSubject.startsWith('chuyen tien') &&
+    normalizedSubject.includes('tai khoan') &&
+    normalizedSubject.includes('thanh cong');
+}
+
+function isFinanceEmail(sender, subject) {
+  return isCreditEmail(sender, subject) || isDebitEmail(sender, subject);
 }
 
 function extractEmailAddress(value) {
