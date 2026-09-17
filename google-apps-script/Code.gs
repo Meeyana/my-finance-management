@@ -4,6 +4,8 @@ const ALLOWED_SENDERS = [
 ];
 
 const CREDIT_SENDER = 'info@card.vib.com.vn';
+const CREDIT_DISCOVERY_QUERY =
+  'newer_than:3d subject:"Thông báo giao dịch thẻ tín dụng"';
 
 const PROP = {
   ingestUrl: 'FINANCE_INGEST_URL',
@@ -149,6 +151,43 @@ function previewLatestCreditEmail() {
 }
 
 /**
+ * Chẩn đoán email VIB gần đây chỉ bằng metadata, không gửi backend.
+ * Dùng khi email mới không xuất hiện trong preview/retry.
+ */
+function diagnoseRecentVibEmails() {
+  const rows = [];
+  const messageIds = {};
+
+  for (const thread of GmailApp.search('newer_than:2d', 0, 100)) {
+    for (const message of thread.getMessages()) {
+      const messageId = message.getId();
+      if (messageIds[messageId]) continue;
+      const sender = extractEmailAddress(message.getFrom());
+      const subject = message.getSubject() || '';
+      const normalizedSubject = normalizeEmailText(subject);
+      if (!isOfficialVibSender(sender) &&
+          !normalizedSubject.includes('giao dich the') &&
+          !normalizedSubject.includes('vib')) continue;
+
+      messageIds[messageId] = true;
+      rows.push({
+        messageId: messageId,
+        receivedAt: message.getDate().toISOString(),
+        sender: sender,
+        subject: subject,
+        officialVibSender: isOfficialVibSender(sender),
+        recognizedCredit: isCreditEmail(sender, subject),
+      });
+    }
+  }
+
+  rows.sort(function (left, right) {
+    return String(right.receivedAt).localeCompare(String(left.receivedAt));
+  });
+  Logger.log(JSON.stringify({ found: rows.length, emails: rows.slice(0, 30) }, null, 2));
+}
+
+/**
  * Gửi lại email tín dụng mới nhất dù messageId từng bị đánh dấu đã xử lý.
  * Backend chống trùng theo Gmail messageId nên chạy lại an toàn.
  */
@@ -183,12 +222,15 @@ function retryRecentCreditEmails() {
   const config = getConfig();
   const candidates = findCandidateMessages(config)
     .filter(function (item) {
-      return extractEmailAddress(item.message.getFrom()) === CREDIT_SENDER;
+      return isCreditEmail(
+        extractEmailAddress(item.message.getFrom()),
+        item.message.getSubject()
+      );
     })
     .sort(function (left, right) {
-      return left.message.getDate().getTime() - right.message.getDate().getTime();
+      return right.message.getDate().getTime() - left.message.getDate().getTime();
     })
-    .slice(-config.maxMessages);
+    .slice(0, config.maxMessages);
 
   if (!candidates.length) throw new Error('No VIB credit email found');
 
@@ -213,7 +255,7 @@ function retryRecentCreditEmails() {
         httpCode: result.httpCode,
         errorCode: result.errorCode,
         success: result.success,
-        response: result.body,
+        response: summarizeFinanceResponse(result.body),
       });
     } catch (error) {
       results.push({
@@ -234,7 +276,10 @@ function retryRecentCreditEmails() {
 
 function findLatestCreditMessage(config) {
   const candidates = findCandidateMessages(config).filter(function (item) {
-    return extractEmailAddress(item.message.getFrom()) === CREDIT_SENDER;
+    return isCreditEmail(
+      extractEmailAddress(item.message.getFrom()),
+      item.message.getSubject()
+    );
   });
   candidates.sort(function (left, right) {
     return right.message.getDate().getTime() - left.message.getDate().getTime();
@@ -243,13 +288,29 @@ function findLatestCreditMessage(config) {
 }
 
 function findCandidateMessages(config) {
-  const threads = GmailApp.search(config.gmailQuery, 0, 50);
+  const queries = [config.gmailQuery, CREDIT_DISCOVERY_QUERY];
+  const threadIds = {};
+  const threads = [];
   const result = [];
 
+  for (const query of queries) {
+    for (const thread of GmailApp.search(query, 0, 50)) {
+      const threadId = thread.getId();
+      if (threadIds[threadId]) continue;
+      threadIds[threadId] = true;
+      threads.push(thread);
+    }
+  }
+
+  const messageIds = {};
   for (const thread of threads) {
     for (const message of thread.getMessages()) {
+      const messageId = message.getId();
+      if (messageIds[messageId]) continue;
       const sender = extractEmailAddress(message.getFrom());
-      if (!ALLOWED_SENDERS.includes(sender)) continue;
+      const subject = message.getSubject() || '';
+      if (!ALLOWED_SENDERS.includes(sender) && !isCreditEmail(sender, subject)) continue;
+      messageIds[messageId] = true;
       result.push({ thread: thread, message: message });
     }
   }
@@ -278,7 +339,7 @@ function buildFinancePayload(message, thread) {
     receivedAt: message.getDate().toISOString(),
   };
 
-  return sender === CREDIT_SENDER ? parseCreditPayload(common) : common;
+  return isCreditEmail(sender, subject) ? parseCreditPayload(common) : common;
 }
 
 function parseCreditPayload(payload) {
@@ -411,6 +472,43 @@ function logPostResult(payload, result) {
     remember: result.remember,
     response: result.body,
   }));
+}
+
+function summarizeFinanceResponse(body) {
+  try {
+    const value = JSON.parse(body);
+    return {
+      created: value.created,
+      transactionId: value.transactionId,
+      status: value.status,
+      kind: value.kind,
+      category: value.category,
+      telegramNotified: value.telegramNotified,
+      error: value.error,
+      reason: value.reason,
+    };
+  } catch (error) {
+    return String(body || '').substring(0, 300);
+  }
+}
+
+function normalizeEmailText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+}
+
+function isOfficialVibSender(sender) {
+  return /@(?:[a-z0-9-]+\.)*vib\.com\.vn$/i.test(String(sender || ''));
+}
+
+function isCreditEmail(sender, subject) {
+  if (!isOfficialVibSender(sender)) return false;
+  if (sender === CREDIT_SENDER) return true;
+  return normalizeEmailText(subject).includes('giao dich the tin dung');
 }
 
 function extractEmailAddress(value) {
